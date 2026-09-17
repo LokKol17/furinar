@@ -1,0 +1,25 @@
+[package]
+name = "furinar"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+native-windows-gui = { version = "1.0.13", features = ["tray-notification"] }
+native-windows-derive = "1.0.5"
+rodio = { version = "0.19", features = ["mp3", "wav", "flac", "vorbis"] }
+mp3-duration = "0.1"
+rand = "0.8"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+winapi = { version = "0.3", features = [
+    "winuser",
+    "wingdi",
+    "windef",
+    "minwindef",
+    "basetsd",
+    "dwmapi",
+    "uxtheme",
+] }
+
+[build-dependencies]
+embed-manifest = "1.4"
