@@ -18,7 +18,8 @@ MP3, WAV, FLAC, OGG/Vorbis, M4A
 - **Shuffle** — reprodução aleatória
 - **Seek** — barra de progresso com busca temporal
 - **Volume** — controle deslizante com persistência
-- **Configuração persistente** — pasta, volume, modo de loop e shuffle são salvos automaticamente
+- **Controles multimídia do sistema** — play/pause, anterior/próxima, stop e seek pelos botões de mídia do teclado (SMTC no Windows, ex.: centro de ações e teclas de mídia)
+- **Configuração persistente** — pasta, volume, modo de loop, shuffle, faixa atual e posição são salvos automaticamente
 
 ## Requisitos
 
@@ -48,8 +49,12 @@ As preferências são salvas automaticamente no arquivo `furinar_config.json`, n
   "pasta": "E:\\Music",
   "volume": 0.11666667,
   "modo_loop": 2,
-  "shuffle": true
+  "shuffle": true,
+  "indice_atual": 5,
+  "tempo_atual": 42
 }
 ```
 
 Edite o arquivo manualmente se necessário — o player lê as configurações ao iniciar.
+
+Ao reabrir, o player restaura automaticamente a última faixa tocada e a posição de reprodução.

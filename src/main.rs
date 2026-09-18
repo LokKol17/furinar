@@ -5,15 +5,20 @@ use std::fs::{self, File};
 use std::io::BufReader;
 use std::path::PathBuf;
 use std::rc::Rc;
+use std::sync::mpsc::{self, Receiver, Sender};
 use std::time::Duration;
 
 use rand::seq::SliceRandom;
 use rodio::{Decoder, OutputStream, Sink, Source};
 use serde::{Deserialize, Serialize};
 use slint::{ModelRc, SharedString, Timer, TimerMode, VecModel};
+use souvlaki::{
+    MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, MediaPosition, PlatformConfig,
+    SeekDirection,
+};
 
 // ---------------------------------------------------------------------
-// Config (idêntico às versões anteriores)
+// Config
 // ---------------------------------------------------------------------
 
 #[derive(Serialize, Deserialize, Default)]
@@ -88,7 +93,7 @@ fn texto_shuffle(ligado: bool) -> &'static str {
 }
 
 // ---------------------------------------------------------------------
-// Estado de áudio/playlist (a mesma lógica de sempre, sem nenhum código de UI)
+// Estado de áudio/playlist
 // ---------------------------------------------------------------------
 
 struct EstadoAudio {
@@ -103,6 +108,8 @@ struct EstadoAudio {
     modo_loop: u8,
     modo_shuffle: bool,
     arquivos: Vec<String>,
+    faixa_controles: Option<String>,
+    status_controles: Option<MediaPlayback>,
 }
 
 impl Default for EstadoAudio {
@@ -119,6 +126,8 @@ impl Default for EstadoAudio {
             modo_loop: 0,
             modo_shuffle: false,
             arquivos: Vec::new(),
+            faixa_controles: None,
+            status_controles: None,
         }
     }
 }
@@ -262,6 +271,36 @@ fn tocar_anterior(estado: &mut EstadoAudio, ui: &MainWindow) {
     tocar_indice(estado, ui, anterior);
 }
 
+fn alternar_play_pause(estado: &EstadoAudio, ui: &MainWindow) {
+    if let Some((_, ref sink)) = estado.audio_player {
+        if sink.is_paused() {
+            sink.play();
+            ui.set_texto_play_pause("Pause".into());
+        } else {
+            sink.pause();
+            ui.set_texto_play_pause("Play".into());
+        }
+    }
+}
+
+fn pausar(estado: &EstadoAudio, ui: &MainWindow) {
+    if let Some((_, ref sink)) = estado.audio_player {
+        if !sink.is_paused() {
+            sink.pause();
+            ui.set_texto_play_pause("Play".into());
+        }
+    }
+}
+
+fn reproduzir(estado: &EstadoAudio, ui: &MainWindow) {
+    if let Some((_, ref sink)) = estado.audio_player {
+        if sink.is_paused() {
+            sink.play();
+            ui.set_texto_play_pause("Pause".into());
+        }
+    }
+}
+
 fn stop_music(estado: &mut EstadoAudio, ui: &MainWindow) {
     estado.audio_player = None;
     estado.tempo_decorrido = 0.0;
@@ -382,12 +421,134 @@ fn atualizar_progresso(estado: &mut EstadoAudio, ui: &MainWindow) {
 }
 
 // ---------------------------------------------------------------------
-// main: cria a UI, conecta os callbacks, inicia o timer, roda o app
+// Controles multimídia do sistema (SMTC no Windows)
+// ---------------------------------------------------------------------
+
+fn obter_hwnd(ui: &MainWindow) -> Option<*mut std::ffi::c_void> {
+    use raw_window_handle::HasWindowHandle;
+    let handle = ui.window().window_handle();
+    let raw = handle.window_handle().ok()?.as_raw();
+    match raw {
+        raw_window_handle::RawWindowHandle::Win32(win32) => {
+            Some(win32.hwnd.get() as *mut std::ffi::c_void)
+        }
+        _ => None,
+    }
+}
+
+fn configurar_controles_multimidia(
+    ui: &MainWindow,
+    tx: Sender<MediaControlEvent>,
+) -> Option<MediaControls> {
+    let hwnd = obter_hwnd(ui)?;
+    let config = PlatformConfig {
+        display_name: "Furinar",
+        dbus_name: "furinar",
+        hwnd: Some(hwnd),
+    };
+    let mut controles = MediaControls::new(config).ok()?;
+    controles
+        .attach(move |event| {
+            let _ = tx.send(event);
+        })
+        .ok()?;
+    Some(controles)
+}
+
+fn processar_eventos_multimidia(
+    rx: &Receiver<MediaControlEvent>,
+    estado: &mut EstadoAudio,
+    ui: &MainWindow,
+) {
+    for evento in rx.try_iter() {
+        match evento {
+            MediaControlEvent::Play => reproduzir(estado, ui),
+            MediaControlEvent::Pause => pausar(estado, ui),
+            MediaControlEvent::Toggle => alternar_play_pause(estado, ui),
+            MediaControlEvent::Next => tocar_proxima_manual(estado, ui),
+            MediaControlEvent::Previous => tocar_anterior(estado, ui),
+            MediaControlEvent::Stop => stop_music(estado, ui),
+            MediaControlEvent::Seek(direcao) => {
+                let delta = match direcao {
+                    SeekDirection::Forward => 10i64,
+                    SeekDirection::Backward => -10i64,
+                };
+                let alvo = (estado.tempo_decorrido as i64 + delta)
+                    .clamp(0, estado.duracao_total_secs as i64) as u64;
+                executar_seek(estado, ui, alvo);
+            }
+            MediaControlEvent::SeekBy(direcao, duracao) => {
+                let delta = match direcao {
+                    SeekDirection::Forward => duracao.as_secs() as i64,
+                    SeekDirection::Backward => -(duracao.as_secs() as i64),
+                };
+                let alvo = (estado.tempo_decorrido as i64 + delta)
+                    .clamp(0, estado.duracao_total_secs as i64) as u64;
+                executar_seek(estado, ui, alvo);
+            }
+            MediaControlEvent::SetPosition(pos) => {
+                executar_seek(estado, ui, pos.0.as_secs());
+            }
+            MediaControlEvent::SetVolume(v) => {
+                let vol = v.clamp(0.0, 1.0) as f32;
+                estado.volume_atual = vol;
+                ui.set_volume(vol);
+                if let Some((_, ref sink)) = estado.audio_player {
+                    sink.set_volume(vol);
+                }
+                salvar_configuracao(estado);
+            }
+            _ => {}
+        }
+    }
+}
+
+fn sincronizar_controles(controles: &Rc<RefCell<Option<MediaControls>>>, estado: &mut EstadoAudio) {
+    let mut guard = controles.borrow_mut();
+    let Some(c) = guard.as_mut() else { return };
+
+    // Metadados: atualiza apenas quando a faixa muda
+    if estado.arquivo_atual != estado.faixa_controles {
+        if let Some(nome) = &estado.arquivo_atual {
+            let _ = c.set_metadata(MediaMetadata {
+                title: Some(nome),
+                album: None,
+                artist: None,
+                cover_url: None,
+                duration: Some(Duration::from_secs(estado.duracao_total_secs)),
+            });
+        }
+        estado.faixa_controles = estado.arquivo_atual.clone();
+    }
+
+    // Status: atualiza quando muda (a cada segundo ou em play/pause/stop)
+    let progresso = MediaPosition(Duration::from_secs(estado.ultimo_segundo));
+    let playback = match &estado.audio_player {
+        Some((_, sink)) if !sink.is_paused() => MediaPlayback::Playing {
+            progress: Some(progresso),
+        },
+        Some((_, _)) => MediaPlayback::Paused {
+            progress: Some(progresso),
+        },
+        None => MediaPlayback::Stopped,
+    };
+    if estado.status_controles.as_ref() != Some(&playback) {
+        let _ = c.set_playback(playback.clone());
+        estado.status_controles = Some(playback);
+    }
+}
+
+// ---------------------------------------------------------------------
+// main
 // ---------------------------------------------------------------------
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let ui = MainWindow::new()?;
     let estado = Rc::new(RefCell::new(EstadoAudio::default()));
+
+    // Canal para os eventos dos controles multimídia do sistema (SMTC)
+    let (tx, rx) = mpsc::channel::<MediaControlEvent>();
+    let controles = Rc::new(RefCell::new(None::<MediaControls>));
 
     {
         let mut e = estado.borrow_mut();
@@ -418,13 +579,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let estado = estado.clone();
         let ui_fraca = ui.as_weak();
         ui.on_abrir_pasta(move || {
-            // O diálogo é modal/bloqueante - chamamos ele ANTES de pegar
-            // o borrow_mut do estado, pra não correr risco de um borrow
-            // duplo se algo repintar a janela nesse meio-tempo.
             if let Some(caminho) = rfd::FileDialog::new().pick_folder() {
                 if let Some(ui) = ui_fraca.upgrade() {
                     let mut e = estado.borrow_mut();
-                    carregar_pasta(&mut e, &ui, caminho.clone());
+                    carregar_pasta(&mut e, &ui, caminho);
                     salvar_configuracao(&e);
                 }
             }
@@ -446,16 +604,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let ui_fraca = ui.as_weak();
         ui.on_play_pause(move || {
             if let Some(ui) = ui_fraca.upgrade() {
-                let e = estado.borrow();
-                if let Some((_, ref sink)) = e.audio_player {
-                    if sink.is_paused() {
-                        sink.play();
-                        ui.set_texto_play_pause("Pause".into());
-                    } else {
-                        sink.pause();
-                        ui.set_texto_play_pause("Play".into());
-                    }
-                }
+                alternar_play_pause(&estado.borrow(), &ui);
             }
         });
     }
@@ -540,14 +689,27 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
     }
 
-    // Timer de progresso - substitui o SetTimer/WM_TIMER manual das versões anteriores.
+    // Timer de progresso
     let timer = Timer::default();
     {
         let estado = estado.clone();
         let ui_fraca = ui.as_weak();
+        let controles = controles.clone();
         timer.start(TimerMode::Repeated, Duration::from_millis(250), move || {
             if let Some(ui) = ui_fraca.upgrade() {
-                atualizar_progresso(&mut estado.borrow_mut(), &ui);
+                let mut e = estado.borrow_mut();
+
+                // Configura os controles multimídia na primeira oportunidade:
+                // a janela winit só existe depois que o event loop inicia
+                if controles.borrow().is_none() {
+                    if let Some(c) = configurar_controles_multimidia(&ui, tx.clone()) {
+                        *controles.borrow_mut() = Some(c);
+                    }
+                }
+
+                processar_eventos_multimidia(&rx, &mut e, &ui);
+                atualizar_progresso(&mut e, &ui);
+                sincronizar_controles(&controles, &mut e);
             }
         });
     }
@@ -562,7 +724,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     ui.run()?;
 
-    // Salva novamente ao encerrar (caso o close request não tenha disparado)
+    // Salva novamente ao encerrar (fallback)
     salvar_configuracao(&estado.borrow());
 
     Ok(())

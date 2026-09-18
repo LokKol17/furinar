@@ -9,6 +9,7 @@ slint = { version = "1", default-features = false, features = [
     "compat-1-2",
     "backend-winit",
     "renderer-winit-software",
+    "raw-window-handle-06",
 ] }
 rfd = "0.15"
 rodio = { version = "0.19", features = ["mp3", "wav", "flac", "vorbis"] }
@@ -16,6 +17,8 @@ mp3-duration = "0.1"
 rand = "0.8"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+souvlaki = "0.8"
+raw-window-handle = "0.6"
 
 [build-dependencies]
 slint-build = "1"
