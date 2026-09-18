@@ -1,0 +1,122 @@
+import { Button, Slider } from "std-widgets.slint";
+
+export component MainWindow inherits Window {
+    title: "Furinar Audio Player";
+    width: 660px;
+    height: 700px;
+    background: #16161a;
+
+    in-out property <string> texto_play_pause: "Play";
+    in-out property <string> texto_loop: "Loop: Desl";
+    in-out property <string> texto_shuffle: "Shuffle: Desl";
+    in-out property <float> volume: 0.8;
+    in-out property <float> progresso: 0.0;
+    in-out property <string> texto_tempo: "00:00 / 00:00";
+    in property <[string]> musicas: [];
+    in-out property <int> indice_selecionado: -1;
+
+    callback abrir_pasta();
+    callback anterior();
+    callback play_pause();
+    callback parar();
+    callback proxima();
+    callback alternar_loop();
+    callback alternar_shuffle();
+    callback volume_mudou(float);
+    callback progresso_mudou(float);
+    callback musica_selecionada(int);
+
+    VerticalLayout {
+        padding: 20px;
+        spacing: 12px;
+
+        HorizontalLayout {
+            spacing: 8px;
+            height: 44px;
+
+            Button {
+                text: "Abrir";
+                clicked => { abrir_pasta(); }
+            }
+            Button {
+                text: "Ant";
+                clicked => { anterior(); }
+            }
+            Button {
+                text: texto_play_pause;
+                clicked => { play_pause(); }
+            }
+            Button {
+                text: "Stop";
+                clicked => { parar(); }
+            }
+            Button {
+                text: "Prox";
+                clicked => { proxima(); }
+            }
+            Button {
+                text: texto_loop;
+                clicked => { alternar_loop(); }
+            }
+            Button {
+                text: texto_shuffle;
+                clicked => { alternar_shuffle(); }
+            }
+        }
+
+        HorizontalLayout {
+            spacing: 12px;
+            height: 28px;
+
+            Slider {
+                width: 120px;
+                minimum: 0;
+                maximum: 1;
+                value <=> volume;
+                changed(v) => { volume_mudou(v); }
+            }
+            Slider {
+                width: 360px;
+                minimum: 0;
+                maximum: 1;
+                value <=> progresso;
+                changed(v) => { progresso_mudou(v); }
+            }
+            Text {
+                text: texto_tempo;
+                color: #e8e8ec;
+                vertical-alignment: center;
+            }
+        }
+
+        Rectangle {
+            background: #201e24;
+            border-radius: 6px;
+            clip: true;
+
+            lista := Flickable {
+                viewport-height: musicas.length * 24px;
+
+                VerticalLayout {
+                    alignment: start;
+
+                    for musica[i] in musicas: Rectangle {
+                        height: 24px;
+                        background: i == indice_selecionado ? #5a5df0 : transparent;
+
+                        Text {
+                            text: musica;
+                            color: #e8e8ec;
+                            vertical-alignment: center;
+                            x: 8px;
+                        }
+
+                        TouchArea {
+                            clicked => { musica_selecionada(i); }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
