@@ -2,5 +2,7 @@
   "pasta": "E:\\Music",
   "volume": 0.11666667,
   "modo_loop": 2,
-  "shuffle": true
+  "shuffle": true,
+  "indice_atual": 7,
+  "tempo_atual": 89
 }

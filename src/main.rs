@@ -22,6 +22,8 @@ struct AppConfig {
     volume: f32,
     modo_loop: u8,
     shuffle: bool,
+    indice_atual: Option<usize>,
+    tempo_atual: Option<u64>,
 }
 
 impl AppConfig {
@@ -34,6 +36,8 @@ impl AppConfig {
                 volume: 0.8,
                 modo_loop: 0,
                 shuffle: false,
+                indice_atual: None,
+                tempo_atual: None,
             }
         }
     }
@@ -128,6 +132,12 @@ fn salvar_configuracao(estado: &EstadoAudio) {
         volume: estado.volume_atual,
         modo_loop: estado.modo_loop,
         shuffle: estado.modo_shuffle,
+        indice_atual: estado.indice_atual,
+        tempo_atual: if estado.tempo_decorrido > 0.0 {
+            Some(estado.tempo_decorrido as u64)
+        } else {
+            None
+        },
     };
     config.salvar();
 }
@@ -152,7 +162,6 @@ fn carregar_pasta(estado: &mut EstadoAudio, ui: &MainWindow, caminho: PathBuf) {
 
     let modelo: Vec<SharedString> = estado.arquivos.iter().map(|s| s.as_str().into()).collect();
     ui.set_musicas(ModelRc::new(VecModel::from(modelo)));
-    salvar_configuracao(estado);
 }
 
 fn executar_seek(estado: &mut EstadoAudio, ui: &MainWindow, alvo_secs: u64) {
@@ -300,6 +309,38 @@ fn proxima_musica_auto(estado: &mut EstadoAudio, ui: &MainWindow) {
     }
 }
 
+fn restaurar_posicao(estado: &mut EstadoAudio, ui: &MainWindow) {
+    let config = AppConfig::carregar();
+
+    // Só restaura se houver índice e tempo salvos
+    let (indice, tempo) = match (config.indice_atual, config.tempo_atual) {
+        (Some(i), Some(t)) => (i, t),
+        _ => return,
+    };
+
+    let pasta_str = match config.pasta {
+        Some(p) => p,
+        None => return,
+    };
+
+    let caminho = PathBuf::from(&pasta_str);
+    if !caminho.exists() {
+        return;
+    }
+
+    // Recarrega a playlist
+    carregar_pasta(estado, ui, caminho);
+
+    // Verifica se o arquivo ainda existe na lista
+    if indice >= estado.arquivos.len() {
+        return;
+    }
+
+    // Toca a faixa salva na posição recuperada
+    tocar_indice(estado, ui, indice);
+    executar_seek(estado, ui, tempo);
+}
+
 fn atualizar_progresso(estado: &mut EstadoAudio, ui: &MainWindow) {
     let total_secs = estado.duracao_total_secs;
 
@@ -367,6 +408,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
+    // Tenta restaurar a posição anterior (música + tempo)
+    {
+        let mut e = estado.borrow_mut();
+        restaurar_posicao(&mut e, &ui);
+    }
+
     {
         let estado = estado.clone();
         let ui_fraca = ui.as_weak();
@@ -377,7 +424,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             if let Some(caminho) = rfd::FileDialog::new().pick_folder() {
                 if let Some(ui) = ui_fraca.upgrade() {
                     let mut e = estado.borrow_mut();
-                    carregar_pasta(&mut e, &ui, caminho);
+                    carregar_pasta(&mut e, &ui, caminho.clone());
+                    salvar_configuracao(&e);
                 }
             }
         });
@@ -504,6 +552,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
     }
 
+    // Salva o estado final ao fechar
+    {
+        let estado = estado.clone();
+        ui.on_fecha_janela(move || {
+            salvar_configuracao(&estado.borrow());
+        });
+    }
+
     ui.run()?;
+
+    // Salva novamente ao encerrar (caso o close request não tenha disparado)
+    salvar_configuracao(&estado.borrow());
+
     Ok(())
 }
