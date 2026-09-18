@@ -29,6 +29,8 @@ struct AppConfig {
     shuffle: bool,
     indice_atual: Option<usize>,
     tempo_atual: Option<u64>,
+    #[serde(default)]
+    escanear_subpastas: bool,
 }
 
 impl AppConfig {
@@ -43,6 +45,7 @@ impl AppConfig {
                 shuffle: false,
                 indice_atual: None,
                 tempo_atual: None,
+                escanear_subpastas: false,
             }
         }
     }
@@ -107,6 +110,7 @@ struct EstadoAudio {
     ultimo_segundo: u64,
     modo_loop: u8,
     modo_shuffle: bool,
+    escanear_subpastas: bool,
     arquivos: Vec<String>,
     faixa_controles: Option<String>,
     status_controles: Option<MediaPlayback>,
@@ -125,6 +129,7 @@ impl Default for EstadoAudio {
             ultimo_segundo: 0,
             modo_loop: 0,
             modo_shuffle: false,
+            escanear_subpastas: false,
             arquivos: Vec::new(),
             faixa_controles: None,
             status_controles: None,
@@ -141,6 +146,7 @@ fn salvar_configuracao(estado: &EstadoAudio) {
         volume: estado.volume_atual,
         modo_loop: estado.modo_loop,
         shuffle: estado.modo_shuffle,
+        escanear_subpastas: estado.escanear_subpastas,
         indice_atual: estado.indice_atual,
         tempo_atual: if estado.tempo_decorrido > 0.0 {
             Some(estado.tempo_decorrido as u64)
@@ -151,26 +157,62 @@ fn salvar_configuracao(estado: &EstadoAudio) {
     config.salvar();
 }
 
+fn coletar_arquivos_audio(
+    diretorio: &std::path::Path,
+    raiz: &std::path::Path,
+    recursivo: bool,
+    saida: &mut Vec<String>,
+) {
+    if let Ok(entradas) = fs::read_dir(diretorio) {
+        for entrada in entradas.flatten() {
+            let path = entrada.path();
+            if path.is_file() && e_arquivo_audio(&path) {
+                // Guarda a ruta relativa à raiz para que `pasta.join(...)`
+                // funcione também com arquivos em subpastas
+                if let Ok(rel) = path.strip_prefix(raiz) {
+                    if let Some(nome) = rel.to_str() {
+                        saida.push(nome.replace('\\', "/"));
+                    }
+                }
+            } else if recursivo && path.is_dir() {
+                coletar_arquivos_audio(&path, raiz, recursivo, saida);
+            }
+        }
+    }
+}
+
 fn carregar_pasta(estado: &mut EstadoAudio, ui: &MainWindow, caminho: PathBuf) {
     estado.arquivos.clear();
     estado.pasta_atual = Some(caminho.clone());
 
-    if let Ok(entradas) = fs::read_dir(&caminho) {
-        let mut arquivos = Vec::new();
-        for entrada in entradas.flatten() {
-            let path = entrada.path();
-            if path.is_file() && e_arquivo_audio(&path) {
-                if let Some(nome) = path.file_name().and_then(|n| n.to_str()) {
-                    arquivos.push(nome.to_string());
-                }
-            }
-        }
-        arquivos.sort();
-        estado.arquivos = arquivos;
-    }
+    let mut arquivos = Vec::new();
+    coletar_arquivos_audio(&caminho, &caminho, estado.escanear_subpastas, &mut arquivos);
+    arquivos.sort();
+    estado.arquivos = arquivos;
 
     let modelo: Vec<SharedString> = estado.arquivos.iter().map(|s| s.as_str().into()).collect();
     ui.set_musicas(ModelRc::new(VecModel::from(modelo)));
+}
+
+fn reescaneiar_pasta(estado: &mut EstadoAudio, ui: &MainWindow) {
+    if let Some(pasta) = estado.pasta_atual.clone() {
+        let atual = estado.arquivo_atual.clone();
+        carregar_pasta(estado, ui, pasta);
+
+        // Mantiene a faixa atual seleccionada na nova lista
+        if let Some(nome) = atual {
+            if let Some(pos) = estado.arquivos.iter().position(|a| *a == nome) {
+                estado.indice_atual = Some(pos);
+                ui.set_indice_selecionado(pos as i32);
+            } else {
+                // A faixa atual já não está na playlist
+                estado.arquivo_atual = None;
+                estado.indice_atual = None;
+                ui.set_indice_selecionado(-1);
+                stop_music(estado, ui);
+            }
+        }
+    }
 }
 
 fn executar_seek(estado: &mut EstadoAudio, ui: &MainWindow, alvo_secs: u64) {
@@ -556,10 +598,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         e.volume_atual = config.volume;
         e.modo_loop = config.modo_loop;
         e.modo_shuffle = config.shuffle;
+        e.escanear_subpastas = config.escanear_subpastas;
 
         ui.set_volume(config.volume);
         ui.set_texto_loop(texto_loop(config.modo_loop).into());
         ui.set_texto_shuffle(texto_shuffle(config.shuffle).into());
+        ui.set_escanear_subpastas(config.escanear_subpastas);
 
         if let Some(pasta_str) = config.pasta {
             let caminho = PathBuf::from(pasta_str);
@@ -651,6 +695,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 e.modo_shuffle = !e.modo_shuffle;
                 ui.set_texto_shuffle(texto_shuffle(e.modo_shuffle).into());
                 salvar_configuracao(&e);
+            }
+        });
+    }
+
+    {
+        let estado = estado.clone();
+        let ui_fraca = ui.as_weak();
+        ui.on_alternar_escanear_subpastas(move |ligado| {
+            if let Some(ui) = ui_fraca.upgrade() {
+                let mut e = estado.borrow_mut();
+                e.escanear_subpastas = ligado;
+                salvar_configuracao(&e);
+                reescaneiar_pasta(&mut e, &ui);
             }
         });
     }

@@ -1,4 +1,4 @@
-import { Button, Slider } from "std-widgets.slint";
+import { Button, Slider, CheckBox } from "std-widgets.slint";
 
 export component MainWindow inherits Window {
     title: "Furinar Audio Player";
@@ -14,6 +14,7 @@ export component MainWindow inherits Window {
     in-out property <string> texto_tempo: "00:00 / 00:00";
     in property <[string]> musicas: [];
     in-out property <int> indice_selecionado: -1;
+    in-out property <bool> escanear_subpastas: false;
 
     callback abrir_pasta();
     callback anterior();
@@ -26,6 +27,7 @@ export component MainWindow inherits Window {
     callback progresso_mudou(float);
     callback musica_selecionada(int);
     callback fecha_janela();
+    callback alternar_escanear_subpastas(bool);
 
     VerticalLayout {
         padding: 20px;
@@ -62,6 +64,10 @@ export component MainWindow inherits Window {
             Button {
                 text: texto_shuffle;
                 clicked => { alternar_shuffle(); }
+            }
+            Button {
+                text: "Config";
+                clicked => { config_popup.show(); }
             }
         }
 
@@ -116,6 +122,43 @@ export component MainWindow inherits Window {
                             clicked => { musica_selecionada(i); }
                         }
                     }
+                }
+            }
+        }
+    }
+
+    config_popup := PopupWindow {
+        x: 170px;
+        y: 265px;
+
+        Rectangle {
+            background: #201e24;
+            border-radius: 8px;
+            border-width: 1px;
+            border-color: #3a3a40;
+
+            VerticalLayout {
+                padding: 16px;
+                spacing: 10px;
+
+                Text {
+                    text: "Configurações";
+                    font-size: 16px;
+                    font-weight: 700;
+                    color: #e8e8ec;
+                }
+
+                CheckBox {
+                    text: "Escaneia subpastas";
+                    checked <=> escanear_subpastas;
+                    toggled => { alternar_escanear_subpastas(self.checked); }
+                }
+
+                Text {
+                    text: "Inclui arquivos de áudio de subpastas ao abrir uma pasta.";
+                    font-size: 12px;
+                    color: #9a9aa0;
+                    wrap: word-wrap;
                 }
             }
         }

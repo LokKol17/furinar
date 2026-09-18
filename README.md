@@ -12,13 +12,15 @@ MP3, WAV, FLAC, OGG/Vorbis, M4A
 
 ### Funcionalidades
 
-- **Playlist por pasta** — escaneia os arquivos de áudio de um diretório e ordena alfabeticamente
+- **Playlist por pasta** — escanea los archivos de audio de un directorio y los ordena alfabéticamente (opcionalmente incluye subcarpetas)
 - **Controles básicos** — Play/Pause, Stop, Anterior, Próxima
-- **Loop** — desligado, repetir faixa ou repetir toda a playlist
-- **Shuffle** — reprodução aleatória
-- **Seek** — barra de progresso com busca temporal
-- **Volume** — controle deslizante com persistência
-- **Controles multimídia do sistema** — play/pause, anterior/próxima, stop e seek pelos botões de mídia do teclado (SMTC no Windows, ex.: centro de ações e teclas de mídia)
+- **Loop** — desligado, repetir faixa o repetir toda la playlist
+- **Shuffle** — reproducción aleatoria
+- **Seek** — barra de progreso con búsqueda temporal
+- **Volume** — control deslizante con persistencia
+- **Menú de configuración** — opción para escanear subcarpetas recursivamente
+- **Controles multimídia del sistema** — play/pause, anterior/próxima, stop y seek por los botones de medios del teclado (SMTC en Windows, ej.: centro de acciones y teclas de medios)
+- **Configuración persistente** — carpeta, volumen, modo de loop, shuffle, escaneo de subcarpetas, pista actual y posición se guardan automáticamente
 - **Configuração persistente** — pasta, volume, modo de loop, shuffle, faixa atual e posição são salvos automaticamente
 
 ## Requisitos
@@ -50,6 +52,7 @@ As preferências são salvas automaticamente no arquivo `furinar_config.json`, n
   "volume": 0.11666667,
   "modo_loop": 2,
   "shuffle": true,
+  "escanear_subpastas": true,
   "indice_atual": 5,
   "tempo_atual": 42
 }
