@@ -20,6 +20,8 @@ MP3, WAV, FLAC, OGG/Vorbis, M4A
 - **Volume** — control deslizante con persistencia
 - **Menú de configuración** — opción para escanear subcarpetas recursivamente
 - **Controles multimídia del sistema** — play/pause, anterior/próxima, stop y seek por los botones de medios del teclado (SMTC en Windows, ej.: centro de acciones y teclas de medios)
+- **Tags ID3/Vorbis** — lê título e artista das tags e exibe "Artista - Título" na lista (com fallback para o nome do arquivo quando não há tag)
+- **Busca/filtro** — filtra a playlist por título ou artista, ignorando acentos e maiúsculas; Anterior/Próxima navegam dentro do resultado filtrado
 - **Configuración persistente** — carpeta, volumen, modo de loop, shuffle, escaneo de subcarpetas, pista actual y posición se guardan automáticamente
 - **Configuração persistente** — pasta, volume, modo de loop, shuffle, faixa atual e posição são salvos automaticamente
 

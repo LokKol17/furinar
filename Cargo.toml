@@ -13,6 +13,8 @@ slint = { version = "1", default-features = false, features = [
 ] }
 rfd = "0.15"
 rodio = { version = "0.19", features = ["mp3", "wav", "flac", "vorbis"] }
+lofty = "0.25"
+unicode-normalization = "0.1"
 mp3-duration = "0.1"
 rand = "0.8"
 serde = { version = "1.0", features = ["derive"] }

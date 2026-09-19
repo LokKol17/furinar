@@ -8,6 +8,9 @@ use std::rc::Rc;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::time::Duration;
 
+use lofty::config::ParseOptions;
+use lofty::prelude::*;
+use lofty::probe::Probe;
 use rand::seq::SliceRandom;
 use rodio::{Decoder, OutputStream, Sink, Source};
 use serde::{Deserialize, Serialize};
@@ -16,6 +19,8 @@ use souvlaki::{
     MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, MediaPosition, PlatformConfig,
     SeekDirection,
 };
+use unicode_normalization::UnicodeNormalization;
+use unicode_normalization::char::is_combining_mark;
 
 // ---------------------------------------------------------------------
 // Config
@@ -96,6 +101,64 @@ fn texto_shuffle(ligado: bool) -> &'static str {
 }
 
 // ---------------------------------------------------------------------
+// Informações de faixa (tags ID3/Vorbis)
+// ---------------------------------------------------------------------
+
+#[derive(Clone)]
+struct TrackInfo {
+    path: String,            // relativo à pasta raiz
+    titulo: String,          // tag title ou fallback do nome do arquivo
+    artista: Option<String>, // tag artist (se houver)
+    chave_busca: String,     // título + artista normalizados (sem acento, minúsculo)
+}
+
+/// Normaliza texto para busca: remove acentos e passa para minúsculas, de modo
+/// que "cancao" encontre "canção".
+fn normalizar_busca(texto: &str) -> String {
+    texto
+        .nfd()
+        .filter(|c| !is_combining_mark(*c))
+        .collect::<String>()
+        .to_lowercase()
+}
+
+/// Lê título e artista das tags. O título cai para o nome do arquivo quando
+/// não há tag.
+fn ler_tags(caminho: &std::path::Path) -> (String, Option<String>) {
+    // Lê apenas as tags (sem propriedades nem capa) para manter o scan rápido
+    let opcoes = ParseOptions::new()
+        .read_properties(false)
+        .read_cover_art(false);
+
+    let mut titulo = None;
+    let mut artista = None;
+
+    if let Ok(tagged) = Probe::open(caminho).and_then(|p| p.options(opcoes).read()) {
+        if let Some(tag) = tagged.primary_tag().or_else(|| tagged.first_tag()) {
+            titulo = tag
+                .title()
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty());
+            artista = tag
+                .artist()
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty());
+        }
+    }
+
+    // Fallback: nome do arquivo sem extensão
+    let titulo = titulo.unwrap_or_else(|| {
+        caminho
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("")
+            .replace('_', " ")
+    });
+
+    (titulo, artista)
+}
+
+// ---------------------------------------------------------------------
 // Estado de áudio/playlist
 // ---------------------------------------------------------------------
 
@@ -111,7 +174,11 @@ struct EstadoAudio {
     modo_loop: u8,
     modo_shuffle: bool,
     escanear_subpastas: bool,
-    arquivos: Vec<String>,
+    tracks: Vec<TrackInfo>,
+    /// Mapeia posição na lista visível -> índice em `tracks`.
+    indices_visiveis: Vec<usize>,
+    /// Texto atual da busca (título/artista).
+    filtro: String,
     faixa_controles: Option<String>,
     status_controles: Option<MediaPlayback>,
 }
@@ -130,7 +197,9 @@ impl Default for EstadoAudio {
             modo_loop: 0,
             modo_shuffle: false,
             escanear_subpastas: false,
-            arquivos: Vec::new(),
+            tracks: Vec::new(),
+            indices_visiveis: Vec::new(),
+            filtro: String::new(),
             faixa_controles: None,
             status_controles: None,
         }
@@ -161,17 +230,26 @@ fn coletar_arquivos_audio(
     diretorio: &std::path::Path,
     raiz: &std::path::Path,
     recursivo: bool,
-    saida: &mut Vec<String>,
+    saida: &mut Vec<TrackInfo>,
 ) {
     if let Ok(entradas) = fs::read_dir(diretorio) {
         for entrada in entradas.flatten() {
             let path = entrada.path();
             if path.is_file() && e_arquivo_audio(&path) {
-                // Guarda a ruta relativa à raiz para que `pasta.join(...)`
-                // funcione também com arquivos em subpastas
                 if let Ok(rel) = path.strip_prefix(raiz) {
                     if let Some(nome) = rel.to_str() {
-                        saida.push(nome.replace('\\', "/"));
+                        let (titulo, artista) = ler_tags(&path);
+                        let mut chave = titulo.clone();
+                        if let Some(a) = &artista {
+                            chave.push(' ');
+                            chave.push_str(a);
+                        }
+                        saida.push(TrackInfo {
+                            path: nome.replace('\\', "/"),
+                            titulo,
+                            artista,
+                            chave_busca: normalizar_busca(&chave),
+                        });
                     }
                 }
             } else if recursivo && path.is_dir() {
@@ -181,17 +259,54 @@ fn coletar_arquivos_audio(
     }
 }
 
+/// Texto exibido na lista: "Artista - Título" quando há artista.
+fn texto_exibicao(track: &TrackInfo) -> String {
+    match &track.artista {
+        Some(artista) => format!("{} - {}", artista, track.titulo),
+        None => track.titulo.clone(),
+    }
+}
+
+/// Marca na UI a posição visível da faixa atual (-1 se ela estiver filtrada).
+fn atualizar_selecao_visivel(estado: &EstadoAudio, ui: &MainWindow) {
+    let pos = estado
+        .indice_atual
+        .and_then(|idx| estado.indices_visiveis.iter().position(|&i| i == idx));
+    ui.set_indice_selecionado(pos.map_or(-1, |p| p as i32));
+}
+
+/// Reconstrói a lista visível aplicando o filtro atual e atualiza a seleção.
+fn atualizar_lista(estado: &mut EstadoAudio, ui: &MainWindow) {
+    let filtro = normalizar_busca(&estado.filtro);
+
+    estado.indices_visiveis = estado
+        .tracks
+        .iter()
+        .enumerate()
+        .filter(|(_, t)| filtro.is_empty() || t.chave_busca.contains(filtro.as_str()))
+        .map(|(i, _)| i)
+        .collect();
+
+    let modelo: Vec<SharedString> = estado
+        .indices_visiveis
+        .iter()
+        .map(|&i| texto_exibicao(&estado.tracks[i]).into())
+        .collect();
+    ui.set_musicas(ModelRc::new(VecModel::from(modelo)));
+
+    atualizar_selecao_visivel(estado, ui);
+}
+
 fn carregar_pasta(estado: &mut EstadoAudio, ui: &MainWindow, caminho: PathBuf) {
-    estado.arquivos.clear();
+    estado.tracks.clear();
     estado.pasta_atual = Some(caminho.clone());
 
-    let mut arquivos = Vec::new();
-    coletar_arquivos_audio(&caminho, &caminho, estado.escanear_subpastas, &mut arquivos);
-    arquivos.sort();
-    estado.arquivos = arquivos;
+    let mut tracks = Vec::new();
+    coletar_arquivos_audio(&caminho, &caminho, estado.escanear_subpastas, &mut tracks);
+    tracks.sort_by(|a, b| a.path.cmp(&b.path));
+    estado.tracks = tracks;
 
-    let modelo: Vec<SharedString> = estado.arquivos.iter().map(|s| s.as_str().into()).collect();
-    ui.set_musicas(ModelRc::new(VecModel::from(modelo)));
+    atualizar_lista(estado, ui);
 }
 
 fn reescaneiar_pasta(estado: &mut EstadoAudio, ui: &MainWindow) {
@@ -199,19 +314,19 @@ fn reescaneiar_pasta(estado: &mut EstadoAudio, ui: &MainWindow) {
         let atual = estado.arquivo_atual.clone();
         carregar_pasta(estado, ui, pasta);
 
-        // Mantiene a faixa atual seleccionada na nova lista
+        // Mantém a faixa atual seleccionada na nova lista
         if let Some(nome) = atual {
-            if let Some(pos) = estado.arquivos.iter().position(|a| *a == nome) {
+            if let Some(pos) = estado.tracks.iter().position(|t| t.path == nome) {
                 estado.indice_atual = Some(pos);
-                ui.set_indice_selecionado(pos as i32);
             } else {
                 // A faixa atual já não está na playlist
                 estado.arquivo_atual = None;
                 estado.indice_atual = None;
-                ui.set_indice_selecionado(-1);
                 stop_music(estado, ui);
             }
         }
+
+        atualizar_lista(estado, ui);
     }
 }
 
@@ -295,22 +410,32 @@ fn executar_seek(estado: &mut EstadoAudio, ui: &MainWindow, alvo_secs: u64) {
 }
 
 fn tocar_indice(estado: &mut EstadoAudio, ui: &MainWindow, index: usize) {
-    if let Some(nome) = estado.arquivos.get(index).cloned() {
-        estado.arquivo_atual = Some(nome);
+    if let Some(track) = estado.tracks.get(index).cloned() {
+        estado.arquivo_atual = Some(track.path.clone());
         estado.indice_atual = Some(index);
-        ui.set_indice_selecionado(index as i32);
+        atualizar_selecao_visivel(estado, ui);
         executar_seek(estado, ui, 0);
     }
 }
 
 fn tocar_anterior(estado: &mut EstadoAudio, ui: &MainWindow) {
-    let total = estado.arquivos.len();
-    if total == 0 {
-        return;
-    }
-    let atual = estado.indice_atual.unwrap_or(0);
-    let anterior = if atual == 0 { total - 1 } else { atual - 1 };
-    tocar_indice(estado, ui, anterior);
+    // Navega dentro da lista visível, respeitando o filtro atual.
+    let alvo = {
+        let visiveis = &estado.indices_visiveis;
+        if visiveis.is_empty() {
+            return;
+        }
+        let pos = estado
+            .indice_atual
+            .and_then(|idx| visiveis.iter().position(|&i| i == idx));
+        match pos {
+            Some(0) => visiveis[visiveis.len() - 1],
+            Some(p) => visiveis[p - 1],
+            // Faixa atual fora do filtro: começa pela última visível
+            None => visiveis[visiveis.len() - 1],
+        }
+    };
+    tocar_indice(estado, ui, alvo);
 }
 
 fn alternar_play_pause(estado: &EstadoAudio, ui: &MainWindow) {
@@ -353,33 +478,41 @@ fn stop_music(estado: &mut EstadoAudio, ui: &MainWindow) {
 }
 
 fn tocar_proxima_manual(estado: &mut EstadoAudio, ui: &MainWindow) {
-    let total = estado.arquivos.len();
-    if total == 0 {
-        return;
-    }
-    let atual = estado.indice_atual.unwrap_or(0);
-    let proximo = if estado.modo_shuffle {
-        let mut rng = rand::thread_rng();
-        (0..total)
-            .filter(|&x| x != atual)
-            .collect::<Vec<_>>()
-            .choose(&mut rng)
-            .copied()
-            .unwrap_or(0)
-    } else {
-        let prox = atual + 1;
-        if prox >= total {
-            if estado.modo_loop == 2 {
-                0
-            } else {
-                stop_music(estado, ui);
-                return;
-            }
+    // Navega dentro da lista visível, respeitando o filtro atual.
+    let alvo = {
+        let visiveis = &estado.indices_visiveis;
+        if visiveis.is_empty() {
+            return;
+        }
+        let pos = estado
+            .indice_atual
+            .and_then(|idx| visiveis.iter().position(|&i| i == idx));
+
+        if estado.modo_shuffle {
+            let mut rng = rand::thread_rng();
+            let candidatos: Vec<usize> = visiveis
+                .iter()
+                .copied()
+                .filter(|&i| Some(i) != estado.indice_atual)
+                .collect();
+            candidatos
+                .choose(&mut rng)
+                .copied()
+                .or_else(|| visiveis.first().copied())
         } else {
-            prox
+            match pos {
+                Some(p) if p + 1 < visiveis.len() => Some(visiveis[p + 1]),
+                Some(_) if estado.modo_loop == 2 => Some(visiveis[0]),
+                Some(_) => None, // fim da lista visível: para
+                None => Some(visiveis[0]),
+            }
         }
     };
-    tocar_indice(estado, ui, proximo);
+
+    match alvo {
+        Some(i) => tocar_indice(estado, ui, i),
+        None => stop_music(estado, ui),
+    }
 }
 
 fn proxima_musica_auto(estado: &mut EstadoAudio, ui: &MainWindow) {
@@ -393,7 +526,6 @@ fn proxima_musica_auto(estado: &mut EstadoAudio, ui: &MainWindow) {
 fn restaurar_posicao(estado: &mut EstadoAudio, ui: &MainWindow) {
     let config = AppConfig::carregar();
 
-    // Só restaura se houver índice e tempo salvos
     let (indice, tempo) = match (config.indice_atual, config.tempo_atual) {
         (Some(i), Some(t)) => (i, t),
         _ => return,
@@ -409,15 +541,12 @@ fn restaurar_posicao(estado: &mut EstadoAudio, ui: &MainWindow) {
         return;
     }
 
-    // Recarrega a playlist
     carregar_pasta(estado, ui, caminho);
 
-    // Verifica se o arquivo ainda existe na lista
-    if indice >= estado.arquivos.len() {
+    if indice >= estado.tracks.len() {
         return;
     }
 
-    // Toca a faixa salva na posição recuperada
     tocar_indice(estado, ui, indice);
     executar_seek(estado, ui, tempo);
 }
@@ -551,11 +680,15 @@ fn sincronizar_controles(controles: &Rc<RefCell<Option<MediaControls>>>, estado:
 
     // Metadados: atualiza apenas quando a faixa muda
     if estado.arquivo_atual != estado.faixa_controles {
-        if let Some(nome) = &estado.arquivo_atual {
+        if let Some(track) = estado
+            .tracks
+            .iter()
+            .find(|t| t.path == estado.arquivo_atual.as_deref().unwrap_or(""))
+        {
             let _ = c.set_metadata(MediaMetadata {
-                title: Some(nome),
+                title: Some(track.titulo.as_str()),
+                artist: track.artista.as_deref(),
                 album: None,
-                artist: None,
                 cover_url: None,
                 duration: Some(Duration::from_secs(estado.duracao_total_secs)),
             });
@@ -626,6 +759,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             if let Some(caminho) = rfd::FileDialog::new().pick_folder() {
                 if let Some(ui) = ui_fraca.upgrade() {
                     let mut e = estado.borrow_mut();
+                    // Pasta nova: limpa a busca
+                    e.filtro.clear();
+                    ui.set_texto_busca("".into());
                     carregar_pasta(&mut e, &ui, caminho);
                     salvar_configuracao(&e);
                 }
@@ -741,7 +877,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let ui_fraca = ui.as_weak();
         ui.on_musica_selecionada(move |indice| {
             if let Some(ui) = ui_fraca.upgrade() {
-                tocar_indice(&mut estado.borrow_mut(), &ui, indice as usize);
+                let mut e = estado.borrow_mut();
+                // `indice` é a posição na lista filtrada; converte para o
+                // índice real em `tracks`.
+                let canonico = match e.indices_visiveis.get(indice as usize) {
+                    Some(&i) => i,
+                    None => return,
+                };
+                tocar_indice(&mut e, &ui, canonico);
+            }
+        });
+    }
+
+    {
+        let estado = estado.clone();
+        let ui_fraca = ui.as_weak();
+        ui.on_busca_mudou(move |texto| {
+            if let Some(ui) = ui_fraca.upgrade() {
+                let mut e = estado.borrow_mut();
+                e.filtro = texto.to_string();
+                atualizar_lista(&mut e, &ui);
             }
         });
     }

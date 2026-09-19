@@ -1,4 +1,4 @@
-import { Button, Slider, CheckBox } from "std-widgets.slint";
+import { Button, Slider, CheckBox, LineEdit } from "std-widgets.slint";
 
 export component MainWindow inherits Window {
     title: "Furinar Audio Player";
@@ -7,6 +7,7 @@ export component MainWindow inherits Window {
     background: #16161a;
 
     in-out property <string> texto_play_pause: "Play";
+    in-out property <string> texto_busca: "";
     in-out property <string> texto_loop: "Loop: Desl";
     in-out property <string> texto_shuffle: "Shuffle: Desl";
     in-out property <float> volume: 0.8;
@@ -26,6 +27,7 @@ export component MainWindow inherits Window {
     callback volume_mudou(float);
     callback progresso_mudou(float);
     callback musica_selecionada(int);
+    callback busca_mudou(string);
     callback fecha_janela();
     callback alternar_escanear_subpastas(bool);
 
@@ -94,6 +96,13 @@ export component MainWindow inherits Window {
                 color: #e8e8ec;
                 vertical-alignment: center;
             }
+        }
+
+        LineEdit {
+            height: 32px;
+            placeholder-text: "Buscar por título ou artista...";
+            text <=> texto_busca;
+            edited(t) => { busca_mudou(t); }
         }
 
         Rectangle {
