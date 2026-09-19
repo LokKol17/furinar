@@ -412,6 +412,7 @@ fn executar_seek(estado: &mut EstadoAudio, ui: &MainWindow, alvo_secs: u64) {
         0.0
     });
     ui.set_texto_play_pause("Pause".into());
+    ui.set_tocando(true);
     let com_horas = total_secs >= 3600;
     ui.set_texto_tempo(
         format!(
@@ -457,9 +458,11 @@ fn alternar_play_pause(estado: &EstadoAudio, ui: &MainWindow) {
         if sink.is_paused() {
             sink.play();
             ui.set_texto_play_pause("Pause".into());
+            ui.set_tocando(true);
         } else {
             sink.pause();
             ui.set_texto_play_pause("Play".into());
+            ui.set_tocando(false);
         }
     }
 }
@@ -469,6 +472,7 @@ fn pausar(estado: &EstadoAudio, ui: &MainWindow) {
         if !sink.is_paused() {
             sink.pause();
             ui.set_texto_play_pause("Play".into());
+            ui.set_tocando(false);
         }
     }
 }
@@ -478,6 +482,7 @@ fn reproduzir(estado: &EstadoAudio, ui: &MainWindow) {
         if sink.is_paused() {
             sink.play();
             ui.set_texto_play_pause("Pause".into());
+            ui.set_tocando(true);
         }
     }
 }
@@ -488,6 +493,7 @@ fn stop_music(estado: &mut EstadoAudio, ui: &MainWindow) {
     estado.ultimo_segundo = 0;
     ui.set_progresso(0.0);
     ui.set_texto_play_pause("Play".into());
+    ui.set_tocando(false);
     ui.set_texto_tempo("00:00 / 00:00".into());
 }
 
@@ -1039,7 +1045,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         ui.set_volume(config.volume);
         ui.set_texto_loop(texto_loop(config.modo_loop).into());
+        ui.set_loop_ativo(config.modo_loop != 0);
         ui.set_texto_shuffle(texto_shuffle(config.shuffle).into());
+        ui.set_shuffle_ativo(config.shuffle);
         ui.set_escanear_subpastas(config.escanear_subpastas);
 
         if let Some(pasta_str) = config.pasta {
@@ -1121,6 +1129,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let mut e = estado.borrow_mut();
                 e.modo_loop = (e.modo_loop + 1) % 3;
                 ui.set_texto_loop(texto_loop(e.modo_loop).into());
+                ui.set_loop_ativo(e.modo_loop != 0);
                 salvar_configuracao(&e);
             }
         });
@@ -1134,6 +1143,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let mut e = estado.borrow_mut();
                 e.modo_shuffle = !e.modo_shuffle;
                 ui.set_texto_shuffle(texto_shuffle(e.modo_shuffle).into());
+                ui.set_shuffle_ativo(e.modo_shuffle);
                 salvar_configuracao(&e);
             }
         });
@@ -1197,6 +1207,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     if let Some((_, ref sink)) = e.audio_player {
                         sink.pause();
                         ui.set_texto_play_pause("Play".into());
+                        ui.set_tocando(false);
                     }
                 }
             }

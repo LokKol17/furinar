@@ -1,0 +1,284 @@
+// ---------------------------------------------------------------------
+// Identidade visual do Furinar
+//
+// Paleta inspirada na Furina (Genshin Impact): azuis profundos, ciano,
+// dourado e um toque pontual de lavanda. Tudo deriva da paleta base
+// declarada em `Tema` — nenhum hex espalhado pelos componentes.
+// ---------------------------------------------------------------------
+
+export global Tema {
+    // Paleta base
+    out property <color> abismo: #0b1a2b;  // fundo principal
+    out property <color> mare: #142943;    // painéis/cards
+    out property <color> oceano: #3da9d6;  // acento primário
+    out property <color> perola: #f1f5f9;  // texto principal
+    out property <color> dourado: #c9a050; // acento secundário
+    out property <color> lavanda: #a78bc4; // toque pontual
+
+    // Derivadas
+    out property <color> mare_claro: mare.brighter(0.16);
+    out property <color> texto_suave: perola.with-alpha(0.60);
+    out property <color> borda: oceano.with-alpha(0.18);
+    out property <color> selecao: oceano.with-alpha(0.18);
+    out property <color> foco: oceano.with-alpha(0.75);
+
+    // Fundo da janela: gradiente sutil, de cima para baixo
+    out property <brush> fundo_janela: @linear-gradient(180deg, abismo, mare);
+}
+
+// ---------------------------------------------------------------------
+// Botão de ícone
+// ---------------------------------------------------------------------
+
+export component BotaoIcone inherits Rectangle {
+    in property <image> icone;
+    in property <string> dica: "";
+    /// Botão principal (play/pause): maior, em oceano.
+    in property <bool> destaque: false;
+    /// Modo ligado (loop/shuffle).
+    in property <bool> ativo: false;
+    callback clicado();
+
+    width: destaque ? 50px : 40px;
+    height: destaque ? 50px : 40px;
+    border-radius: 10px;
+    border-width: 1px;
+    border-color: destaque ? Tema.oceano.with-alpha(0.55) : Tema.borda;
+
+    background: destaque
+        ? Tema.oceano
+        : (ativo ? Tema.oceano.with-alpha(0.20) : Tema.mare);
+
+    accessible-role: button;
+    accessible-label: root.dica;
+
+    animate background, border-color { duration: 130ms; }
+
+    ico := Image {
+        source: root.icone;
+        width: destaque ? 22px : 18px;
+        height: destaque ? 22px : 18px;
+        x: (root.width - self.width) / 2;
+        y: (root.height - self.height) / 2;
+        colorize: destaque ? Tema.perola : (ativo ? Tema.dourado : Tema.perola);
+        animate colorize { duration: 130ms; }
+    }
+
+    touch := TouchArea {
+        clicked => { root.clicado(); }
+    }
+
+    // Primeiro state que casa vence, então "pressionado" tem prioridade
+    // sobre "hover".
+    states [
+        pressionado when touch.pressed : {
+            background: destaque ? Tema.oceano.darker(0.22) : Tema.mare.darker(0.22);
+            border-color: Tema.oceano.with-alpha(0.6);
+        }
+        hover when touch.has-hover : {
+            background: destaque ? Tema.oceano.brighter(0.12) : Tema.mare_claro;
+            border-color: Tema.oceano.with-alpha(0.42);
+            ico.colorize: destaque ? Tema.perola : Tema.dourado;
+        }
+    ]
+}
+
+// ---------------------------------------------------------------------
+// Slider (progresso e volume)
+// ---------------------------------------------------------------------
+
+export component BarraDeslizante inherits Rectangle {
+    in property <float> minimo: 0;
+    in property <float> maximo: 1;
+    in-out property <float> valor: 0;
+    callback mudou(float);
+
+    height: 22px;
+
+    private property <float> fracao: maximo > minimo
+        ? min(1.0, max(0.0, (valor - minimo) / (maximo - minimo)))
+        : 0.0;
+
+    trilha := Rectangle {
+        x: 0px;
+        width: parent.width;
+        height: 6px;
+        y: (parent.height - self.height) / 2;
+        border-radius: 3px;
+        background: Tema.mare;
+        border-width: 1px;
+        border-color: Tema.borda;
+    }
+
+    // Sem `x` o Slint centraliza o elemento no pai; ancoramos na esquerda para
+    // o preenchimento crescer a partir dali.
+    preenchido := Rectangle {
+        x: 0px;
+        width: polegar.x + polegar.width / 2;
+        height: 6px;
+        y: (parent.height - self.height) / 2;
+        border-radius: 3px;
+        background: @linear-gradient(90deg, Tema.oceano, Tema.oceano.brighter(0.18));
+    }
+
+    polegar := Rectangle {
+        width: 12px;
+        height: 12px;
+        border-radius: 6px;
+        background: Tema.perola;
+        x: max(0px, min(parent.width - self.width, parent.width * root.fracao - self.width / 2));
+        y: (parent.height - self.height) / 2;
+
+        drop-shadow-color: transparent;
+        drop-shadow-blur: 0px;
+        drop-shadow-offset-y: 1px;
+        animate drop-shadow-color, drop-shadow-blur { duration: 140ms; }
+    }
+
+    touch := TouchArea {
+        width: 100%;
+        height: 100%;
+
+        pointer-event(event) => {
+            if (event.button != PointerEventButton.left) {
+                return;
+            }
+            if (event.kind == PointerEventKind.down) {
+                root.definir_por_x(self.mouse-x);
+            } else if (event.kind == PointerEventKind.move && self.pressed) {
+                root.definir_por_x(self.mouse-x);
+            }
+        }
+    }
+
+    states [
+        hover when touch.has-hover : {
+            polegar.drop-shadow-color: Tema.oceano.with-alpha(0.70);
+            polegar.drop-shadow-blur: 6px;
+        }
+    ]
+
+    public function definir_por_x(x: length) {
+        if (root.width <= 0px) {
+            return;
+        }
+        let novo = root.minimo + min(1.0, max(0.0, x / root.width)) * (root.maximo - root.minimo);
+        if (novo == root.valor) {
+            return;
+        }
+        root.valor = novo;
+        root.mudou(root.valor);
+    }
+}
+
+// ---------------------------------------------------------------------
+// Campo de busca
+// ---------------------------------------------------------------------
+
+export component CampoBusca inherits Rectangle {
+    in-out property <string> texto: "";
+    in property <string> placeholder: "";
+    out property <bool> tem_foco: entrada.has-focus;
+    callback editado(string);
+    callback aceito(string);
+
+    height: 38px;
+    border-radius: 10px;
+    background: Tema.mare;
+    border-width: 1px;
+    border-color: entrada.has-focus ? Tema.foco : Tema.borda;
+    animate border-color { duration: 140ms; }
+
+    lupa := Image {
+        source: @image-url("icons/busca.svg");
+        width: 16px;
+        height: 16px;
+        x: 12px;
+        y: (root.height - self.height) / 2;
+        colorize: entrada.has-focus ? Tema.oceano : Tema.texto_suave;
+        animate colorize { duration: 140ms; }
+    }
+
+    // O TextInput não tem `placeholder-text`: desenhamos o texto fantasma
+    // antes dele, para que o cursor fique por cima.
+    placeholder_texto := Text {
+        x: 38px;
+        y: (root.height - self.height) / 2;
+        text: (root.texto == "" && entrada.preedit-text == "") ? root.placeholder : "";
+        color: Tema.texto_suave;
+        font-size: 14px;
+        vertical-alignment: center;
+    }
+
+    entrada := TextInput {
+        x: 38px;
+        width: root.width - 38px - 12px;
+        height: root.height;
+        color: Tema.perola;
+        font-size: 14px;
+        vertical-alignment: center;
+        selection-background-color: Tema.oceano.with-alpha(0.35);
+        selection-foreground-color: Tema.perola;
+        text <=> root.texto;
+        edited => { root.editado(self.text); }
+        accepted => { root.aceito(self.text); }
+    }
+}
+
+// ---------------------------------------------------------------------
+// Caixa de seleção (substitui o CheckBox do std-widgets)
+// ---------------------------------------------------------------------
+
+export component CaixaSelecao inherits Rectangle {
+    in property <string> rotulo: "";
+    in-out property <bool> marcado: false;
+    callback alternado(bool);
+
+    height: 26px;
+
+    HorizontalLayout {
+        spacing: 8px;
+        alignment: start;
+        cross-axis-alignment: center;
+
+        caixa := Rectangle {
+            width: 18px;
+            height: 18px;
+            border-radius: 5px;
+            border-width: 1px;
+            border-color: root.marcado ? Tema.oceano : Tema.borda;
+            background: root.marcado ? Tema.oceano.with-alpha(0.22) : Tema.mare;
+            animate background, border-color { duration: 130ms; }
+
+            check := Image {
+                source: @image-url("icons/check.svg");
+                width: 12px;
+                height: 12px;
+                x: (parent.width - self.width) / 2;
+                y: (parent.height - self.height) / 2;
+                colorize: Tema.dourado;
+                visible: root.marcado;
+            }
+        }
+
+        Text {
+            text: root.rotulo;
+            color: Tema.perola;
+            font-size: 14px;
+            vertical-alignment: center;
+        }
+    }
+
+    touch := TouchArea {
+        clicked => {
+            root.marcado = !root.marcado;
+            root.alternado(root.marcado);
+        }
+    }
+
+    states [
+        hover when touch.has-hover : {
+            caixa.border-color: Tema.oceano.with-alpha(0.50);
+        }
+    ]
+}

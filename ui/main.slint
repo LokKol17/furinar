@@ -1,14 +1,17 @@
-import { Button, Slider, CheckBox, LineEdit } from "std-widgets.slint";
+import { Tema, BotaoIcone, BarraDeslizante, CampoBusca, CaixaSelecao } from "theme.slint";
 
 export component MainWindow inherits Window {
     title: "Furinar Audio Player";
     width: 660px;
     height: 700px;
-    background: #16161a;
+    background: Tema.fundo_janela;
 
     // Foco inicial vai para o FocusScope dos atalhos de teclado
     forward-focus: atalhos;
 
+    in-out property <bool> tocando: false;
+    in-out property <bool> loop_ativo: false;
+    in-out property <bool> shuffle_ativo: false;
     in-out property <string> texto_play_pause: "Play";
     in-out property <string> texto_busca: "";
     in-out property <string> texto_loop: "Loop: Desl";
@@ -35,13 +38,16 @@ export component MainWindow inherits Window {
     callback fecha_janela();
     callback alternar_escanear_subpastas(bool);
 
+    // Altura de cada linha da playlist
+    private property <length> altura_linha: 30px;
+
     // Mantém a linha selecionada dentro da área visível da lista
     function manter_visivel() {
         if (indice_selecionado >= 0) {
-            if (indice_selecionado * 24px < lista.content-y) {
-                lista.content-y = indice_selecionado * 24px;
-            } else if ((indice_selecionado + 1) * 24px > lista.content-y + lista.height) {
-                lista.content-y = (indice_selecionado + 1) * 24px - lista.height;
+            if (indice_selecionado * altura_linha < lista.content-y) {
+                lista.content-y = indice_selecionado * altura_linha;
+            } else if ((indice_selecionado + 1) * altura_linha > lista.content-y + lista.height) {
+                lista.content-y = (indice_selecionado + 1) * altura_linha - lista.height;
             }
         }
     }
@@ -51,7 +57,7 @@ export component MainWindow inherits Window {
     atalhos := FocusScope {
         key-pressed(event) => {
             // Enquanto o usuário digita na busca, as teclas pertencem ao campo
-            if (campo_busca.has-focus) {
+            if (busca.tem_foco) {
                 return reject;
             }
 
@@ -99,101 +105,150 @@ export component MainWindow inherits Window {
     }
 
     VerticalLayout {
-        padding: 20px;
-        spacing: 12px;
+        padding: 18px;
+        spacing: 14px;
 
+        // -------------------------------------------------------------
+        // Controles: transportes à esquerda, modos à direita
+        // -------------------------------------------------------------
         HorizontalLayout {
             spacing: 8px;
-            height: 44px;
+            height: 52px;
+            cross-axis-alignment: center;
 
-            Button {
-                text: "Abrir";
-                clicked => { abrir_pasta(); }
+            HorizontalLayout {
+                spacing: 8px;
+                cross-axis-alignment: center;
+
+                BotaoIcone {
+                    icone: @image-url("icons/abrir.svg");
+                    dica: "Abrir pasta";
+                    clicado => { abrir_pasta(); }
+                }
+                BotaoIcone {
+                    icone: @image-url("icons/anterior.svg");
+                    dica: "Anterior";
+                    clicado => { anterior(); }
+                }
+                BotaoIcone {
+                    icone: tocando ? @image-url("icons/pause.svg") : @image-url("icons/play.svg");
+                    dica: texto_play_pause;
+                    destaque: true;
+                    clicado => { play_pause(); }
+                }
+                BotaoIcone {
+                    icone: @image-url("icons/stop.svg");
+                    dica: "Parar";
+                    clicado => { parar(); }
+                }
+                BotaoIcone {
+                    icone: @image-url("icons/proxima.svg");
+                    dica: "Próxima";
+                    clicado => { proxima(); }
+                }
             }
-            Button {
-                text: "Ant";
-                clicked => { anterior(); }
-            }
-            Button {
-                text: texto_play_pause;
-                clicked => { play_pause(); }
-            }
-            Button {
-                text: "Stop";
-                clicked => { parar(); }
-            }
-            Button {
-                text: "Prox";
-                clicked => { proxima(); }
-            }
-            Button {
-                text: texto_loop;
-                clicked => { alternar_loop(); }
-            }
-            Button {
-                text: texto_shuffle;
-                clicked => { alternar_shuffle(); }
-            }
-            Button {
-                text: "Config";
-                clicked => { config_popup.show(); }
+
+            // Espaçador: empurra os modos para a direita
+            Rectangle { horizontal-stretch: 1; }
+
+            HorizontalLayout {
+                spacing: 8px;
+                cross-axis-alignment: center;
+
+                BotaoIcone {
+                    icone: @image-url("icons/loop.svg");
+                    dica: texto_loop;
+                    ativo: loop_ativo;
+                    clicado => { alternar_loop(); }
+                }
+                BotaoIcone {
+                    icone: @image-url("icons/shuffle.svg");
+                    dica: texto_shuffle;
+                    ativo: shuffle_ativo;
+                    clicado => { alternar_shuffle(); }
+                }
+                BotaoIcone {
+                    icone: @image-url("icons/config.svg");
+                    dica: "Configurações";
+                    clicado => { config_popup.show(); }
+                }
             }
         }
 
+        // -------------------------------------------------------------
+        // Sliders: volume, progresso e tempo
+        // -------------------------------------------------------------
         HorizontalLayout {
             spacing: 12px;
-            height: 28px;
+            height: 26px;
+            cross-axis-alignment: center;
 
-            Slider {
-                width: 120px;
-                minimum: 0;
-                maximum: 1;
-                value <=> volume;
-                changed(v) => { volume_mudou(v); }
+            BarraDeslizante {
+                width: 110px;
+                valor <=> volume;
+                mudou(v) => { volume_mudou(v); }
             }
-            Slider {
-                width: 360px;
-                minimum: 0;
-                maximum: 1;
-                value <=> progresso;
-                changed(v) => { progresso_mudou(v); }
+            BarraDeslizante {
+                width: 340px;
+                valor <=> progresso;
+                mudou(v) => { progresso_mudou(v); }
             }
             Text {
                 text: texto_tempo;
-                color: #e8e8ec;
+                color: Tema.texto_suave;
+                font-size: 13px;
                 vertical-alignment: center;
             }
         }
 
-        campo_busca := LineEdit {
-            height: 32px;
-            placeholder-text: "Buscar por título ou artista...";
-            text <=> texto_busca;
-            edited(t) => { busca_mudou(t); }
+        // -------------------------------------------------------------
+        // Busca
+        // -------------------------------------------------------------
+        busca := CampoBusca {
+            texto <=> texto_busca;
+            placeholder: "Buscar por título ou artista...";
+            editado(t) => { busca_mudou(t); }
             // Enter na busca devolve o foco aos atalhos
-            accepted(t) => { atalhos.focus(); }
+            aceito(t) => { atalhos.focus(); }
         }
 
+        // -------------------------------------------------------------
+        // Playlist
+        // -------------------------------------------------------------
         Rectangle {
-            background: #201e24;
-            border-radius: 6px;
+            background: Tema.mare.with-alpha(0.55);
+            border-radius: 12px;
+            border-width: 1px;
+            border-color: Tema.borda;
             clip: true;
 
             lista := Flickable {
-                content-height: musicas.length * 24px;
+                content-height: musicas.length * altura_linha;
 
                 VerticalLayout {
                     alignment: start;
 
                     for musica[i] in musicas: Rectangle {
-                        height: 24px;
-                        background: i == indice_selecionado ? #5a5df0 : transparent;
+                        height: altura_linha;
+                        background: i == indice_selecionado ? Tema.selecao : transparent;
+
+                        // Barrinha dourada marcando a linha selecionada
+                        Rectangle {
+                            visible: i == indice_selecionado;
+                            x: 0px;
+                            y: 5px;
+                            width: 3px;
+                            height: parent.height - 10px;
+                            border-radius: 2px;
+                            background: Tema.dourado;
+                        }
 
                         Text {
                             text: musica;
-                            color: #e8e8ec;
+                            color: Tema.perola;
+                            font-size: 13px;
                             vertical-alignment: center;
-                            x: 8px;
+                            x: 14px;
                         }
 
                         TouchArea {
@@ -209,37 +264,40 @@ export component MainWindow inherits Window {
         }
     }
 
+    // -------------------------------------------------------------
+    // Configurações
+    // -------------------------------------------------------------
     config_popup := PopupWindow {
         x: 170px;
         y: 265px;
 
         Rectangle {
-            background: #201e24;
-            border-radius: 8px;
+            background: Tema.mare;
+            border-radius: 12px;
             border-width: 1px;
-            border-color: #3a3a40;
+            border-color: Tema.borda;
 
             VerticalLayout {
                 padding: 16px;
-                spacing: 10px;
+                spacing: 12px;
 
                 Text {
                     text: "Configurações";
                     font-size: 16px;
                     font-weight: 700;
-                    color: #e8e8ec;
+                    color: Tema.perola;
                 }
 
-                CheckBox {
-                    text: "Escaneia subpastas";
-                    checked <=> escanear_subpastas;
-                    toggled => { alternar_escanear_subpastas(self.checked); }
+                CaixaSelecao {
+                    rotulo: "Escaneia subpastas";
+                    marcado <=> escanear_subpastas;
+                    alternado(v) => { alternar_escanear_subpastas(v); }
                 }
 
                 Text {
                     text: "Inclui arquivos de áudio de subpastas ao abrir uma pasta.";
                     font-size: 12px;
-                    color: #9a9aa0;
+                    color: Tema.texto_suave;
                     wrap: word-wrap;
                 }
             }
