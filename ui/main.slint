@@ -21,6 +21,10 @@ export component MainWindow inherits Window {
     in-out property <string> texto_tempo: "00:00 / 00:00";
     in property <[string]> musicas: [];
     in-out property <int> indice_selecionado: -1;
+    in property <[string]> abas: [];
+    in-out property <int> aba_ativa: 0;
+    /// Aba da pasta de onde vem o som agora (-1 se nada está tocando).
+    in property <int> aba_tocando: -1;
     in-out property <bool> escanear_subpastas: false;
 
     callback abrir_pasta();
@@ -35,11 +39,14 @@ export component MainWindow inherits Window {
     callback seek_relativo(int);
     callback musica_selecionada(int);
     callback busca_mudou(string);
+    callback aba_selecionada(int);
+    callback fechar_aba(int);
     callback fecha_janela();
     callback alternar_escanear_subpastas(bool);
 
     // Altura de cada linha da playlist
     private property <length> altura_linha: 30px;
+    private property <length> largura_aba: 150px;
 
     // Mantém a linha selecionada dentro da área visível da lista
     function manter_visivel() {
@@ -210,6 +217,146 @@ export component MainWindow inherits Window {
             editado(t) => { busca_mudou(t); }
             // Enter na busca devolve o foco aos atalhos
             aceito(t) => { atalhos.focus(); }
+        }
+
+        // -------------------------------------------------------------
+        // Abas das pastas. Trocar de aba só muda o que a lista exibe:
+        // a reprodução continua na pasta de onde a faixa veio.
+        // -------------------------------------------------------------
+        HorizontalLayout {
+            height: 34px;
+            spacing: 8px;
+            cross-axis-alignment: center;
+
+            Flickable {
+                horizontal-stretch: 1;
+                height: 32px;
+                content-width: abas.length * (largura_aba + 6px);
+                content-height: 32px;
+
+                HorizontalLayout {
+                    alignment: start;
+                    spacing: 6px;
+
+                    for nome[i] in abas: Rectangle {
+                        width: largura_aba;
+                        height: 32px;
+                        border-radius: 8px;
+                        background: i == aba_ativa ? Tema.oceano.with-alpha(0.16) : Tema.mare;
+                        border-width: 1px;
+                        border-color: i == aba_ativa ? Tema.oceano.with-alpha(0.45) : Tema.borda;
+                        clip: true;
+                        animate background, border-color { duration: 130ms; }
+
+                        TouchArea {
+                            clicked => {
+                                aba_selecionada(i);
+                                atalhos.focus();
+                            }
+                        }
+
+                        // Sublinhado da aba ativa
+                        Rectangle {
+                            visible: i == aba_ativa;
+                            x: 10px;
+                            y: parent.height - 4px;
+                            width: parent.width - 20px;
+                            height: 2px;
+                            border-radius: 1px;
+                            background: Tema.oceano;
+                        }
+
+                        Text {
+                            x: 12px;
+                            y: 0px;
+                            width: parent.width - 50px;
+                            height: parent.height - 4px;
+                            text: nome;
+                            color: i == aba_ativa ? Tema.perola : Tema.texto_suave;
+                            font-size: 13px;
+                            vertical-alignment: center;
+                            wrap: no-wrap;
+                            overflow: elide;
+                        }
+
+                        // Pontinho dourado: de onde vem o som agora
+                        Rectangle {
+                            visible: i == aba_tocando;
+                            x: parent.width - 32px;
+                            y: (parent.height - self.height) / 2;
+                            width: 6px;
+                            height: 6px;
+                            border-radius: 3px;
+                            background: Tema.dourado;
+                        }
+
+                        // Fechar: só na aba ativa, para não poluir
+                        Rectangle {
+                            visible: i == aba_ativa;
+                            x: parent.width - 22px;
+                            y: 8px;
+                            width: 16px;
+                            height: 16px;
+                            border-radius: 4px;
+                            background: transparent;
+                            animate background { duration: 120ms; }
+
+                            Image {
+                                source: @image-url("icons/x.svg");
+                                width: 10px;
+                                height: 10px;
+                                x: (parent.width - self.width) / 2;
+                                y: (parent.height - self.height) / 2;
+                                colorize: Tema.texto_suave;
+                            }
+
+                            fechar_touch := TouchArea {
+                                clicked => { fechar_aba(i); }
+                            }
+
+                            states [
+                                hover when fechar_touch.has-hover : {
+                                    background: Tema.mare_claro;
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+
+            // Abrir mais uma pasta
+            Rectangle {
+                width: 32px;
+                height: 32px;
+                border-radius: 8px;
+                background: Tema.mare;
+                border-width: 1px;
+                border-color: Tema.borda;
+                animate background, border-color { duration: 130ms; }
+
+                Image {
+                    source: @image-url("icons/mais.svg");
+                    width: 14px;
+                    height: 14px;
+                    x: (parent.width - self.width) / 2;
+                    y: (parent.height - self.height) / 2;
+                    colorize: Tema.perola;
+                }
+
+                mais_touch := TouchArea {
+                    clicked => {
+                        abrir_pasta();
+                        atalhos.focus();
+                    }
+                }
+
+                states [
+                    hover when mais_touch.has-hover : {
+                        background: Tema.mare_claro;
+                        border-color: Tema.oceano.with-alpha(0.42);
+                    }
+                ]
+            }
         }
 
         // -------------------------------------------------------------
