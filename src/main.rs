@@ -14,6 +14,7 @@ use lofty::probe::Probe;
 use rand::seq::SliceRandom;
 use rodio::{Decoder, OutputStream, Sink, Source};
 use serde::{Deserialize, Serialize};
+use slint::winit_030::winit::platform::windows::EventLoopBuilderExtWindows;
 use slint::{ModelRc, SharedString, Timer, TimerMode, VecModel};
 use souvlaki::{
     MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, MediaPosition, PlatformConfig,
@@ -21,6 +22,19 @@ use souvlaki::{
 };
 use unicode_normalization::UnicodeNormalization;
 use unicode_normalization::char::is_combining_mark;
+use windows::Win32::Foundation::{HINSTANCE, HWND};
+use windows::Win32::System::Com::{CLSCTX_INPROC_SERVER, CoCreateInstance};
+use windows::Win32::System::LibraryLoader::GetModuleHandleW;
+use windows::Win32::UI::Controls::{
+    HIMAGELIST, ILC_COLOR32, ILC_MASK, ImageList_Create, ImageList_Destroy, ImageList_ReplaceIcon,
+};
+use windows::Win32::UI::Shell::{
+    ITaskbarList3, THB_BITMAP, THB_FLAGS, THB_ICON, THB_TOOLTIP, THBF_ENABLED, THBN_CLICKED,
+    THUMBBUTTON, TaskbarList,
+};
+use windows::Win32::UI::WindowsAndMessaging::{
+    CreateIcon, DestroyIcon, GetSystemMetrics, HICON, MSG, SM_CXSMICON, WM_COMMAND,
+};
 
 // ---------------------------------------------------------------------
 // Config
@@ -714,16 +728,306 @@ fn sincronizar_controles(controles: &Rc<RefCell<Option<MediaControls>>>, estado:
 }
 
 // ---------------------------------------------------------------------
+// Botões na miniatura da barra de tarefas (ITaskbarList3)
+// ---------------------------------------------------------------------
+
+// IDs dos botões (viram LOWORD(wParam) no WM_COMMAND).
+const BTN_ANTERIOR: u32 = 0x100;
+const BTN_PLAY_PAUSE: u32 = 0x101;
+const BTN_PROXIMA: u32 = 0x102;
+
+// Índices dos ícones na HIMAGELIST, na ordem em que são inseridos.
+const IDX_ICONE_ANTERIOR: u32 = 0;
+const IDX_ICONE_PLAY: u32 = 1;
+const IDX_ICONE_PAUSE: u32 = 2;
+const IDX_ICONE_PROXIMA: u32 = 3;
+
+/// Recursos dos botões da taskbar. Precisam continuar vivos enquanto o app
+/// roda: a shell referencia a HIMAGELIST e os HICONs são nossos.
+struct BotoesTaskbar {
+    taskbar: ITaskbarList3,
+    hwnd: HWND,
+    himl: HIMAGELIST,
+    icones: Vec<HICON>,
+    pausado: bool,
+}
+
+impl BotoesTaskbar {
+    /// Troca o ícone do botão central entre play e pause.
+    fn atualizar_play_pause(&mut self, pausado: bool) {
+        if self.pausado == pausado {
+            return;
+        }
+        self.pausado = pausado;
+        let indice = if pausado {
+            IDX_ICONE_PAUSE
+        } else {
+            IDX_ICONE_PLAY
+        };
+        let botoes = [criar_botao(
+            BTN_PLAY_PAUSE,
+            indice,
+            self.icones[indice as usize],
+            "Tocar/Pausar",
+        )];
+        unsafe {
+            let _ = self.taskbar.ThumbBarUpdateButtons(self.hwnd, &botoes);
+        }
+    }
+}
+
+impl Drop for BotoesTaskbar {
+    fn drop(&mut self) {
+        unsafe {
+            let _ = ImageList_Destroy(Some(self.himl));
+            for icone in &self.icones {
+                let _ = DestroyIcon(*icone);
+            }
+        }
+    }
+}
+
+/// Triângulo com ápice em `apex_x` e base vertical em `base_x`.
+fn forma_triangulo(x: i32, y: i32, apex_x: i32, base_x: i32) -> bool {
+    let (esq, dir) = if apex_x < base_x {
+        (apex_x, base_x)
+    } else {
+        (base_x, apex_x)
+    };
+    if x < esq || x > dir {
+        return false;
+    }
+    let meia_altura = (x - apex_x).abs() * 5 / (base_x - apex_x).abs();
+    (y - 8).abs() <= meia_altura
+}
+
+fn forma_play(x: i32, y: i32) -> bool {
+    forma_triangulo(x, y, 12, 4)
+}
+
+fn forma_pause(x: i32, y: i32) -> bool {
+    ((4..=6).contains(&x) || (9..=11).contains(&x)) && (3..=12).contains(&y)
+}
+
+fn forma_anterior(x: i32, y: i32) -> bool {
+    ((2..=3).contains(&x) && (3..=12).contains(&y)) || forma_triangulo(x, y, 5, 13)
+}
+
+fn forma_proxima(x: i32, y: i32) -> bool {
+    forma_triangulo(x, y, 10, 2) || ((11..=12).contains(&x) && (3..=12).contains(&y))
+}
+
+/// Gera as máscaras AND/XOR de um ícone monocromático 1bpp.
+///
+/// Fundo: AND=1 e XOR=0 (transparente). Forma: AND=0 e XOR=1 (branco).
+fn mascaras_icone(tamanho: i32, dentro: impl Fn(i32, i32) -> bool) -> (Vec<u8>, Vec<u8>) {
+    // Cada linha é preenchida até múltiplo de 2 bytes (WORD)
+    let bytes_por_linha = ((tamanho + 15) / 16 * 2) as usize;
+    let mut mascara_and = vec![0u8; bytes_por_linha * tamanho as usize];
+    let mut mascara_xor = vec![0u8; bytes_por_linha * tamanho as usize];
+
+    for y in 0..tamanho {
+        for x in 0..tamanho {
+            let offset = y as usize * bytes_por_linha + (x / 8) as usize;
+            let bit = 0x80u8 >> (x % 8);
+            if dentro(x, y) {
+                mascara_xor[offset] |= bit;
+            } else {
+                mascara_and[offset] |= bit;
+            }
+        }
+    }
+
+    (mascara_and, mascara_xor)
+}
+
+fn criar_icone(tamanho: i32, dentro: impl Fn(i32, i32) -> bool) -> windows::core::Result<HICON> {
+    let (mascara_and, mascara_xor) = mascaras_icone(tamanho, dentro);
+    let modulo = unsafe { GetModuleHandleW(None)? };
+    unsafe {
+        CreateIcon(
+            Some(HINSTANCE(modulo.0)),
+            tamanho,
+            tamanho,
+            1,
+            1,
+            mascara_and.as_ptr(),
+            mascara_xor.as_ptr(),
+        )
+    }
+}
+
+fn criar_botao(id: u32, indice_icone: u32, icone: HICON, dica: &str) -> THUMBBUTTON {
+    let mut sz_tip = [0u16; 260];
+    for (i, c) in dica.encode_utf16().take(259).enumerate() {
+        sz_tip[i] = c;
+    }
+    THUMBBUTTON {
+        dwMask: THB_ICON | THB_BITMAP | THB_TOOLTIP | THB_FLAGS,
+        iId: id,
+        iBitmap: indice_icone,
+        hIcon: icone,
+        szTip: sz_tip,
+        dwFlags: THBF_ENABLED,
+    }
+}
+
+/// Cria a barra de botões na miniatura da taskbar. Devolve `None` (sem quebrar
+/// o app) se qualquer passo falhar.
+fn configurar_botoes_taskbar(ui: &MainWindow) -> Option<BotoesTaskbar> {
+    let hwnd = HWND(obter_hwnd(ui)?);
+
+    let taskbar: ITaskbarList3 = unsafe {
+        CoCreateInstance(
+            &TaskbarList,
+            None::<&windows::core::IUnknown>,
+            CLSCTX_INPROC_SERVER,
+        )
+        .ok()?
+    };
+    unsafe {
+        taskbar.HrInit().ok()?;
+    }
+
+    let tamanho = unsafe { GetSystemMetrics(SM_CXSMICON) };
+    if tamanho <= 0 {
+        return None;
+    }
+
+    // Cria os ícones; se algum falhar, libera os que já foram criados.
+    let formas: [fn(i32, i32) -> bool; 4] =
+        [forma_anterior, forma_play, forma_pause, forma_proxima];
+    let mut icones: Vec<HICON> = Vec::with_capacity(formas.len());
+    for forma in formas {
+        match criar_icone(tamanho, forma) {
+            Ok(icone) => icones.push(icone),
+            Err(_) => {
+                for icone in &icones {
+                    unsafe {
+                        let _ = DestroyIcon(*icone);
+                    }
+                }
+                return None;
+            }
+        }
+    }
+
+    let himl = unsafe { ImageList_Create(tamanho, tamanho, ILC_COLOR32 | ILC_MASK, 4, 1) };
+    if himl.is_invalid() {
+        for icone in &icones {
+            unsafe {
+                let _ = DestroyIcon(*icone);
+            }
+        }
+        return None;
+    }
+
+    // A partir daqui a struct já cuida de liberar os recursos se algo falhar.
+    let botoes = BotoesTaskbar {
+        taskbar,
+        hwnd,
+        himl,
+        icones,
+        pausado: false,
+    };
+
+    unsafe {
+        for icone in &botoes.icones {
+            ImageList_ReplaceIcon(botoes.himl, -1, *icone);
+        }
+
+        botoes
+            .taskbar
+            .ThumbBarSetImageList(botoes.hwnd, botoes.himl)
+            .ok()?;
+
+        let lista = [
+            criar_botao(
+                BTN_ANTERIOR,
+                IDX_ICONE_ANTERIOR,
+                botoes.icones[0],
+                "Anterior",
+            ),
+            criar_botao(
+                BTN_PLAY_PAUSE,
+                IDX_ICONE_PLAY,
+                botoes.icones[1],
+                "Tocar/Pausar",
+            ),
+            criar_botao(BTN_PROXIMA, IDX_ICONE_PROXIMA, botoes.icones[3], "Próxima"),
+        ];
+        botoes
+            .taskbar
+            .ThumbBarAddButtons(botoes.hwnd, &lista)
+            .ok()?;
+    }
+
+    Some(botoes)
+}
+
+/// Trata os cliques que o message hook mandou pelo canal.
+fn processar_eventos_taskbar(rx: &Receiver<u32>, estado: &mut EstadoAudio, ui: &MainWindow) {
+    for id in rx.try_iter() {
+        match id {
+            BTN_ANTERIOR => tocar_anterior(estado, ui),
+            BTN_PLAY_PAUSE => alternar_play_pause(estado, ui),
+            BTN_PROXIMA => tocar_proxima_manual(estado, ui),
+            _ => {}
+        }
+    }
+}
+
+/// Mantém o ícone do botão central coerente com o estado de reprodução.
+fn atualizar_icone_taskbar(botoes: &Rc<RefCell<Option<BotoesTaskbar>>>, estado: &EstadoAudio) {
+    let pausado = match &estado.audio_player {
+        Some((_, sink)) => sink.is_paused(),
+        // Parado: o botão oferece "tocar"
+        None => true,
+    };
+    if let Some(b) = botoes.borrow_mut().as_mut() {
+        b.atualizar_play_pause(pausado);
+    }
+}
+
+// ---------------------------------------------------------------------
 // main
 // ---------------------------------------------------------------------
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Canal dos cliques nos botões da miniatura da taskbar
+    let (tx_taskbar, rx_taskbar) = mpsc::channel::<u32>();
+
+    // Injeta um message hook no event loop do winit (via backend do Slint) para
+    // observar o `WM_COMMAND` que a shell manda ao clicar nos botões. Precisa
+    // ser antes de qualquer janela existir.
+    let mut construtor_eventos: slint::winit_030::EventLoopBuilder =
+        slint::winit_030::winit::event_loop::EventLoop::with_user_event();
+    construtor_eventos.with_msg_hook(move |msg| {
+        // Só observa: retorna `false` para o winit despachar a mensagem normal.
+        let msg = msg as *const MSG;
+        if !msg.is_null() {
+            let msg = unsafe { &*msg };
+            if msg.message == WM_COMMAND {
+                let id = (msg.wParam.0 & 0xFFFF) as u32;
+                let codigo = ((msg.wParam.0 >> 16) & 0xFFFF) as u32;
+                if codigo == THBN_CLICKED && (BTN_ANTERIOR..=BTN_PROXIMA).contains(&id) {
+                    let _ = tx_taskbar.send(id);
+                }
+            }
+        }
+        false
+    });
+    slint::BackendSelector::new()
+        .with_winit_event_loop_builder(construtor_eventos)
+        .select()?;
+
     let ui = MainWindow::new()?;
     let estado = Rc::new(RefCell::new(EstadoAudio::default()));
 
     // Canal para os eventos dos controles multimídia do sistema (SMTC)
     let (tx, rx) = mpsc::channel::<MediaControlEvent>();
     let controles = Rc::new(RefCell::new(None::<MediaControls>));
+    let botoes_taskbar = Rc::new(RefCell::new(None::<BotoesTaskbar>));
 
     {
         let mut e = estado.borrow_mut();
@@ -875,6 +1179,33 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     {
         let estado = estado.clone();
         let ui_fraca = ui.as_weak();
+        ui.on_seek_relativo(move |delta| {
+            if let Some(ui) = ui_fraca.upgrade() {
+                let mut e = estado.borrow_mut();
+                // Só faz sentido pular se houver faixa carregada
+                let Some(estava_pausado) =
+                    e.audio_player.as_ref().map(|(_, sink)| sink.is_paused())
+                else {
+                    return;
+                };
+                let alvo = (e.tempo_decorrido as i64 + delta as i64)
+                    .clamp(0, e.duracao_total_secs as i64) as u64;
+                executar_seek(&mut e, &ui, alvo);
+                // `executar_seek` recria o player já tocando; se estava pausado,
+                // volta a pausar para o atalho não retomar sem querer.
+                if estava_pausado {
+                    if let Some((_, ref sink)) = e.audio_player {
+                        sink.pause();
+                        ui.set_texto_play_pause("Play".into());
+                    }
+                }
+            }
+        });
+    }
+
+    {
+        let estado = estado.clone();
+        let ui_fraca = ui.as_weak();
         ui.on_musica_selecionada(move |indice| {
             if let Some(ui) = ui_fraca.upgrade() {
                 let mut e = estado.borrow_mut();
@@ -907,6 +1238,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let estado = estado.clone();
         let ui_fraca = ui.as_weak();
         let controles = controles.clone();
+        let botoes_taskbar = botoes_taskbar.clone();
+        let mut tentativas_taskbar = 0u32;
         timer.start(TimerMode::Repeated, Duration::from_millis(250), move || {
             if let Some(ui) = ui_fraca.upgrade() {
                 let mut e = estado.borrow_mut();
@@ -919,9 +1252,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 }
 
+                // Idem para os botões da taskbar: só quando a janela já existe,
+                // e com poucas tentativas para não recriar recursos à toa.
+                if botoes_taskbar.borrow().is_none()
+                    && tentativas_taskbar < 3
+                    && obter_hwnd(&ui).is_some()
+                {
+                    tentativas_taskbar += 1;
+                    if let Some(b) = configurar_botoes_taskbar(&ui) {
+                        *botoes_taskbar.borrow_mut() = Some(b);
+                    }
+                }
+
                 processar_eventos_multimidia(&rx, &mut e, &ui);
+                processar_eventos_taskbar(&rx_taskbar, &mut e, &ui);
                 atualizar_progresso(&mut e, &ui);
                 sincronizar_controles(&controles, &mut e);
+                atualizar_icone_taskbar(&botoes_taskbar, &e);
             }
         });
     }

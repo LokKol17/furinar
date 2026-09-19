@@ -6,6 +6,9 @@ export component MainWindow inherits Window {
     height: 700px;
     background: #16161a;
 
+    // Foco inicial vai para o FocusScope dos atalhos de teclado
+    forward-focus: atalhos;
+
     in-out property <string> texto_play_pause: "Play";
     in-out property <string> texto_busca: "";
     in-out property <string> texto_loop: "Loop: Desl";
@@ -26,10 +29,74 @@ export component MainWindow inherits Window {
     callback alternar_shuffle();
     callback volume_mudou(float);
     callback progresso_mudou(float);
+    callback seek_relativo(int);
     callback musica_selecionada(int);
     callback busca_mudou(string);
     callback fecha_janela();
     callback alternar_escanear_subpastas(bool);
+
+    // Mantém a linha selecionada dentro da área visível da lista
+    function manter_visivel() {
+        if (indice_selecionado >= 0) {
+            if (indice_selecionado * 24px < lista.content-y) {
+                lista.content-y = indice_selecionado * 24px;
+            } else if ((indice_selecionado + 1) * 24px > lista.content-y + lista.height) {
+                lista.content-y = (indice_selecionado + 1) * 24px - lista.height;
+            }
+        }
+    }
+
+    // Atalhos de teclado. Sem filhos e sem tamanho: existe só para receber o
+    // foco (via `forward-focus` e `atalhos.focus()`) e tratar o teclado.
+    atalhos := FocusScope {
+        key-pressed(event) => {
+            // Enquanto o usuário digita na busca, as teclas pertencem ao campo
+            if (campo_busca.has-focus) {
+                return reject;
+            }
+
+            if (event.text == Key.Space) {
+                play_pause();
+                return accept;
+            } else if (event.text == Key.LeftArrow) {
+                seek_relativo(-5);
+                return accept;
+            } else if (event.text == Key.RightArrow) {
+                seek_relativo(5);
+                return accept;
+            } else if (event.text == Key.UpArrow) {
+                if (musicas.length > 0) {
+                    if (indice_selecionado < 0) {
+                        indice_selecionado = 0;
+                    } else if (indice_selecionado < 1) {
+                        indice_selecionado = musicas.length - 1;
+                    } else {
+                        indice_selecionado -= 1;
+                    }
+                }
+                manter_visivel();
+                return accept;
+            } else if (event.text == Key.DownArrow) {
+                if (musicas.length > 0) {
+                    if (indice_selecionado < 0) {
+                        indice_selecionado = 0;
+                    } else if (indice_selecionado >= musicas.length - 1) {
+                        indice_selecionado = 0;
+                    } else {
+                        indice_selecionado += 1;
+                    }
+                }
+                manter_visivel();
+                return accept;
+            } else if (event.text == Key.Return) {
+                if (indice_selecionado >= 0) {
+                    musica_selecionada(indice_selecionado);
+                }
+                return accept;
+            }
+            return reject;
+        }
+    }
 
     VerticalLayout {
         padding: 20px;
@@ -98,11 +165,13 @@ export component MainWindow inherits Window {
             }
         }
 
-        LineEdit {
+        campo_busca := LineEdit {
             height: 32px;
             placeholder-text: "Buscar por título ou artista...";
             text <=> texto_busca;
             edited(t) => { busca_mudou(t); }
+            // Enter na busca devolve o foco aos atalhos
+            accepted(t) => { atalhos.focus(); }
         }
 
         Rectangle {
@@ -111,7 +180,7 @@ export component MainWindow inherits Window {
             clip: true;
 
             lista := Flickable {
-                viewport-height: musicas.length * 24px;
+                content-height: musicas.length * 24px;
 
                 VerticalLayout {
                     alignment: start;
@@ -128,7 +197,11 @@ export component MainWindow inherits Window {
                         }
 
                         TouchArea {
-                            clicked => { musica_selecionada(i); }
+                            clicked => {
+                                musica_selecionada(i);
+                                // Devolve o foco para os atalhos de teclado
+                                atalhos.focus();
+                            }
                         }
                     }
                 }

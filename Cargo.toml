@@ -10,6 +10,7 @@ slint = { version = "1", default-features = false, features = [
     "backend-winit",
     "renderer-winit-software",
     "raw-window-handle-06",
+    "unstable-winit-030",
 ] }
 rfd = "0.15"
 rodio = { version = "0.19", features = ["mp3", "wav", "flac", "vorbis"] }
@@ -21,6 +22,14 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 souvlaki = "0.8"
 raw-window-handle = "0.6"
+windows = { version = "0.62", features = [
+    "Win32_Foundation",
+    "Win32_System_Com",
+    "Win32_System_LibraryLoader",
+    "Win32_UI_Controls",
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
+] }
 
 [build-dependencies]
 slint-build = "1"

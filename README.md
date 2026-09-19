@@ -22,6 +22,8 @@ MP3, WAV, FLAC, OGG/Vorbis, M4A
 - **Controles multimídia del sistema** — play/pause, anterior/próxima, stop y seek por los botones de medios del teclado (SMTC en Windows, ej.: centro de acciones y teclas de medios)
 - **Tags ID3/Vorbis** — lê título e artista das tags e exibe "Artista - Título" na lista (com fallback para o nome do arquivo quando não há tag)
 - **Busca/filtro** — filtra a playlist por título ou artista, ignorando acentos e maiúsculas; Anterior/Próxima navegam dentro do resultado filtrado
+- **Atalhos de teclado** — Espaço pausa/retoma, ←/→ pulam -5s/+5s, ↑/↓ navegam pela lista (com rolagem automática) e Enter toca a faixa selecionada
+- **Botões na miniatura da barra de tarefas** — Anterior, Play/Pause e Próxima aparecem no preview do ícone (ITaskbarList3), com o ícone central acompanhando o estado de reprodução
 - **Configuración persistente** — carpeta, volumen, modo de loop, shuffle, escaneo de subcarpetas, pista actual y posición se guardan automáticamente
 - **Configuração persistente** — pasta, volume, modo de loop, shuffle, faixa atual e posição são salvos automaticamente
 
