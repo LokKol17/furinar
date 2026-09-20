@@ -1,30 +1,49 @@
 // ---------------------------------------------------------------------
 // Identidade visual do Furinar
 //
-// Paleta inspirada na Furina (Genshin Impact): azuis profundos, ciano,
-// dourado e um toque pontual de lavanda. Tudo deriva da paleta base
-// declarada em `Tema` — nenhum hex espalhado pelos componentes.
+// Paleta inspirada na Furina (Genshin Impact). Tudo deriva de `Tema.escuro`,
+// então alternar esse booleano re-tinge o app inteiro na hora. Nenhum hex
+// espalhado pelos componentes: só aqui.
 // ---------------------------------------------------------------------
 
 export global Tema {
-    // Paleta base
-    out property <color> abismo: #0b1a2b;  // fundo principal
-    out property <color> mare: #142943;    // painéis/cards
-    out property <color> oceano: #3da9d6;  // acento primário
-    out property <color> perola: #f1f5f9;  // texto principal
-    out property <color> dourado: #c9a050; // acento secundário
-    out property <color> lavanda: #a78bc4; // toque pontual
-    out property <color> perigo: #c9564f;  // vermelho suave (fechar)
+    /// Fonte da verdade do tema. Todo o resto abaixo deriva daqui.
+    in-out property <bool> escuro: true;
+
+    // Base — par claro/escuro
+    out property <color> fundo: escuro ? #0b1a2b : #eaf4fb;
+    out property <color> painel: escuro ? #142943 : #ffffff;
+    out property <color> oceano: escuro ? #3da9d6 : #2f8fc4;
+    out property <color> texto: escuro ? #f1f5f9 : #0e1c30;
+    out property <color> dourado: escuro ? #c9a050 : #b8934a;
+    out property <color> lavanda: escuro ? #a78bc4 : #8b6fa8;
+    out property <color> perigo: escuro ? #c9564f : #c0453d;
+
+    /// Fundo dos controles que não são destaque. No escuro é a cor do painel
+    /// (mantém o visual atual); no claro, um azul acinzentado que se lê como
+    /// botão em cima do fundo.
+    out property <color> neutro: escuro ? painel : #dceaf5;
+    out property <color> neutro_hover: escuro ? painel.brighter(0.16) : #c8ddf0;
+
+    /// Barra de título: no escuro acompanha o topo do gradiente; no claro usa
+    /// o painel branco para se destacar do fundo.
+    out property <color> barra: escuro ? fundo : painel;
+
+    /// Texto e ícones sobre o acento oceano (o botão de play, por exemplo).
+    out property <color> sobre_acento: escuro ? #f1f5f9 : #ffffff;
 
     // Derivadas
-    out property <color> mare_claro: mare.brighter(0.16);
-    out property <color> texto_suave: perola.with-alpha(0.60);
-    out property <color> borda: oceano.with-alpha(0.18);
-    out property <color> selecao: oceano.with-alpha(0.18);
-    out property <color> foco: oceano.with-alpha(0.75);
+    out property <color> texto_suave: texto.with-alpha(escuro ? 0.60 : 0.62);
+    out property <color> borda: oceano.with-alpha(escuro ? 0.18 : 0.30);
+    out property <color> selecao: oceano.with-alpha(escuro ? 0.18 : 0.16);
+    out property <color> foco: oceano.with-alpha(escuro ? 0.75 : 0.85);
+    /// Painel levemente translúcido (lista e painel de letra)
+    out property <color> painel_fosco: painel.with-alpha(escuro ? 0.55 : 0.92);
 
     // Fundo da janela: gradiente sutil, de cima para baixo
-    out property <brush> fundo_janela: @linear-gradient(180deg, abismo, mare);
+    out property <brush> fundo_janela: escuro
+        ? @linear-gradient(180deg, fundo, painel)
+        : @linear-gradient(180deg, fundo, #cfe6f7);
 }
 
 // ---------------------------------------------------------------------
@@ -48,7 +67,7 @@ export component BotaoIcone inherits Rectangle {
 
     background: destaque
         ? Tema.oceano
-        : (ativo ? Tema.oceano.with-alpha(0.20) : Tema.mare);
+        : (ativo ? Tema.oceano.with-alpha(0.20) : Tema.neutro);
 
     accessible-role: button;
     accessible-label: root.dica;
@@ -61,7 +80,7 @@ export component BotaoIcone inherits Rectangle {
         height: destaque ? 22px : 18px;
         x: (root.width - self.width) / 2;
         y: (root.height - self.height) / 2;
-        colorize: destaque ? Tema.perola : (ativo ? Tema.dourado : Tema.perola);
+        colorize: destaque ? Tema.sobre_acento : (ativo ? Tema.dourado : Tema.texto);
         animate colorize { duration: 130ms; }
     }
 
@@ -73,13 +92,13 @@ export component BotaoIcone inherits Rectangle {
     // sobre "hover".
     states [
         pressionado when touch.pressed : {
-            background: destaque ? Tema.oceano.darker(0.22) : Tema.mare.darker(0.22);
+            background: destaque ? Tema.oceano.darker(0.22) : Tema.neutro.darker(0.22);
             border-color: Tema.oceano.with-alpha(0.6);
         }
         hover when touch.has-hover : {
-            background: destaque ? Tema.oceano.brighter(0.12) : Tema.mare_claro;
+            background: destaque ? Tema.oceano.brighter(0.12) : Tema.neutro_hover;
             border-color: Tema.oceano.with-alpha(0.42);
-            ico.colorize: destaque ? Tema.perola : Tema.dourado;
+            ico.colorize: destaque ? Tema.sobre_acento : Tema.dourado;
         }
     ]
 }
@@ -106,7 +125,7 @@ export component BarraDeslizante inherits Rectangle {
         height: 6px;
         y: (parent.height - self.height) / 2;
         border-radius: 3px;
-        background: Tema.mare;
+        background: Tema.neutro;
         border-width: 1px;
         border-color: Tema.borda;
     }
@@ -126,7 +145,7 @@ export component BarraDeslizante inherits Rectangle {
         width: 12px;
         height: 12px;
         border-radius: 6px;
-        background: Tema.perola;
+        background: Tema.texto;
         x: max(0px, min(parent.width - self.width, parent.width * root.fracao - self.width / 2));
         y: (parent.height - self.height) / 2;
 
@@ -185,7 +204,7 @@ export component CampoBusca inherits Rectangle {
 
     height: 38px;
     border-radius: 10px;
-    background: Tema.mare;
+    background: Tema.painel;
     border-width: 1px;
     border-color: entrada.has-focus ? Tema.foco : Tema.borda;
     animate border-color { duration: 140ms; }
@@ -215,11 +234,11 @@ export component CampoBusca inherits Rectangle {
         x: 38px;
         width: root.width - 38px - 12px;
         height: root.height;
-        color: Tema.perola;
+        color: Tema.texto;
         font-size: 14px;
         vertical-alignment: center;
         selection-background-color: Tema.oceano.with-alpha(0.35);
-        selection-foreground-color: Tema.perola;
+        selection-foreground-color: Tema.texto;
         text <=> root.texto;
         edited => { root.editado(self.text); }
         accepted => { root.aceito(self.text); }
@@ -262,8 +281,9 @@ export component BotaoTitulo inherits Rectangle {
 
     states [
         hover when touch.has-hover : {
-            background: root.perigo ? Tema.perigo.with-alpha(0.85) : Tema.mare_claro;
-            ico.colorize: Tema.perola;
+            background: root.perigo ? Tema.perigo.with-alpha(0.85) : Tema.neutro_hover;
+            // Sobre o vermelho o ícone tem que ser claro nos dois temas
+            ico.colorize: root.perigo ? Tema.sobre_acento : Tema.texto;
         }
     ]
 }
@@ -290,7 +310,7 @@ export component CaixaSelecao inherits Rectangle {
             border-radius: 5px;
             border-width: 1px;
             border-color: root.marcado ? Tema.oceano : Tema.borda;
-            background: root.marcado ? Tema.oceano.with-alpha(0.22) : Tema.mare;
+            background: root.marcado ? Tema.oceano.with-alpha(0.22) : Tema.neutro;
             animate background, border-color { duration: 130ms; }
 
             check := Image {
@@ -306,7 +326,7 @@ export component CaixaSelecao inherits Rectangle {
 
         Text {
             text: root.rotulo;
-            color: Tema.perola;
+            color: Tema.texto;
             font-size: 14px;
             vertical-alignment: center;
         }

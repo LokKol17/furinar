@@ -29,6 +29,7 @@ MP3, WAV, FLAC, OGG/Vorbis, M4A
 - **Barra de título própria** — janela sem moldura nativa, com barra no tema do app (arrastar com Aero Snap, minimizar e fechar) e cantos arredondados no Windows 11
 - **Configuración persistente** — carpeta, volumen, modo de loop, shuffle, escaneo de subcarpetas, pista actual y posición se guardan automáticamente
 - **Configuração persistente** — pasta, volume, modo de loop, shuffle, faixa atual e posição são salvos automaticamente
+- **Tema claro/escuro** — switch nas configurações com troca instantânea; a escolha é lembrada entre execuções e aplicada antes da primeira renderização (sem piscar)
 
 ### Ícone
 
@@ -59,15 +60,20 @@ As preferências são salvas automaticamente no arquivo `furinar_config.json`, n
 
 ```json
 {
-  "pasta": "E:\\Music",
+  "pastas": ["E:\\Music"],
+  "aba_visivel_salva": 0,
+  "pasta_reproducao_salva": 0,
   "volume": 0.11666667,
   "modo_loop": 2,
   "shuffle": true,
-  "escanear_subpastas": true,
   "indice_atual": 5,
-  "tempo_atual": 42
+  "tempo_atual": 42,
+  "escanear_subpastas": true,
+  "tema_claro": false
 }
 ```
+
+O campo antigo `pasta` (singular) ainda é lido — se `pastas` estiver vazio e ele existir, é migrado automaticamente para a lista.
 
 Edite o arquivo manualmente se necessário — o player lê as configurações ao iniciar.
 

@@ -68,6 +68,9 @@ struct AppConfig {
     tempo_atual: Option<u64>,
     #[serde(default)]
     escanear_subpastas: bool,
+    /// Tema claro ligado. `false` = escuro (padrão, mantém quem já usa o app).
+    #[serde(default)]
+    tema_claro: bool,
 }
 
 impl AppConfig {
@@ -242,6 +245,7 @@ struct EstadoAudio {
     modo_loop: u8,
     modo_shuffle: bool,
     escanear_subpastas: bool,
+    tema_claro: bool,
     /// Mapeia posição na lista visível -> índice em `pastas[aba_visivel].tracks`.
     indices_visiveis: Vec<usize>,
     /// Texto atual da busca (título/artista).
@@ -273,6 +277,7 @@ impl Default for EstadoAudio {
             modo_loop: 0,
             modo_shuffle: false,
             escanear_subpastas: false,
+            tema_claro: false,
             indices_visiveis: Vec::new(),
             filtro: String::new(),
             letra_atual: Vec::new(),
@@ -298,6 +303,7 @@ fn salvar_configuracao(estado: &EstadoAudio) {
         modo_loop: estado.modo_loop,
         shuffle: estado.modo_shuffle,
         escanear_subpastas: estado.escanear_subpastas,
+        tema_claro: estado.tema_claro,
         indice_atual: estado.indice_atual,
         tempo_atual: if estado.tempo_decorrido > 0.0 {
             Some(estado.tempo_decorrido as u64)
@@ -1493,6 +1499,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ui.set_shuffle_ativo(config.shuffle);
         ui.set_escanear_subpastas(config.escanear_subpastas);
 
+        // Aplica o tema salvo antes da primeira renderização, para não piscar
+        e.tema_claro = config.tema_claro;
+        ui.set_tema_escuro(!config.tema_claro);
+
         // Carrega as pastas salvas. Se alguma não existir mais, é pulada, e o
         // mapeamento mantém os índices salvos coerentes com a nova lista.
         let mut mapeamento: Vec<Option<usize>> = Vec::with_capacity(config.pastas.len());
@@ -1669,6 +1679,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 salvar_configuracao(&e);
                 reescaneiar_pastas(&mut e, &ui);
             }
+        });
+    }
+
+    {
+        let estado = estado.clone();
+        ui.on_trocar_tema(move |escuro| {
+            // O visual já mudou sozinho pelo binding da UI com `Tema.escuro`;
+            // aqui só guardamos a escolha no config.
+            let mut e = estado.borrow_mut();
+            e.tema_claro = !escuro;
+            salvar_configuracao(&e);
         });
     }
 

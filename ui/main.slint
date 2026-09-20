@@ -37,6 +37,8 @@ export component MainWindow inherits Window {
     in property <int> letra_destaque: -1;
     in-out property <bool> mostrar_letra: false;
     in-out property <bool> escanear_subpastas: false;
+    /// Espelha `Tema.escuro` para o Rust conseguir ler e gravar o tema
+    in-out property <bool> tema_escuro <=> Tema.escuro;
 
     callback abrir_pasta();
     callback anterior();
@@ -57,6 +59,7 @@ export component MainWindow inherits Window {
     callback alternar_escanear_subpastas(bool);
     callback minimizar();
     callback alternar_maximizado();
+    callback trocar_tema(bool);
 
     // Altura de cada linha da playlist
     private property <length> altura_linha: 30px;
@@ -135,7 +138,7 @@ export component MainWindow inherits Window {
         y: 0px;
         width: parent.width;
         height: altura_barra;
-        background: Tema.abismo;
+        background: Tema.barra;
 
         // O Windows faz o arraste (com Aero Snap de graça)
         WindowMoveArea {
@@ -154,7 +157,7 @@ export component MainWindow inherits Window {
                 }
                 Text {
                     text: "Furinar";
-                    color: Tema.perola;
+                    color: Tema.texto;
                     font-size: 13px;
                     font-weight: 600;
                     vertical-alignment: center;
@@ -317,7 +320,7 @@ export component MainWindow inherits Window {
                         width: largura_aba;
                         height: 32px;
                         border-radius: 8px;
-                        background: i == aba_ativa ? Tema.oceano.with-alpha(0.16) : Tema.mare;
+                        background: i == aba_ativa ? Tema.oceano.with-alpha(0.16) : Tema.neutro;
                         border-width: 1px;
                         border-color: i == aba_ativa ? Tema.oceano.with-alpha(0.45) : Tema.borda;
                         clip: true;
@@ -347,7 +350,7 @@ export component MainWindow inherits Window {
                             width: parent.width - 50px;
                             height: parent.height - 4px;
                             text: nome;
-                            color: i == aba_ativa ? Tema.perola : Tema.texto_suave;
+                            color: i == aba_ativa ? Tema.texto : Tema.texto_suave;
                             font-size: 13px;
                             vertical-alignment: center;
                             wrap: no-wrap;
@@ -391,7 +394,7 @@ export component MainWindow inherits Window {
 
                             states [
                                 hover when fechar_touch.has-hover : {
-                                    background: Tema.mare_claro;
+                                    background: Tema.neutro_hover;
                                 }
                             ]
                         }
@@ -404,7 +407,7 @@ export component MainWindow inherits Window {
                 width: 32px;
                 height: 32px;
                 border-radius: 8px;
-                background: Tema.mare;
+                background: Tema.neutro;
                 border-width: 1px;
                 border-color: Tema.borda;
                 animate background, border-color { duration: 130ms; }
@@ -415,7 +418,7 @@ export component MainWindow inherits Window {
                     height: 14px;
                     x: (parent.width - self.width) / 2;
                     y: (parent.height - self.height) / 2;
-                    colorize: Tema.perola;
+                    colorize: Tema.texto;
                 }
 
                 mais_touch := TouchArea {
@@ -427,7 +430,7 @@ export component MainWindow inherits Window {
 
                 states [
                     hover when mais_touch.has-hover : {
-                        background: Tema.mare_claro;
+                        background: Tema.neutro_hover;
                         border-color: Tema.oceano.with-alpha(0.42);
                     }
                 ]
@@ -442,7 +445,7 @@ export component MainWindow inherits Window {
             // do conteúdo como preferred e o layout estoura a janela.
             vertical-stretch: 1;
             preferred-height: 0px;
-            background: Tema.mare.with-alpha(0.55);
+            background: Tema.painel_fosco;
             border-radius: 12px;
             border-width: 1px;
             border-color: Tema.borda;
@@ -476,7 +479,7 @@ export component MainWindow inherits Window {
 
                         Text {
                             text: musica;
-                            color: Tema.perola;
+                            color: Tema.texto;
                             font-size: 13px;
                             vertical-alignment: center;
                             x: 14px;
@@ -539,7 +542,7 @@ export component MainWindow inherits Window {
                             width: parent.width - 24px;
                             height: parent.height;
                             text: linha;
-                            color: i == letra_destaque ? Tema.dourado : Tema.perola.with-alpha(0.62);
+                            color: i == letra_destaque ? Tema.dourado : Tema.texto.with-alpha(0.62);
                             font-size: i == letra_destaque ? 19px : 15px;
                             font-weight: i == letra_destaque ? 700 : 400;
                             horizontal-alignment: center;
@@ -572,7 +575,7 @@ export component MainWindow inherits Window {
         y: 299px;
 
         Rectangle {
-            background: Tema.mare;
+            background: Tema.painel;
             border-radius: 12px;
             border-width: 1px;
             border-color: Tema.borda;
@@ -585,7 +588,13 @@ export component MainWindow inherits Window {
                     text: "Configurações";
                     font-size: 16px;
                     font-weight: 700;
-                    color: Tema.perola;
+                    color: Tema.texto;
+                }
+
+                CaixaSelecao {
+                    rotulo: tema_escuro ? "Tema: Escuro" : "Tema: Claro";
+                    marcado <=> tema_escuro;
+                    alternado(v) => { trocar_tema(v); }
                 }
 
                 CaixaSelecao {
