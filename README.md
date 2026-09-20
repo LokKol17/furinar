@@ -23,10 +23,16 @@ MP3, WAV, FLAC, OGG/Vorbis, M4A
 - **Tags ID3/Vorbis** — lê título e artista das tags e exibe "Artista - Título" na lista (com fallback para o nome do arquivo quando não há tag)
 - **Busca/filtro** — filtra a playlist por título ou artista, ignorando acentos e maiúsculas; Anterior/Próxima navegam dentro do resultado filtrado
 - **Múltiplas pastas em abas** — cada pasta aberta vira uma aba; navegar entre abas não interfere na reprodução, que continua na pasta de onde a faixa veio (indicada por um ponto dourado na aba)
+- **Letras sincronizadas (.lrc)** — botão na barra de controles abre um painel que rola junto com a faixa; arquivos `.lrc` irmãos do áudio são lidos sob demanda, e sem `.lrc` o painel mostra uma mensagem simples
 - **Atalhos de teclado** — Espaço pausa/retoma, ←/→ pulam -5s/+5s, ↑/↓ navegam pela lista (com rolagem automática) e Enter toca a faixa selecionada
 - **Botões na miniatura da barra de tarefas** — Anterior, Play/Pause e Próxima aparecem no preview do ícone (ITaskbarList3), com o ícone central acompanhando o estado de reprodução
+- **Barra de título própria** — janela sem moldura nativa, com barra no tema do app (arrastar com Aero Snap, minimizar e fechar) e cantos arredondados no Windows 11
 - **Configuración persistente** — carpeta, volumen, modo de loop, shuffle, escaneo de subcarpetas, pista actual y posición se guardan automáticamente
 - **Configuração persistente** — pasta, volume, modo de loop, shuffle, faixa atual e posição são salvos automaticamente
+
+### Ícone
+
+O ícone do app fica em `ui/assets/furinar_icon.png`. Não precisa ser quadrado: o `build.rs` recorta as bordas transparentes e centraliza o conteúdo num quadrado de 256px (preservando a proporção, sem esticar), gerando `ui/assets/furinar_icon_quadrado.png`. Esse derivado alimenta tanto o ícone da janela quanto o `.ico` multi-resolução (16/32/48/256) embutido no executável. Substitua o arquivo de origem pelo seu — o build cuida do resto.
 
 ## Requisitos
 

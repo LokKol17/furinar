@@ -1,3 +1,6 @@
+// Em release não abrimos console junto do app; no debug mantemos, para ver logs.
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 slint::include_modules!();
 
 use std::cell::RefCell;
@@ -23,6 +26,10 @@ use souvlaki::{
 use unicode_normalization::UnicodeNormalization;
 use unicode_normalization::char::is_combining_mark;
 use windows::Win32::Foundation::{HINSTANCE, HWND};
+use windows::Win32::Graphics::Dwm::{
+    DWM_WINDOW_CORNER_PREFERENCE, DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND,
+    DwmSetWindowAttribute,
+};
 use windows::Win32::System::Com::{CLSCTX_INPROC_SERVER, CoCreateInstance};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Controls::{
@@ -239,6 +246,13 @@ struct EstadoAudio {
     indices_visiveis: Vec<usize>,
     /// Texto atual da busca (título/artista).
     filtro: String,
+    /// Letra sincronizada da faixa atual (tempo em segundos, texto), ordenada.
+    letra_atual: Vec<(f64, String)>,
+    /// Índice da linha da letra exibida (-1 = antes da primeira).
+    letra_indice: i32,
+    /// Índice absoluto da primeira linha do recorte que está na UI. Serve para
+    /// traduzir o clique numa linha do painel de volta para o timestamp.
+    letra_janela_inicio: usize,
     faixa_controles: Option<String>,
     status_controles: Option<MediaPlayback>,
 }
@@ -261,6 +275,9 @@ impl Default for EstadoAudio {
             escanear_subpastas: false,
             indices_visiveis: Vec::new(),
             filtro: String::new(),
+            letra_atual: Vec::new(),
+            letra_indice: -1,
+            letra_janela_inicio: 0,
             faixa_controles: None,
             status_controles: None,
         }
@@ -519,6 +536,161 @@ fn reescaneiar_pastas(estado: &mut EstadoAudio, ui: &MainWindow) {
     atualizar_lista(estado, ui);
 }
 
+// ---------------------------------------------------------------------
+// Letras sincronizadas (.lrc)
+// ---------------------------------------------------------------------
+
+/// Quantas linhas mandamos pra UI ao redor da linha atual. Ímpar, para a
+/// linha atual poder ficar centralizada.
+const LETRA_JANELA: usize = 9;
+
+/// Caminho do .lrc irmão da faixa: mesmo nome, extensão trocada.
+fn caminho_lrc(caminho_faixa: &std::path::Path) -> PathBuf {
+    caminho_faixa.with_extension("lrc")
+}
+
+/// Converte "mm:ss", "mm:ss.xx" ou "mm:ss.xxx" em segundos.
+fn parse_tempo(dentro: &str) -> Option<f64> {
+    let (minutos, resto) = dentro.split_once(':')?;
+    let minutos: u64 = minutos.trim().parse().ok()?;
+
+    let (segundos, fracao) = match resto.split_once('.') {
+        Some((s, f)) => (s, Some(f)),
+        None => (resto, None),
+    };
+    let segundos: u64 = segundos.trim().parse().ok()?;
+
+    let fracao = match fracao {
+        None => 0.0,
+        Some(f) => {
+            let f = f.trim();
+            // 1 a 3 dígitos: ".5", ".50" e ".500" valem 500 ms
+            if f.is_empty() || f.len() > 3 || !f.bytes().all(|b| b.is_ascii_digit()) {
+                return None;
+            }
+            let valor: u64 = f.parse().ok()?;
+            match f.len() {
+                1 => valor as f64 / 10.0,
+                2 => valor as f64 / 100.0,
+                _ => valor as f64 / 1000.0,
+            }
+        }
+    };
+
+    Some(minutos as f64 * 60.0 + segundos as f64 + fracao)
+}
+
+/// Parseia um .lrc. Linhas fora do padrão `[tempo]texto` são ignoradas em
+/// silêncio, e uma linha com vários timestamps gera uma entrada por timestamp.
+fn parse_lrc(conteudo: &str) -> Vec<(f64, String)> {
+    let mut linhas: Vec<(f64, String)> = Vec::new();
+
+    for linha in conteudo.lines() {
+        let mut resto = linha;
+        let mut tempos: Vec<f64> = Vec::new();
+
+        // Consome todos os `[tempo]` no começo da linha
+        while let Some(fim) = resto.find(']') {
+            if !resto.starts_with('[') {
+                break;
+            }
+            match parse_tempo(&resto[1..fim]) {
+                Some(t) => tempos.push(t),
+                // Metadado ([ar:...], [ti:...]) ou lixo: a linha não serve
+                None => break,
+            }
+            resto = &resto[fim + 1..];
+        }
+
+        if tempos.is_empty() {
+            continue;
+        }
+
+        let texto = resto.trim().to_string();
+        for t in tempos {
+            linhas.push((t, texto.clone()));
+        }
+    }
+
+    linhas.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+    linhas
+}
+
+/// Índice da última linha cujo tempo é ≤ `tempo` (-1 se ainda não chegou).
+fn indice_letra(letra: &[(f64, String)], tempo: f64) -> i32 {
+    let n = letra.partition_point(|(t, _)| *t <= tempo);
+    if n == 0 { -1 } else { (n - 1) as i32 }
+}
+
+/// Recorte de linhas ao redor da linha atual. Devolve (início, linhas, destaque).
+/// A janela fica centrada na linha atual, exceto perto das pontas — é isso
+/// que dá a sensação de rolagem em vez de um texto trocando no lugar.
+fn janela_letra(letra: &[(f64, String)], indice: i32) -> (usize, Vec<SharedString>, i32) {
+    if letra.is_empty() {
+        return (0, Vec::new(), -1);
+    }
+
+    let inicio = if indice < 0 {
+        0
+    } else {
+        let atual = indice as usize;
+        let metade = LETRA_JANELA / 2;
+        if atual < metade {
+            0
+        } else if atual + metade + 1 > letra.len() {
+            letra.len().saturating_sub(LETRA_JANELA)
+        } else {
+            atual - metade
+        }
+    };
+
+    let fim = (inicio + LETRA_JANELA).min(letra.len());
+    let linhas = letra[inicio..fim]
+        .iter()
+        .map(|(_, t)| t.as_str().into())
+        .collect();
+    let destaque = if indice < 0 {
+        -1
+    } else {
+        indice - inicio as i32
+    };
+
+    (inicio, linhas, destaque)
+}
+
+/// Carrega a letra da faixa e já publica o primeiro recorte. Não existir .lrc
+/// é o caso normal ("sem letra disponível"), não uma falha.
+fn carregar_letra(
+    estado: &mut EstadoAudio,
+    ui: &MainWindow,
+    caminho_faixa: &std::path::Path,
+    tempo: f64,
+) {
+    estado.letra_atual = fs::read_to_string(caminho_lrc(caminho_faixa))
+        .map(|conteudo| parse_lrc(&conteudo))
+        .unwrap_or_default();
+    estado.letra_indice = indice_letra(&estado.letra_atual, tempo);
+    publicar_letra(estado, ui);
+}
+
+/// Recalcula a linha atual e só mexe na UI quando ela muda.
+fn sincronizar_letra(estado: &mut EstadoAudio, ui: &MainWindow) {
+    let indice = indice_letra(&estado.letra_atual, estado.tempo_decorrido);
+    if indice == estado.letra_indice {
+        return;
+    }
+    estado.letra_indice = indice;
+    publicar_letra(estado, ui);
+}
+
+/// Manda pra UI o recorte de linhas ao redor da linha atual.
+fn publicar_letra(estado: &mut EstadoAudio, ui: &MainWindow) {
+    let (inicio, janela, destaque) = janela_letra(&estado.letra_atual, estado.letra_indice);
+    estado.letra_janela_inicio = inicio;
+    ui.set_letra(ModelRc::new(VecModel::from(janela)));
+    ui.set_letra_destaque(destaque);
+}
+
 fn executar_seek(estado: &mut EstadoAudio, ui: &MainWindow, alvo_secs: u64) {
     // Sempre a pasta de onde vem a faixa atual, nunca a aba visível.
     let pasta = match estado.pasta_reproducao.and_then(|i| estado.pastas.get(i)) {
@@ -613,14 +785,16 @@ fn iniciar_faixa(
 ) {
     garantir_pasta_carregada(estado, pasta_idx);
 
-    let caminho = match estado
-        .pastas
-        .get(pasta_idx)
-        .and_then(|p| p.tracks.get(track_idx))
-    {
-        Some(t) => t.path.clone(),
+    let (caminho, pasta_raiz) = match estado.pastas.get(pasta_idx) {
+        Some(pasta) => match pasta.tracks.get(track_idx) {
+            Some(t) => (t.path.clone(), pasta.caminho.clone()),
+            None => return,
+        },
         None => return,
     };
+
+    // Troca de faixa: descarta a letra anterior e tenta carregar a nova
+    carregar_letra(estado, ui, &pasta_raiz.join(&caminho), alvo_secs as f64);
 
     estado.pasta_reproducao = Some(pasta_idx);
     estado.indice_atual = Some(track_idx);
@@ -631,6 +805,29 @@ fn iniciar_faixa(
 
 fn tocar_faixa(estado: &mut EstadoAudio, ui: &MainWindow, pasta_idx: usize, track_idx: usize) {
     iniciar_faixa(estado, ui, pasta_idx, track_idx, 0);
+}
+
+/// Reposiciona a faixa mantendo o estado de pausa. `executar_seek` recria o
+/// player já tocando, então re-pausamos quando for o caso.
+fn seek_mantendo_pausa(estado: &mut EstadoAudio, ui: &MainWindow, alvo_secs: u64) {
+    let Some(estava_pausado) = estado
+        .audio_player
+        .as_ref()
+        .map(|(_, sink)| sink.is_paused())
+    else {
+        // Sem faixa carregada não há o que reposicionar
+        return;
+    };
+
+    executar_seek(estado, ui, alvo_secs);
+
+    if estava_pausado {
+        if let Some((_, ref sink)) = estado.audio_player {
+            sink.pause();
+            ui.set_texto_play_pause("Play".into());
+            ui.set_tocando(false);
+        }
+    }
 }
 
 fn tocar_anterior(estado: &mut EstadoAudio, ui: &MainWindow) {
@@ -704,6 +901,11 @@ fn stop_music(estado: &mut EstadoAudio, ui: &MainWindow) {
     ui.set_texto_play_pause("Play".into());
     ui.set_tocando(false);
     ui.set_texto_tempo("00:00 / 00:00".into());
+
+    // Nada tocando: some com a letra da faixa anterior
+    estado.letra_atual.clear();
+    estado.letra_indice = -1;
+    publicar_letra(estado, ui);
 }
 
 fn tocar_proxima_manual(estado: &mut EstadoAudio, ui: &MainWindow) {
@@ -795,6 +997,9 @@ fn atualizar_progresso(estado: &mut EstadoAudio, ui: &MainWindow) {
         proxima_musica_auto(estado, ui);
         return;
     }
+
+    // Letra: recalcula a linha atual (também quando pausado, após um seek)
+    sincronizar_letra(estado, ui);
 
     let pausado = match estado.audio_player {
         Some((_, ref sink)) => sink.is_paused(),
@@ -1214,6 +1419,24 @@ fn atualizar_icone_taskbar(botoes: &Rc<RefCell<Option<BotoesTaskbar>>>, estado: 
     }
 }
 
+/// Cantos arredondados nativos (Windows 11). Em versões que não conhecem o
+/// atributo a chamada falha e é simplesmente ignorada.
+fn arredondar_cantos(ui: &MainWindow) {
+    let Some(hwnd) = obter_hwnd(ui).map(HWND) else {
+        return;
+    };
+
+    let preferencia: DWM_WINDOW_CORNER_PREFERENCE = DWMWCP_ROUND;
+    unsafe {
+        let _ = DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_WINDOW_CORNER_PREFERENCE,
+            &preferencia as *const _ as *const std::ffi::c_void,
+            std::mem::size_of::<DWM_WINDOW_CORNER_PREFERENCE>() as u32,
+        );
+    }
+}
+
 // ---------------------------------------------------------------------
 // main
 // ---------------------------------------------------------------------
@@ -1479,24 +1702,30 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ui.on_seek_relativo(move |delta| {
             if let Some(ui) = ui_fraca.upgrade() {
                 let mut e = estado.borrow_mut();
-                // Só faz sentido pular se houver faixa carregada
-                let Some(estava_pausado) =
-                    e.audio_player.as_ref().map(|(_, sink)| sink.is_paused())
-                else {
-                    return;
-                };
                 let alvo = (e.tempo_decorrido as i64 + delta as i64)
                     .clamp(0, e.duracao_total_secs as i64) as u64;
-                executar_seek(&mut e, &ui, alvo);
-                // `executar_seek` recria o player já tocando; se estava pausado,
-                // volta a pausar para o atalho não retomar sem querer.
-                if estava_pausado {
-                    if let Some((_, ref sink)) = e.audio_player {
-                        sink.pause();
-                        ui.set_texto_play_pause("Play".into());
-                        ui.set_tocando(false);
-                    }
-                }
+                seek_mantendo_pausa(&mut e, &ui, alvo);
+            }
+        });
+    }
+
+    {
+        let estado = estado.clone();
+        let ui_fraca = ui.as_weak();
+        ui.on_letra_linha_clicada(move |posicao| {
+            if let Some(ui) = ui_fraca.upgrade() {
+                let mut e = estado.borrow_mut();
+                // `posicao` é relativa ao recorte que está na UI
+                let Some(absoluto) = e.letra_janela_inicio.checked_add(posicao as usize) else {
+                    return;
+                };
+                let Some((tempo, _)) = e.letra_atual.get(absoluto) else {
+                    return;
+                };
+                let alvo = tempo.max(0.0) as u64;
+                seek_mantendo_pausa(&mut e, &ui, alvo);
+                // Reflete o novo ponto na hora, sem esperar o próximo tick
+                sincronizar_letra(&mut e, &ui);
             }
         });
     }
@@ -1539,9 +1768,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let controles = controles.clone();
         let botoes_taskbar = botoes_taskbar.clone();
         let mut tentativas_taskbar = 0u32;
+        let mut cantos_arredondados = false;
         timer.start(TimerMode::Repeated, Duration::from_millis(250), move || {
             if let Some(ui) = ui_fraca.upgrade() {
                 let mut e = estado.borrow_mut();
+
+                // Cantos arredondados nativos: uma vez, assim que a janela existe
+                if !cantos_arredondados && obter_hwnd(&ui).is_some() {
+                    cantos_arredondados = true;
+                    arredondar_cantos(&ui);
+                }
 
                 // Configura os controles multimídia na primeira oportunidade:
                 // a janela winit só existe depois que o event loop inicia
@@ -1572,11 +1808,35 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
     }
 
+    {
+        let ui_fraca = ui.as_weak();
+        ui.on_minimizar(move || {
+            if let Some(ui) = ui_fraca.upgrade() {
+                ui.window().set_minimized(true);
+            }
+        });
+    }
+
+    {
+        let ui_fraca = ui.as_weak();
+        ui.on_alternar_maximizado(move || {
+            if let Some(ui) = ui_fraca.upgrade() {
+                let janela = ui.window();
+                janela.set_maximized(!janela.is_maximized());
+            }
+        });
+    }
+
     // Salva o estado final ao fechar
     {
         let estado = estado.clone();
+        let ui_fraca = ui.as_weak();
         ui.on_fecha_janela(move || {
-            salvar_configuracao(&estado.borrow());
+            if let Some(ui) = ui_fraca.upgrade() {
+                // Mesmo comportamento de antes: salva e deixa o event loop sair
+                salvar_configuracao(&estado.borrow());
+                let _ = ui.hide();
+            }
         });
     }
 

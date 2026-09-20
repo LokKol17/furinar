@@ -14,6 +14,7 @@ export global Tema {
     out property <color> perola: #f1f5f9;  // texto principal
     out property <color> dourado: #c9a050; // acento secundário
     out property <color> lavanda: #a78bc4; // toque pontual
+    out property <color> perigo: #c9564f;  // vermelho suave (fechar)
 
     // Derivadas
     out property <color> mare_claro: mare.brighter(0.16);
@@ -223,6 +224,48 @@ export component CampoBusca inherits Rectangle {
         edited => { root.editado(self.text); }
         accepted => { root.aceito(self.text); }
     }
+}
+
+// ---------------------------------------------------------------------
+// Botão da barra de título (janela sem moldura nativa)
+// ---------------------------------------------------------------------
+
+export component BotaoTitulo inherits Rectangle {
+    in property <image> icone;
+    in property <string> dica: "";
+    /// Fechar: hover em vermelho suave em vez de oceano.
+    in property <bool> perigo: false;
+    callback clicado();
+
+    width: 40px;
+    height: 30px;
+    border-radius: 6px;
+    background: transparent;
+    accessible-role: button;
+    accessible-label: root.dica;
+
+    animate background { duration: 110ms; }
+
+    ico := Image {
+        source: root.icone;
+        width: 14px;
+        height: 14px;
+        x: (root.width - self.width) / 2;
+        y: (root.height - self.height) / 2;
+        colorize: Tema.texto_suave;
+        animate colorize { duration: 110ms; }
+    }
+
+    touch := TouchArea {
+        clicked => { root.clicado(); }
+    }
+
+    states [
+        hover when touch.has-hover : {
+            background: root.perigo ? Tema.perigo.with-alpha(0.85) : Tema.mare_claro;
+            ico.colorize: Tema.perola;
+        }
+    ]
 }
 
 // ---------------------------------------------------------------------

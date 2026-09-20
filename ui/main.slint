@@ -1,10 +1,16 @@
-import { Tema, BotaoIcone, BarraDeslizante, CampoBusca, CaixaSelecao } from "theme.slint";
+import { Tema, BotaoIcone, BotaoTitulo, BarraDeslizante, CampoBusca, CaixaSelecao } from "theme.slint";
 
 export component MainWindow inherits Window {
     title: "Furinar Audio Player";
     width: 660px;
-    height: 700px;
+    height: 734px;
     background: Tema.fundo_janela;
+
+    // Sem moldura nativa: a barra de título é nossa. O Slint (winit) ainda
+    // cuida do redimensionamento pelas bordas.
+    no-frame: true;
+    resize-border-width: 6px;
+    icon: @image-url("assets/furinar_icon_quadrado.png");
 
     // Foco inicial vai para o FocusScope dos atalhos de teclado
     forward-focus: atalhos;
@@ -25,6 +31,11 @@ export component MainWindow inherits Window {
     in-out property <int> aba_ativa: 0;
     /// Aba da pasta de onde vem o som agora (-1 se nada está tocando).
     in property <int> aba_tocando: -1;
+    /// Recorte da letra ao redor da linha atual.
+    in property <[string]> letra: [];
+    /// Linha destacada dentro do recorte (-1 se nenhuma).
+    in property <int> letra_destaque: -1;
+    in-out property <bool> mostrar_letra: false;
     in-out property <bool> escanear_subpastas: false;
 
     callback abrir_pasta();
@@ -39,14 +50,19 @@ export component MainWindow inherits Window {
     callback seek_relativo(int);
     callback musica_selecionada(int);
     callback busca_mudou(string);
+    callback letra_linha_clicada(int);
     callback aba_selecionada(int);
     callback fechar_aba(int);
     callback fecha_janela();
     callback alternar_escanear_subpastas(bool);
+    callback minimizar();
+    callback alternar_maximizado();
 
     // Altura de cada linha da playlist
     private property <length> altura_linha: 30px;
     private property <length> largura_aba: 150px;
+    private property <length> altura_letra_linha: 32px;
+    private property <length> altura_barra: 34px;
 
     // Mantém a linha selecionada dentro da área visível da lista
     function manter_visivel() {
@@ -111,7 +127,60 @@ export component MainWindow inherits Window {
         }
     }
 
+    // -------------------------------------------------------------
+    // Barra de título customizada
+    // -------------------------------------------------------------
+    Rectangle {
+        x: 0px;
+        y: 0px;
+        width: parent.width;
+        height: altura_barra;
+        background: Tema.abismo;
+
+        // O Windows faz o arraste (com Aero Snap de graça)
+        WindowMoveArea {
+            HorizontalLayout {
+                padding-left: 10px;
+                padding-right: 4px;
+                spacing: 8px;
+                cross-axis-alignment: center;
+
+                Image {
+                    source: @image-url("assets/furinar_icon_quadrado.png");
+                    // A fonte pode não ser quadrada: recorta mantendo a proporção
+                    image-fit: contain;
+                    width: 20px;
+                    height: 20px;
+                }
+                Text {
+                    text: "Furinar";
+                    color: Tema.perola;
+                    font-size: 13px;
+                    font-weight: 600;
+                    vertical-alignment: center;
+                }
+
+                Rectangle { horizontal-stretch: 1; }
+
+                BotaoTitulo {
+                    icone: @image-url("icons/minimizar.svg");
+                    dica: "Minimizar";
+                    clicado => { minimizar(); }
+                }
+                BotaoTitulo {
+                    icone: @image-url("icons/x.svg");
+                    dica: "Fechar";
+                    perigo: true;
+                    clicado => { fecha_janela(); }
+                }
+            }
+        }
+    }
+
     VerticalLayout {
+        // Abaixo da barra de título
+        y: altura_barra;
+        height: parent.height - altura_barra;
         padding: 18px;
         spacing: 14px;
 
@@ -173,6 +242,12 @@ export component MainWindow inherits Window {
                     dica: texto_shuffle;
                     ativo: shuffle_ativo;
                     clicado => { alternar_shuffle(); }
+                }
+                BotaoIcone {
+                    icone: @image-url("icons/letra.svg");
+                    dica: "Letra";
+                    ativo: mostrar_letra;
+                    clicado => { mostrar_letra = !mostrar_letra; }
                 }
                 BotaoIcone {
                     icone: @image-url("icons/config.svg");
@@ -360,9 +435,13 @@ export component MainWindow inherits Window {
         }
 
         // -------------------------------------------------------------
-        // Playlist
+        // Conteúdo: playlist ou painel de letra, no mesmo espaço
         // -------------------------------------------------------------
-        Rectangle {
+        conteudo := Rectangle {
+            // Absorve o espaço restante: sem isso o Flickable propaga o tamanho
+            // do conteúdo como preferred e o layout estoura a janela.
+            vertical-stretch: 1;
+            preferred-height: 0px;
             background: Tema.mare.with-alpha(0.55);
             border-radius: 12px;
             border-width: 1px;
@@ -370,6 +449,11 @@ export component MainWindow inherits Window {
             clip: true;
 
             lista := Flickable {
+                visible: !mostrar_letra;
+                x: 0px;
+                y: 0px;
+                width: parent.width;
+                height: parent.height;
                 content-height: musicas.length * altura_linha;
 
                 VerticalLayout {
@@ -408,6 +492,75 @@ export component MainWindow inherits Window {
                     }
                 }
             }
+
+            // Painel de letra: sobrepõe exatamente a área da lista
+            painel_letra := Rectangle {
+                visible: mostrar_letra;
+                x: 0px;
+                y: 0px;
+                width: parent.width;
+                height: parent.height;
+                background: transparent;
+
+                if letra.length == 0 : VerticalLayout {
+                    x: 0px;
+                    y: 0px;
+                    width: painel_letra.width;
+                    height: painel_letra.height;
+                    alignment: center;
+                    padding: 20px;
+
+                    Text {
+                        text: "Sem letra disponível para esta faixa.";
+                        color: Tema.texto_suave;
+                        font-size: 13px;
+                        horizontal-alignment: center;
+                        wrap: word-wrap;
+                    }
+                }
+
+                if letra.length > 0 : VerticalLayout {
+                    x: 0px;
+                    y: 0px;
+                    width: painel_letra.width;
+                    height: painel_letra.height;
+                    alignment: center;
+                    padding: 14px;
+                    spacing: 2px;
+
+                    for linha[i] in letra: Rectangle {
+                        height: altura_letra_linha;
+                        background: transparent;
+                        animate background { duration: 120ms; }
+
+                        Text {
+                            x: 12px;
+                            y: 0px;
+                            width: parent.width - 24px;
+                            height: parent.height;
+                            text: linha;
+                            color: i == letra_destaque ? Tema.dourado : Tema.perola.with-alpha(0.62);
+                            font-size: i == letra_destaque ? 19px : 15px;
+                            font-weight: i == letra_destaque ? 700 : 400;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                            wrap: no-wrap;
+                            overflow: elide;
+                        }
+
+                        // Clicar numa linha pula a música para aquele trecho
+                        letra_touch := TouchArea {
+                            clicked => { letra_linha_clicada(i); }
+                        }
+
+                        states [
+                            hover when letra_touch.has-hover : {
+                                background: Tema.oceano.with-alpha(0.10);
+                            }
+                        ]
+                    }
+                }
+            }
         }
     }
 
@@ -416,7 +569,7 @@ export component MainWindow inherits Window {
     // -------------------------------------------------------------
     config_popup := PopupWindow {
         x: 170px;
-        y: 265px;
+        y: 299px;
 
         Rectangle {
             background: Tema.mare;
