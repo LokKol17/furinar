@@ -17,10 +17,12 @@
 
 ---
 
-<!--
-  Suggestion: add a real screenshot of the app here before publishing.
-  E.g.: ![Furinar in action](docs/screenshot.png)
--->
+<div align="center">
+
+<!-- Screenshot 1: main player view (folder/tabs/playlist visible) -->
+![Furinar - main player](docs/screenshot-player.png)
+
+</div>
 
 ## Why Furinar?
 
@@ -47,10 +49,30 @@ The visual palette — deep navy, cyan, and gold (or baby blue and pearl white i
 - **Light/dark theme**, switched instantly, no restart needed
 - Frameless window with a custom title bar (drag-to-move, Aero Snap, rounded corners on Windows 11)
 
+<div align="center">
+
+<!-- Screenshot 2: synced lyrics panel -->
+![Furinar - synced lyrics](docs/screenshot-lyrics.png)
+
+</div>
+
 **Windows integration**
 - **Play/Pause, Previous, and Next** buttons right on the taskbar thumbnail preview
 - System media controls (keyboard media keys, action center) via SMTC
 - Keyboard shortcuts: `Space` play/pause, `←`/`→` seek ±5s, `↑`/`↓` navigate the list, `Enter` plays the selected track
+
+<div align="center">
+  <table>
+    <tr>
+      <td align="center"><b>Bright Theme</b></td>
+      <td align="center"><b>Dark Theme</b></td>
+    </tr>
+    <tr>
+      <td><img src="docs/screenshot-player.png" alt="Furinar - tema claro"></td>
+      <td><img src="docs/screenshot-player-dark.png" alt="Furinar - tema escuro"></td>
+    </tr>
+  </table>
+</div>
 
 ## 🚀 Getting started
 
@@ -126,6 +148,4 @@ Built with [Slint](https://slint.dev) under its Royalty-free License.
 
 Inspired by Furina, from *Genshin Impact* (HoYoverse). Furinar is a fan project with no official affiliation.
 
-<a href="https://slint.dev">
-  <img src="https://raw.githubusercontent.com/slint-ui/slint/master/logo/MadeWithSlint-logo-whitebg.png" width="180" alt="Made with Slint" />
-</a>
+<a href="https://slint.dev"><img src="https://raw.githubusercontent.com/slint-ui/slint/master/logo/MadeWithSlint-logo-whitebg.png" width="180" alt="Made with Slint" /></a>

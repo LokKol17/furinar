@@ -17,10 +17,12 @@
 
 ---
 
-<!--
-  Sugestão: coloque uma screenshot real do app aqui antes de publicar.
-  Ex: ![Furinar em ação](docs/screenshot.png)
--->
+<div align="center">
+
+<!-- Screenshot 1: visão principal do player (pasta/abas/playlist visíveis) -->
+![Furinar - player principal](docs/screenshot-player.png)
+
+</div>
 
 ## Por que Furinar?
 
@@ -47,10 +49,30 @@ A paleta visual — azul-marinho profundo, ciano e dourado (ou azul-bebê e bran
 - **Tema claro/escuro**, trocado na hora, sem reiniciar o app
 - Janela sem moldura nativa, com barra de título própria (arraste, Aero Snap, cantos arredondados no Windows 11)
 
+<div align="center">
+
+<!-- Screenshot 2: painel de letras sincronizadas -->
+![Furinar - letras sincronizadas](docs/screenshot-lyrics.png)
+
+</div>
+
 **Integração com o Windows**
 - Botões de **Play/Pause, Anterior e Próxima** direto na miniatura da barra de tarefas
 - Controles multimídia do sistema (teclas de mídia do teclado, central de ações) via SMTC
 - Atalhos de teclado: `Espaço` pausa/retoma, `←`/`→` pulam 5s, `↑`/`↓` navegam a lista, `Enter` toca a faixa selecionada
+
+<div align="center">
+  <table>
+    <tr>
+      <td align="center"><b>Tema Claro</b></td>
+      <td align="center"><b>Tema Escuro</b></td>
+    </tr>
+    <tr>
+      <td><img src="docs/screenshot-player.png" alt="Furinar - tema claro"></td>
+      <td><img src="docs/screenshot-player-dark.png" alt="Furinar - tema escuro"></td>
+    </tr>
+  </table>
+</div>
 
 ## 🚀 Como usar
 
