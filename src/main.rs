@@ -30,6 +30,9 @@ use windows::Win32::Graphics::Dwm::{
     DWM_WINDOW_CORNER_PREFERENCE, DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND,
     DwmSetWindowAttribute,
 };
+use windows::Win32::Graphics::Gdi::{
+    RDW_ALLCHILDREN, RDW_ERASE, RDW_INVALIDATE, RDW_UPDATENOW, RedrawWindow,
+};
 use windows::Win32::System::Com::{CLSCTX_INPROC_SERVER, CoCreateInstance};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::Controls::{
@@ -41,6 +44,7 @@ use windows::Win32::UI::Shell::{
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     CreateIcon, DestroyIcon, GetSystemMetrics, HICON, MSG, SM_CXSMICON, WM_COMMAND,
+    WM_DISPLAYCHANGE, WM_DWMCOMPOSITIONCHANGED, WM_EXITSIZEMOVE,
 };
 
 // ---------------------------------------------------------------------
@@ -259,7 +263,15 @@ struct EstadoAudio {
     letra_janela_inicio: usize,
     faixa_controles: Option<String>,
     status_controles: Option<MediaPlayback>,
+    /// Últimas faixas tocadas (pasta, índice), mais recente no fim. Usado
+    /// pelo shuffle pra não repetir o que acabou de tocar — ver
+    /// `TAMANHO_HISTORICO_SHUFFLE`.
+    historico_shuffle: std::collections::VecDeque<(usize, usize)>,
 }
+
+/// Quantas faixas recentes o shuffle evita repetir. Pastas pequenas usam
+/// menos que isso automaticamente (nunca excluímos a pasta inteira).
+const TAMANHO_HISTORICO_SHUFFLE: usize = 5;
 
 impl Default for EstadoAudio {
     fn default() -> Self {
@@ -285,6 +297,7 @@ impl Default for EstadoAudio {
             letra_janela_inicio: 0,
             faixa_controles: None,
             status_controles: None,
+            historico_shuffle: std::collections::VecDeque::new(),
         }
     }
 }
@@ -805,6 +818,14 @@ fn iniciar_faixa(
     estado.pasta_reproducao = Some(pasta_idx);
     estado.indice_atual = Some(track_idx);
     estado.arquivo_atual = Some(caminho);
+
+    // Registra no histórico do shuffle (independente de ter sido esse modo
+    // que trouxe a faixa aqui — o que importa é o que foi ouvido).
+    estado.historico_shuffle.push_back((pasta_idx, track_idx));
+    while estado.historico_shuffle.len() > TAMANHO_HISTORICO_SHUFFLE {
+        estado.historico_shuffle.pop_front();
+    }
+
     atualizar_selecao_visivel(estado, ui);
     executar_seek(estado, ui, alvo_secs);
 }
@@ -935,11 +956,28 @@ fn tocar_proxima_manual(estado: &mut EstadoAudio, ui: &MainWindow) {
 
         if estado.modo_shuffle {
             let mut rng = rand::thread_rng();
+
+            // Evita repetir faixas ouvidas recentemente, não só a última
+            // (era o bug: com poucas faixas, excluir só a atual deixava a
+            // mesma música voltar 2 jogadas depois). O tamanho da exclusão
+            // se adapta a pastas pequenas: sempre sobra pelo menos 1
+            // candidato, nunca excluímos a pasta inteira.
+            let max_excluir = ordem.len().saturating_sub(1);
+            let recentes_mesma_pasta: Vec<usize> = estado
+                .historico_shuffle
+                .iter()
+                .rev()
+                .filter(|(p, _)| *p == pasta_idx)
+                .map(|(_, i)| *i)
+                .take(max_excluir)
+                .collect();
+
             let candidatos: Vec<usize> = ordem
                 .iter()
                 .copied()
-                .filter(|&i| Some(i) != estado.indice_atual)
+                .filter(|i| !recentes_mesma_pasta.contains(i))
                 .collect();
+
             candidatos
                 .choose(&mut rng)
                 .copied()
@@ -1038,6 +1076,25 @@ fn atualizar_progresso(estado: &mut EstadoAudio, ui: &MainWindow) {
 // ---------------------------------------------------------------------
 // Controles multimídia do sistema (SMTC no Windows)
 // ---------------------------------------------------------------------
+
+/// Contorna um bug conhecido do renderer de software do Slint no Windows: o
+/// rastreamento de "região suja" às vezes não marca a janela inteira como
+/// suja quando o fundo muda (troca de tema) ou em certos eventos de
+/// composição do DWM (Aero Snap, redimensionar, trocar de monitor) — o
+/// sintoma é a janela ficando parcialmente transparente até algo mais
+/// forçar o redesenho daquele pedaço. `RedrawWindow` com essas flags força
+/// um repaint completo e imediato, sem esperar o rastreamento de região
+/// suja decidir sozinho.
+fn forcar_repaint_completo(hwnd: HWND) {
+    unsafe {
+        let _ = RedrawWindow(
+            Some(hwnd),
+            None,
+            None,
+            RDW_INVALIDATE | RDW_UPDATENOW | RDW_ERASE | RDW_ALLCHILDREN,
+        );
+    }
+}
 
 fn obter_hwnd(ui: &MainWindow) -> Option<*mut std::ffi::c_void> {
     use raw_window_handle::HasWindowHandle;
@@ -1467,6 +1524,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 if codigo == THBN_CLICKED && (BTN_ANTERIOR..=BTN_PROXIMA).contains(&id) {
                     let _ = tx_taskbar.send(id);
                 }
+            } else if matches!(
+                msg.message,
+                WM_EXITSIZEMOVE | WM_DWMCOMPOSITIONCHANGED | WM_DISPLAYCHANGE
+            ) {
+                // Gatilhos conhecidos do bug de redraw parcial do renderer
+                // de software (ver `forcar_repaint_completo`).
+                forcar_repaint_completo(msg.hwnd);
             }
         }
         false
@@ -1684,12 +1748,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     {
         let estado = estado.clone();
+        let ui_fraca = ui.as_weak();
         ui.on_trocar_tema(move |escuro| {
             // O visual já mudou sozinho pelo binding da UI com `Tema.escuro`;
             // aqui só guardamos a escolha no config.
             let mut e = estado.borrow_mut();
             e.tema_claro = !escuro;
             salvar_configuracao(&e);
+
+            // Troca de fundo é o gatilho mais documentado do bug de redraw
+            // parcial do renderer de software (ver `forcar_repaint_completo`).
+            if let Some(ui) = ui_fraca.upgrade() {
+                if let Some(hwnd) = obter_hwnd(&ui).map(HWND) {
+                    forcar_repaint_completo(hwnd);
+                }
+            }
         });
     }
 
