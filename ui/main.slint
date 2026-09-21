@@ -17,7 +17,7 @@ export component MainWindow inherits Window {
 
     in-out property <bool> tocando: false;
     in-out property <bool> loop_ativo: false;
-    in-out property <bool> shuffle_ativo: false;
+    in-out property <int> shuffle_modo: 0;
     in-out property <string> texto_play_pause: "Play";
     in-out property <string> texto_busca: "";
     in-out property <string> texto_loop: "Loop: Desl";
@@ -243,7 +243,8 @@ export component MainWindow inherits Window {
                 BotaoIcone {
                     icone: @image-url("icons/shuffle.svg");
                     dica: texto_shuffle;
-                    ativo: shuffle_ativo;
+                    ativo: shuffle_modo != 0;
+                    intenso: shuffle_modo == 2;
                     clicado => { alternar_shuffle(); }
                 }
                 BotaoIcone {

@@ -57,6 +57,10 @@ export component BotaoIcone inherits Rectangle {
     in property <bool> destaque: false;
     /// Modo ligado (loop/shuffle).
     in property <bool> ativo: false;
+    /// Nível extra acima de `ativo` (ex: shuffle inteligente) — mesmo
+    /// ícone/posição, fundo com um toque mais quente pra se diferenciar do
+    /// "ativo" simples sem precisar de um ícone novo.
+    in property <bool> intenso: false;
     callback clicado();
 
     width: destaque ? 50px : 40px;
@@ -67,7 +71,9 @@ export component BotaoIcone inherits Rectangle {
 
     background: destaque
         ? Tema.oceano
-        : (ativo ? Tema.oceano.with-alpha(0.20) : Tema.neutro);
+        : (intenso
+            ? Tema.dourado.with-alpha(0.28)
+            : (ativo ? Tema.oceano.with-alpha(0.20) : Tema.neutro));
 
     accessible-role: button;
     accessible-label: root.dica;

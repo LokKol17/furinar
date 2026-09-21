@@ -67,7 +67,12 @@ struct AppConfig {
     pasta_reproducao_salva: Option<usize>,
     volume: f32,
     modo_loop: u8,
+    /// Campo antigo (só ligado/desligado). Existe apenas para migrar configs antigas.
+    #[serde(default, skip_serializing)]
     shuffle: bool,
+    /// 0 = desligado, 1 = shuffle, 2 = shuffle inteligente.
+    #[serde(default)]
+    modo_shuffle: u8,
     indice_atual: Option<usize>,
     tempo_atual: Option<u64>,
     #[serde(default)]
@@ -92,13 +97,17 @@ impl AppConfig {
     }
 
     /// Migra configs antigas: o campo `pasta` (singular) vira uma entrada em
-    /// `pastas`, e essa pasta era necessariamente a que estava tocando.
+    /// `pastas`, e essa pasta era necessariamente a que estava tocando. O
+    /// campo `shuffle` (bool) vira `modo_shuffle` (0/1/2).
     fn migrar(&mut self) {
         if self.pastas.is_empty() {
             if let Some(antiga) = self.pasta.take() {
                 self.pastas.push(antiga);
                 self.pasta_reproducao_salva = Some(0);
             }
+        }
+        if self.modo_shuffle == 0 && self.shuffle {
+            self.modo_shuffle = 1;
         }
     }
 
@@ -139,11 +148,11 @@ fn texto_loop(modo: u8) -> &'static str {
     }
 }
 
-fn texto_shuffle(ligado: bool) -> &'static str {
-    if ligado {
-        "Shuffle: Lig"
-    } else {
-        "Shuffle: Desl"
+fn texto_shuffle(modo: u8) -> &'static str {
+    match modo {
+        1 => "Shuffle",
+        2 => "Shuffle Inteligente",
+        _ => "Shuffle: Desl",
     }
 }
 
@@ -247,7 +256,13 @@ struct EstadoAudio {
     duracao_total_secs: u64,
     ultimo_segundo: u64,
     modo_loop: u8,
-    modo_shuffle: bool,
+    /// 0 = desligado, 1 = shuffle, 2 = shuffle inteligente.
+    modo_shuffle: u8,
+    /// Sacola do shuffle inteligente: índices embaralhados restantes na
+    /// pasta de reprodução atual. Esvazia -> reembaralha. Resetada (fica
+    /// vazia, força reembaralho) quando a pasta de reprodução muda, a
+    /// lista de faixas muda, ou o modo sai/entra no inteligente.
+    sacola_shuffle: Vec<usize>,
     escanear_subpastas: bool,
     tema_claro: bool,
     /// Mapeia posição na lista visível -> índice em `pastas[aba_visivel].tracks`.
@@ -263,15 +278,7 @@ struct EstadoAudio {
     letra_janela_inicio: usize,
     faixa_controles: Option<String>,
     status_controles: Option<MediaPlayback>,
-    /// Últimas faixas tocadas (pasta, índice), mais recente no fim. Usado
-    /// pelo shuffle pra não repetir o que acabou de tocar — ver
-    /// `TAMANHO_HISTORICO_SHUFFLE`.
-    historico_shuffle: std::collections::VecDeque<(usize, usize)>,
 }
-
-/// Quantas faixas recentes o shuffle evita repetir. Pastas pequenas usam
-/// menos que isso automaticamente (nunca excluímos a pasta inteira).
-const TAMANHO_HISTORICO_SHUFFLE: usize = 5;
 
 impl Default for EstadoAudio {
     fn default() -> Self {
@@ -287,7 +294,8 @@ impl Default for EstadoAudio {
             duracao_total_secs: 0,
             ultimo_segundo: 0,
             modo_loop: 0,
-            modo_shuffle: false,
+            modo_shuffle: 0,
+            sacola_shuffle: Vec::new(),
             escanear_subpastas: false,
             tema_claro: false,
             indices_visiveis: Vec::new(),
@@ -297,7 +305,6 @@ impl Default for EstadoAudio {
             letra_janela_inicio: 0,
             faixa_controles: None,
             status_controles: None,
-            historico_shuffle: std::collections::VecDeque::new(),
         }
     }
 }
@@ -314,7 +321,8 @@ fn salvar_configuracao(estado: &EstadoAudio) {
         pasta_reproducao_salva: estado.pasta_reproducao,
         volume: estado.volume_atual,
         modo_loop: estado.modo_loop,
-        shuffle: estado.modo_shuffle,
+        shuffle: false,
+        modo_shuffle: estado.modo_shuffle,
         escanear_subpastas: estado.escanear_subpastas,
         tema_claro: estado.tema_claro,
         indice_atual: estado.indice_atual,
@@ -533,6 +541,10 @@ fn reescaneiar_pastas(estado: &mut EstadoAudio, ui: &MainWindow) {
         tracks.sort_by(|a, b| a.path.cmp(&b.path));
         pasta.tracks = tracks;
     }
+
+    // Índices podem ter mudado com o reescaneio; a sacola do shuffle
+    // inteligente não serve mais.
+    estado.sacola_shuffle.clear();
 
     if let (Some(p), Some(nome)) = (estado.pasta_reproducao, estado.arquivo_atual.clone()) {
         let novo = estado
@@ -815,16 +827,15 @@ fn iniciar_faixa(
     // Troca de faixa: descarta a letra anterior e tenta carregar a nova
     carregar_letra(estado, ui, &pasta_raiz.join(&caminho), alvo_secs as f64);
 
+    if estado.pasta_reproducao != Some(pasta_idx) {
+        // Pasta de reprodução mudou: a sacola do shuffle inteligente era
+        // da pasta antiga, não serve mais aqui.
+        estado.sacola_shuffle.clear();
+    }
+
     estado.pasta_reproducao = Some(pasta_idx);
     estado.indice_atual = Some(track_idx);
     estado.arquivo_atual = Some(caminho);
-
-    // Registra no histórico do shuffle (independente de ter sido esse modo
-    // que trouxe a faixa aqui — o que importa é o que foi ouvido).
-    estado.historico_shuffle.push_back((pasta_idx, track_idx));
-    while estado.historico_shuffle.len() > TAMANHO_HISTORICO_SHUFFLE {
-        estado.historico_shuffle.pop_front();
-    }
 
     atualizar_selecao_visivel(estado, ui);
     executar_seek(estado, ui, alvo_secs);
@@ -954,35 +965,34 @@ fn tocar_proxima_manual(estado: &mut EstadoAudio, ui: &MainWindow) {
             .indice_atual
             .and_then(|idx| ordem.iter().position(|&i| i == idx));
 
-        if estado.modo_shuffle {
+        if estado.modo_shuffle == 2 {
+            // Shuffle inteligente: consome de uma "sacola" embaralhada até
+            // esvaziar; só então reembaralha uma nova. Garante que todas
+            // as faixas tocam uma vez antes de qualquer repetição.
+            if estado.sacola_shuffle.is_empty() {
+                let mut rng = rand::thread_rng();
+                let mut nova_sacola = ordem.clone();
+                nova_sacola.shuffle(&mut rng);
+
+                // Evita repetição colada na emenda entre um ciclo e o
+                // outro: a próxima a sair é `nova_sacola.last()` (o pop
+                // consome do fim) — se for igual à última tocada, troca de
+                // lugar com outra posição.
+                if nova_sacola.len() > 1 && nova_sacola.last().copied() == estado.indice_atual {
+                    let ultimo = nova_sacola.len() - 1;
+                    nova_sacola.swap(0, ultimo);
+                }
+
+                estado.sacola_shuffle = nova_sacola;
+            }
+            estado.sacola_shuffle.pop().map(|i| (pasta_idx, i))
+        } else if estado.modo_shuffle == 1 {
+            // Aleatório de verdade: sorteia entre todas as faixas, sem
+            // excluir nada (pode repetir, inclusive de seguida — é assim
+            // que aleatório de verdade se comporta). Quem quiser evitar
+            // repetição é o Shuffle Inteligente.
             let mut rng = rand::thread_rng();
-
-            // Evita repetir faixas ouvidas recentemente, não só a última
-            // (era o bug: com poucas faixas, excluir só a atual deixava a
-            // mesma música voltar 2 jogadas depois). O tamanho da exclusão
-            // se adapta a pastas pequenas: sempre sobra pelo menos 1
-            // candidato, nunca excluímos a pasta inteira.
-            let max_excluir = ordem.len().saturating_sub(1);
-            let recentes_mesma_pasta: Vec<usize> = estado
-                .historico_shuffle
-                .iter()
-                .rev()
-                .filter(|(p, _)| *p == pasta_idx)
-                .map(|(_, i)| *i)
-                .take(max_excluir)
-                .collect();
-
-            let candidatos: Vec<usize> = ordem
-                .iter()
-                .copied()
-                .filter(|i| !recentes_mesma_pasta.contains(i))
-                .collect();
-
-            candidatos
-                .choose(&mut rng)
-                .copied()
-                .or_else(|| ordem.first().copied())
-                .map(|i| (pasta_idx, i))
+            ordem.choose(&mut rng).copied().map(|i| (pasta_idx, i))
         } else {
             match pos {
                 Some(p) if p + 1 < ordem.len() => Some((pasta_idx, ordem[p + 1])),
@@ -1553,14 +1563,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut e = estado.borrow_mut();
         e.volume_atual = config.volume;
         e.modo_loop = config.modo_loop;
-        e.modo_shuffle = config.shuffle;
+        e.modo_shuffle = config.modo_shuffle;
         e.escanear_subpastas = config.escanear_subpastas;
 
         ui.set_volume(config.volume);
         ui.set_texto_loop(texto_loop(config.modo_loop).into());
         ui.set_loop_ativo(config.modo_loop != 0);
-        ui.set_texto_shuffle(texto_shuffle(config.shuffle).into());
-        ui.set_shuffle_ativo(config.shuffle);
+        ui.set_texto_shuffle(texto_shuffle(config.modo_shuffle).into());
+        ui.set_shuffle_modo(config.modo_shuffle as i32);
         ui.set_escanear_subpastas(config.escanear_subpastas);
 
         // Aplica o tema salvo antes da primeira renderização, para não piscar
@@ -1725,9 +1735,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ui.on_alternar_shuffle(move || {
             if let Some(ui) = ui_fraca.upgrade() {
                 let mut e = estado.borrow_mut();
-                e.modo_shuffle = !e.modo_shuffle;
+                e.modo_shuffle = (e.modo_shuffle + 1) % 3;
+                // Sacola da pasta antiga não serve pro modo novo.
+                e.sacola_shuffle.clear();
                 ui.set_texto_shuffle(texto_shuffle(e.modo_shuffle).into());
-                ui.set_shuffle_ativo(e.modo_shuffle);
+                ui.set_shuffle_modo(e.modo_shuffle as i32);
                 salvar_configuracao(&e);
             }
         });
