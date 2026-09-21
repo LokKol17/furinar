@@ -276,6 +276,7 @@ export component MainWindow inherits Window {
             BarraDeslizante {
                 width: 340px;
                 valor <=> progresso;
+                ao_vivo: false;
                 mudou(v) => { progresso_mudou(v); }
             }
             Text {

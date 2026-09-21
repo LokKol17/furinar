@@ -111,6 +111,13 @@ export component BarraDeslizante inherits Rectangle {
     in property <float> minimo: 0;
     in property <float> maximo: 1;
     in-out property <float> valor: 0;
+    // Quando falso, `mudou` só dispara no clique inicial e ao soltar o
+    // botão — não a cada pixel do arrasto. O volume mantém o padrão
+    // (`true`) porque o feedback de áudio em tempo real é esperado e é
+    // barato; o progresso usa `false` porque cada disparo aciona um seek
+    // (reabre arquivo, recria o Sink) — caro o bastante pra travar o app
+    // se disparado dezenas de vezes por segundo durante o arrasto.
+    in property <bool> ao_vivo: true;
     callback mudou(float);
 
     height: 22px;
@@ -164,9 +171,19 @@ export component BarraDeslizante inherits Rectangle {
                 return;
             }
             if (event.kind == PointerEventKind.down) {
-                root.definir_por_x(self.mouse-x);
-            } else if (event.kind == PointerEventKind.move && self.pressed) {
-                root.definir_por_x(self.mouse-x);
+                root.atualizar_valor(self.mouse-x);
+                root.mudou(root.valor);
+            } else if (event.kind == PointerEventKind.up && !root.ao_vivo) {
+                root.mudou(root.valor);
+            }
+        }
+
+        moved => {
+            if (self.pressed) {
+                root.atualizar_valor(self.mouse-x);
+                if (root.ao_vivo) {
+                    root.mudou(root.valor);
+                }
             }
         }
     }
@@ -178,16 +195,13 @@ export component BarraDeslizante inherits Rectangle {
         }
     ]
 
-    public function definir_por_x(x: length) {
+    // Só atualiza o valor (visual) — não dispara `mudou`. Chamada a cada
+    // pixel do arrasto, então precisa ser barata.
+    public function atualizar_valor(x: length) {
         if (root.width <= 0px) {
             return;
         }
-        let novo = root.minimo + min(1.0, max(0.0, x / root.width)) * (root.maximo - root.minimo);
-        if (novo == root.valor) {
-            return;
-        }
-        root.valor = novo;
-        root.mudou(root.valor);
+        root.valor = root.minimo + min(1.0, max(0.0, x / root.width)) * (root.maximo - root.minimo);
     }
 }
 
