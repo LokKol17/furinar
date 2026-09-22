@@ -5,7 +5,7 @@
 # ============================================================================
 set -euo pipefail
 
-VERSION="${FURINAR_VERSION:-0.1.0}"
+VERSION="${FURINAR_VERSION:-1.3.0}"
 INSTALL_DIR="/usr/local/bin"
 ICON_DIR="/usr/share/icons/hicolor/256x256/apps"
 DESKTOP_DIR="/usr/share/applications"
@@ -64,7 +64,6 @@ install_deps() {
             sudo apt-get install -y -qq libasound2 libgtk-3-0t64 2>/dev/null || true
             ;;
         arch)
-            # Arch geralmente já tem ALSA e GTK, mas garante
             sudo pacman -S --noconfirm --needed alsa-lib gtk3 2>/dev/null || true
             ;;
         fedora)
@@ -83,7 +82,7 @@ install_deps() {
 }
 
 # ---------------------------------------------------------------------------
-# Baixar binário
+# Baixar binário do GitHub Release
 # ---------------------------------------------------------------------------
 download_binary() {
     local url="https://github.com/LokKol17/furinar/releases/download/v${VERSION}/furinar-linux-x86_64"
@@ -103,17 +102,43 @@ download_binary() {
 }
 
 # ---------------------------------------------------------------------------
-# Copiar binário local (para instalação a partir do source)
+# Gerar desktop entry e metadados inline (quando não estamos no repo)
 # ---------------------------------------------------------------------------
-install_from_source() {
-    local src="target/release/furinar"
-    if [ ! -f "$src" ]; then
-        err "Binário não encontrado em $src"
-        err "Execute 'cargo build --release' primeiro."
-        exit 1
+generate_desktop_files() {
+    # Desktop entry
+    if [ ! -f /tmp/furinar.desktop ]; then
+        cat > /tmp/furinar.desktop << 'DESKTOP'
+[Desktop Entry]
+Type=Application
+Name=Furinar
+GenericName=Music Player
+Comment=A light, fast, and beautiful audio player
+Exec=furinar %f
+Icon=furinar
+Terminal=false
+Categories=Audio;Music;Player;
+MimeType=audio/mpeg;audio/x-flac;audio/ogg;audio/wav;audio/mp4;
+Keywords=music;player;audio;mp3;flac;ogg;
+StartupWMClass=furinar
+DESKTOP
     fi
-    cp "$src" /tmp/furinar
-    chmod +x /tmp/furinar
+
+    # AppStream metadata
+    if [ ! -f /tmp/dev.furinar.Furinar.metainfo.xml ]; then
+        cat > /tmp/dev.furinar.Furinar.metainfo.xml << 'META'
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>dev.furinar.Furinar</id>
+  <name>Furinar</name>
+  <summary>A light, fast, and beautiful audio player</summary>
+  <metadata_license>BSD-3-Clause</metadata_license>
+  <project_license>BSD-3-Clause</project_license>
+  <launchable type="desktop-id">furinar.desktop</launchable>
+  <provides><binary>furinar</binary></provides>
+  <content_rating type="oars-1.1" />
+</component>
+META
+    fi
 }
 
 # ---------------------------------------------------------------------------
@@ -124,25 +149,28 @@ install_files() {
     sudo install -Dm755 /tmp/furinar "${INSTALL_DIR}/furinar"
     sudo rm -f /tmp/furinar
 
-    # Ícone
-    local icon_src="ui/assets/furinar_icon.png"
-    if [ -f "$icon_src" ]; then
-        sudo install -Dm644 "$icon_src" "${ICON_DIR}/furinar.png"
+    # Desktop entry — tenta do repo, senão usa o gerado
+    local desktop_src=""
+    if [ -f "pkg/furinar.desktop" ]; then
+        desktop_src="pkg/furinar.desktop"
+    elif [ -f /tmp/furinar.desktop ]; then
+        desktop_src="/tmp/furinar.desktop"
     fi
-
-    # Desktop entry
-    local desktop_src="pkg/furinar.desktop"
-    if [ -f "$desktop_src" ]; then
+    if [ -n "$desktop_src" ]; then
         sudo install -Dm644 "$desktop_src" "${DESKTOP_DIR}/furinar.desktop"
-        # Atualizar cache de ícones
         if command -v gtk-update-icon-cache &>/dev/null; then
             sudo gtk-update-icon-cache -f -t /usr/share/icons/hicolor 2>/dev/null || true
         fi
     fi
 
     # AppStream metadata
-    local meta_src="pkg/furinar.metainfo.xml"
-    if [ -f "$meta_src" ]; then
+    local meta_src=""
+    if [ -f "pkg/furinar.metainfo.xml" ]; then
+        meta_src="pkg/furinar.metainfo.xml"
+    elif [ -f /tmp/dev.furinar.Furinar.metainfo.xml ]; then
+        meta_src="/tmp/dev.furinar.Furinar.metainfo.xml"
+    fi
+    if [ -n "$meta_src" ]; then
         sudo install -Dm644 "$meta_src" "${METADATA_DIR}/dev.furinar.Furinar.metainfo.xml"
     fi
 
@@ -162,13 +190,27 @@ uninstall() {
 }
 
 # ---------------------------------------------------------------------------
+# Copiar binário local (para instalação a partir do source)
+# ---------------------------------------------------------------------------
+install_from_source() {
+    local src="target/release/furinar"
+    if [ ! -f "$src" ]; then
+        err "Binário não encontrado em $src"
+        err "Execute 'cargo build --release' primeiro."
+        exit 1
+    fi
+    cp "$src" /tmp/furinar
+    chmod +x /tmp/furinar
+}
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 usage() {
     echo "Uso: $0 [OPÇÕES]"
     echo ""
     echo "Opções:"
-    echo "  (sem args)     Instala furinar"
+    echo "  (sem args)     Instala furinar (baixa do GitHub Releases)"
     echo "  --deps         Apenas instala dependências"
     echo "  --from-source  Instala a partir do binário local (target/release/furinar)"
     echo "  --uninstall    Remove furinar"
@@ -195,6 +237,7 @@ main() {
             ;;
         source)
             install_deps
+            generate_desktop_files
             install_from_source
             install_files
             ;;
@@ -204,6 +247,7 @@ main() {
         install)
             install_deps
             download_binary
+            generate_desktop_files
             install_files
             ;;
     esac

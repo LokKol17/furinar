@@ -1,0 +1,89 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build
+        run: cargo build --release
+
+      - name: Rename binary
+        run: copy target\release\furinar.exe dist\furinar-windows-x86_64.exe
+        shell: cmd
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: dist/furinar-windows-x86_64.exe
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev libgtk-3-dev pkg-config
+
+      - name: Build
+        run: cargo build --release
+
+      - name: Package tarball
+        run: |
+          mkdir -p dist
+          tar -czf dist/furinar-linux-x86_64.tar.gz -C target/release furinar
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: dist/furinar-linux-x86_64.tar.gz
+
+  release:
+    needs: [build-windows, build-linux]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Generate checksums
+        run: |
+          cd windows
+          sha256sum furinar-windows-x86_64.exe > SHA256SUMS
+          cd ../linux
+          sha256sum furinar-linux-x86_64.tar.gz >> ../windows/SHA256SUMS
+          mv windows/SHA256SUMS .
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Furinar - ${{ github.ref_name }}"
+          body: |
+            ## What's Changed
+            See [CHANGELOG.md](https://github.com/LokKol17/furinar/blob/master/CHANGELOG.md) for details.
+
+            ## Downloads
+            - **Windows:** `furinar-windows-x86_64.exe`
+            - **Linux:** `furinar-linux-x86_64.tar.gz`
+          files: |
+            windows/furinar-windows-x86_64.exe
+            linux/furinar-linux-x86_64.tar.gz
+            SHA256SUMS
+          draft: false
+          prerelease: false

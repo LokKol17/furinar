@@ -96,7 +96,7 @@ Ou clone e instale a partir do código-fonte:
 git clone https://github.com/LokKol17/furinar.git
 cd furinar
 make tarball
-cd dist/furinar-0.1.0
+cd dist/furinar-*/
 sudo ./install.sh --from-source
 ```
 
