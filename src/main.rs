@@ -1835,6 +1835,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             // Troca de fundo é o gatilho mais documentado do bug de redraw
             // parcial do renderer de software (ver `forcar_repaint_completo`).
+            #[cfg(target_os = "windows")]
             if let Some(ui) = ui_fraca.upgrade() {
                 if let Some(hwnd) = obter_hwnd(&ui).map(HWND) {
                     forcar_repaint_completo(hwnd);
