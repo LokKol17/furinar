@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Furinar — A light, fast, and beautiful audio player</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="icon" type="image/png" href="screenshot-player.png">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <a href="#" class="logo">🎵 Furinar</a>
+            <div class="nav-links">
+                <a href="#features">Features</a>
+                <a href="#download">Download</a>
+                <a href="https://github.com/LokKol17/furinar" target="_blank">GitHub</a>
+            </div>
+        </div>
+    </nav>
+
+    <header class="hero">
+        <div class="container">
+            <h1>Furinar</h1>
+            <p class="tagline">A light, fast, and beautiful audio player</p>
+            <p class="subtitle">Inspired by the Hydro Archon. Opens in milliseconds, uses 2–10 MB of RAM.</p>
+            <div class="hero-buttons">
+                <a href="#download" class="btn btn-primary">Download</a>
+                <a href="https://github.com/LokKol17/furinar" target="_blank" class="btn btn-secondary">View on GitHub</a>
+            </div>
+            <div class="hero-screenshot">
+                <img src="screenshot-player.png" alt="Furinar Player" class="screenshot">
+            </div>
+        </div>
+    </header>
+
+    <section id="features" class="features">
+        <div class="container">
+            <h2>Features</h2>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">⚡</div>
+                    <h3>Lightweight</h3>
+                    <p>Opens in milliseconds and uses only 2–10 MB of RAM — less than a single browser tab.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🎵</div>
+                    <h3>Multi-format</h3>
+                    <p>MP3, WAV, FLAC, OGG/Vorbis, and M4A support out of the box.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">📂</div>
+                    <h3>Multiple Libraries</h3>
+                    <p>Open as many folders as tabs. Switching tabs never interrupts playback.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">📝</div>
+                    <h3>Synced Lyrics</h3>
+                    <p>Display synchronized lyrics via .lrc files, scrolling along with the track.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🎨</div>
+                    <h3>Light & Dark Themes</h3>
+                    <p>Switch instantly between beautiful light and dark themes.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🔍</div>
+                    <h3>Smart Search</h3>
+                    <p>Filter by title or artist, accent- and case-insensitive.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">⌨️</div>
+                    <h3>Keyboard Shortcuts</h3>
+                    <p>Space, arrows, Enter — full control without touching the mouse.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🖥️</div>
+                    <h3>System Integration</h3>
+                    <p>Media controls on Windows and Linux (MPRIS). Taskbar buttons on Windows.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="screenshots" class="screenshots">
+        <div class="container">
+            <h2>Screenshots</h2>
+            <div class="screenshot-grid">
+                <div class="screenshot-item">
+                    <img src="screenshot-player.png" alt="Furinar - Light Theme">
+                    <p>Light Theme</p>
+                </div>
+                <div class="screenshot-item">
+                    <img src="screenshot-player-dark.png" alt="Furinar - Dark Theme">
+                    <p>Dark Theme</p>
+                </div>
+                <div class="screenshot-item">
+                    <img src="screenshot-lyrics.png" alt="Furinar - Synced Lyrics">
+                    <p>Synced Lyrics</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="download" class="download">
+        <div class="container">
+            <h2>Download</h2>
+            <p class="download-subtitle">Available for Windows and Linux</p>
+            <div class="download-cards">
+                <div class="download-card">
+                    <div class="download-icon">🪟</div>
+                    <h3>Windows</h3>
+                    <p>furinar-windows-x86_64.exe</p>
+                    <a href="https://github.com/LokKol17/furinar/releases/latest/download/furinar-windows-x86_64.exe" class="btn btn-primary">Download .exe</a>
+                </div>
+                <div class="download-card">
+                    <div class="download-icon">🐧</div>
+                    <h3>Linux</h3>
+                    <p>furinar-linux-x86_64.tar.gz</p>
+                    <a href="https://github.com/LokKol17/furinar/releases/latest/download/furinar-linux-x86_64.tar.gz" class="btn btn-primary">Download .tar.gz</a>
+                </div>
+            </div>
+            <div class="install-methods">
+                <h3>Other install methods</h3>
+                <pre><code># Universal installer
+curl -fsSL https://raw.githubusercontent.com/LokKol17/furinar/main/pkg/install.sh | bash
+
+# Debian/Ubuntu
+make deb && sudo dpkg -i dist/furinar_*.deb
+
+# Fedora
+make rpm && sudo rpm -i dist/rpm/RPMS/x86_64/*.rpm
+
+# Arch/Manjaro
+cd pkg/arch && makepkg -si</code></pre>
+            </div>
+        </div>
+    </section>
+
+    <footer class="footer">
+        <div class="container">
+            <p>Made with ❤️ by <a href="https://github.com/LokKol17">LokKol17</a> and contributors</p>
+            <p>Inspired by <a href="https://genshin-impact.fandom.com/wiki/Furina" target="_blank">Furina</a> from Genshin Impact</p>
+            <p class="license">Licensed under BSD-3-Clause</p>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
