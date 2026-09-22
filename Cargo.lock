@@ -1547,7 +1547,7 @@ dependencies = [
 
 [[package]]
 name = "furinar"
-version = "1.5.1"
+version = "1.5.2"
 dependencies = [
  "image",
  "lofty",
