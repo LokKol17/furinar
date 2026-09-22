@@ -87,7 +87,7 @@ A paleta visual — azul-marinho profundo, ciano e dourado (ou azul-bebê e bran
 **Opção 1 — Instalador universal:**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/user/furinar/main/pkg/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/LokKol17/furinar/main/pkg/install.sh | bash
 ```
 
 Ou clone e instale a partir do código-fonte:
