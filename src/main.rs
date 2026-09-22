@@ -3,6 +3,7 @@
 
 slint::include_modules!();
 
+mod translations;
 mod updates;
 
 use std::cell::RefCell;
@@ -94,6 +95,12 @@ struct AppConfig {
     /// Tema claro ligado. `false` = escuro (padrão, mantém quem já usa o app).
     #[serde(default)]
     tema_claro: bool,
+    #[serde(default = "default_idioma")]
+    idioma: String,
+}
+
+fn default_idioma() -> String {
+    "pt-br".to_string()
 }
 
 impl AppConfig {
@@ -154,20 +161,65 @@ fn e_arquivo_audio(caminho: &std::path::Path) -> bool {
     }
 }
 
-fn texto_loop(modo: u8) -> &'static str {
-    match modo {
-        1 => "Loop: Faixa",
-        2 => "Loop: Toda",
-        _ => "Loop: Desl",
-    }
+fn texto_loop(modo: u8, lang: &translations::Translations) -> String {
+    let key = match modo {
+        1 => "loop_track",
+        2 => "loop_list",
+        _ => "loop_off",
+    };
+    lang.get(key).copied().unwrap_or(key).to_string()
 }
 
-fn texto_shuffle(modo: u8) -> &'static str {
-    match modo {
-        1 => "Shuffle",
-        2 => "Shuffle Inteligente",
-        _ => "Shuffle: Desl",
-    }
+fn texto_shuffle(modo: u8, lang: &translations::Translations) -> String {
+    let key = match modo {
+        1 => "shuffle_on",
+        2 => "shuffle_smart",
+        _ => "shuffle_off",
+    };
+    lang.get(key).copied().unwrap_or(key).to_string()
+}
+
+fn texto_play(lang: &translations::Translations) -> String {
+    lang.get("play").copied().unwrap_or("Play").to_string()
+}
+
+fn texto_pause(lang: &translations::Translations) -> String {
+    lang.get("pause").copied().unwrap_or("Pause").to_string()
+}
+
+/// Aplica todas as traduções ao widget da UI.
+fn aplicar_idioma(idioma: &str, ui: &MainWindow) {
+    let t = translations::get_translations(idioma);
+    let g = |k: &str| -> slint::SharedString { t.get(k).copied().unwrap_or(k).into() };
+    let i18n = ui.global::<I18n>();
+    i18n.set_app_name(g("app_name"));
+    i18n.set_tip_minimize(g("tip_minimize"));
+    i18n.set_tip_close(g("tip_close"));
+    i18n.set_tip_open_folder(g("tip_open_folder"));
+    i18n.set_tip_previous(g("tip_previous"));
+    i18n.set_tip_stop(g("tip_stop"));
+    i18n.set_tip_next(g("tip_next"));
+    i18n.set_tip_lyrics(g("tip_lyrics"));
+    i18n.set_tip_settings(g("tip_settings"));
+    i18n.set_search_placeholder(g("search_placeholder"));
+    i18n.set_no_lyrics(g("no_lyrics"));
+    i18n.set_config_title(g("config_title"));
+    i18n.set_theme_dark(g("theme_dark"));
+    i18n.set_theme_light(g("theme_light"));
+    i18n.set_scan_subfolders(g("scan_subfolders"));
+    i18n.set_scan_subfolders_desc(g("scan_subfolders_desc"));
+    i18n.set_update_title(g("update_title"));
+    i18n.set_update_downloading(g("update_downloading"));
+    i18n.set_update_button(g("update_button"));
+    i18n.set_update_later(g("update_later"));
+    i18n.set_play_label(g("play"));
+    i18n.set_pause_label(g("pause"));
+    i18n.set_loop_off(g("loop_off"));
+    i18n.set_loop_track(g("loop_track"));
+    i18n.set_loop_list(g("loop_list"));
+    i18n.set_shuffle_off(g("shuffle_off"));
+    i18n.set_shuffle_on(g("shuffle_on"));
+    i18n.set_idioma(idioma.into());
 }
 
 // ---------------------------------------------------------------------
@@ -279,6 +331,7 @@ struct EstadoAudio {
     sacola_shuffle: Vec<usize>,
     escanear_subpastas: bool,
     tema_claro: bool,
+    idioma: String,
     /// Mapeia posição na lista visível -> índice em `pastas[aba_visivel].tracks`.
     indices_visiveis: Vec<usize>,
     /// Texto atual da busca (título/artista).
@@ -312,6 +365,7 @@ impl Default for EstadoAudio {
             sacola_shuffle: Vec::new(),
             escanear_subpastas: false,
             tema_claro: false,
+            idioma: "pt-br".to_string(),
             indices_visiveis: Vec::new(),
             filtro: String::new(),
             letra_atual: Vec::new(),
@@ -339,6 +393,7 @@ fn salvar_configuracao(estado: &EstadoAudio) {
         modo_shuffle: estado.modo_shuffle,
         escanear_subpastas: estado.escanear_subpastas,
         tema_claro: estado.tema_claro,
+        idioma: estado.idioma.clone(),
         indice_atual: estado.indice_atual,
         tempo_atual: if estado.tempo_decorrido > 0.0 {
             Some(estado.tempo_decorrido as u64)
@@ -804,7 +859,7 @@ fn executar_seek(estado: &mut EstadoAudio, ui: &MainWindow, alvo_secs: u64) {
     } else {
         0.0
     });
-    ui.set_texto_play_pause("Pause".into());
+    ui.set_texto_play_pause(texto_pause(&translations::get_translations(&estado.idioma)).into());
     ui.set_tocando(true);
     let com_horas = total_secs >= 3600;
     ui.set_texto_tempo(
@@ -876,7 +931,9 @@ fn seek_mantendo_pausa(estado: &mut EstadoAudio, ui: &MainWindow, alvo_secs: u64
     if estava_pausado {
         if let Some((_, ref sink)) = estado.audio_player {
             sink.pause();
-            ui.set_texto_play_pause("Play".into());
+            ui.set_texto_play_pause(
+                texto_play(&translations::get_translations(&estado.idioma)).into(),
+            );
             ui.set_tocando(false);
         }
     }
@@ -913,13 +970,14 @@ fn tocar_anterior(estado: &mut EstadoAudio, ui: &MainWindow) {
 
 fn alternar_play_pause(estado: &EstadoAudio, ui: &MainWindow) {
     if let Some((_, ref sink)) = estado.audio_player {
+        let t = translations::get_translations(&estado.idioma);
         if sink.is_paused() {
             sink.play();
-            ui.set_texto_play_pause("Pause".into());
+            ui.set_texto_play_pause(texto_pause(&t).into());
             ui.set_tocando(true);
         } else {
             sink.pause();
-            ui.set_texto_play_pause("Play".into());
+            ui.set_texto_play_pause(texto_play(&t).into());
             ui.set_tocando(false);
         }
     }
@@ -929,7 +987,9 @@ fn pausar(estado: &EstadoAudio, ui: &MainWindow) {
     if let Some((_, ref sink)) = estado.audio_player {
         if !sink.is_paused() {
             sink.pause();
-            ui.set_texto_play_pause("Play".into());
+            ui.set_texto_play_pause(
+                texto_play(&translations::get_translations(&estado.idioma)).into(),
+            );
             ui.set_tocando(false);
         }
     }
@@ -939,7 +999,9 @@ fn reproduzir(estado: &EstadoAudio, ui: &MainWindow) {
     if let Some((_, ref sink)) = estado.audio_player {
         if sink.is_paused() {
             sink.play();
-            ui.set_texto_play_pause("Pause".into());
+            ui.set_texto_play_pause(
+                texto_pause(&translations::get_translations(&estado.idioma)).into(),
+            );
             ui.set_tocando(true);
         }
     }
@@ -950,7 +1012,7 @@ fn stop_music(estado: &mut EstadoAudio, ui: &MainWindow) {
     estado.tempo_decorrido = 0.0;
     estado.ultimo_segundo = 0;
     ui.set_progresso(0.0);
-    ui.set_texto_play_pause("Play".into());
+    ui.set_texto_play_pause(texto_play(&translations::get_translations(&estado.idioma)).into());
     ui.set_tocando(false);
     ui.set_texto_tempo("00:00 / 00:00".into());
 
@@ -1630,17 +1692,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         e.modo_loop = config.modo_loop;
         e.modo_shuffle = config.modo_shuffle;
         e.escanear_subpastas = config.escanear_subpastas;
+        e.idioma = config.idioma.clone();
 
         ui.set_volume(config.volume);
-        ui.set_texto_loop(texto_loop(config.modo_loop).into());
+        let lang = translations::get_translations(&config.idioma);
+        ui.set_texto_loop(texto_loop(config.modo_loop, &lang).into());
         ui.set_loop_ativo(config.modo_loop != 0);
-        ui.set_texto_shuffle(texto_shuffle(config.modo_shuffle).into());
+        ui.set_texto_shuffle(texto_shuffle(config.modo_shuffle, &lang).into());
         ui.set_shuffle_modo(config.modo_shuffle as i32);
         ui.set_escanear_subpastas(config.escanear_subpastas);
 
         // Aplica o tema salvo antes da primeira renderização, para não piscar
         e.tema_claro = config.tema_claro;
         ui.set_tema_escuro(!config.tema_claro);
+
+        // Aplica todas as traduções antes da primeira renderização
+        aplicar_idioma(&config.idioma, &ui);
 
         // Carrega as pastas salvas. Se alguma não existir mais, é pulada, e o
         // mapeamento mantém os índices salvos coerentes com a nova lista.
@@ -1787,7 +1854,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             if let Some(ui) = ui_fraca.upgrade() {
                 let mut e = estado.borrow_mut();
                 e.modo_loop = (e.modo_loop + 1) % 3;
-                ui.set_texto_loop(texto_loop(e.modo_loop).into());
+                let lang = translations::get_translations(&e.idioma);
+                ui.set_texto_loop(texto_loop(e.modo_loop, &lang).into());
                 ui.set_loop_ativo(e.modo_loop != 0);
                 salvar_configuracao(&e);
             }
@@ -1803,7 +1871,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 e.modo_shuffle = (e.modo_shuffle + 1) % 3;
                 // Sacola da pasta antiga não serve pro modo novo.
                 e.sacola_shuffle.clear();
-                ui.set_texto_shuffle(texto_shuffle(e.modo_shuffle).into());
+                let lang = translations::get_translations(&e.idioma);
+                ui.set_texto_shuffle(texto_shuffle(e.modo_shuffle, &lang).into());
                 ui.set_shuffle_modo(e.modo_shuffle as i32);
                 salvar_configuracao(&e);
             }
@@ -1840,6 +1909,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 if let Some(hwnd) = obter_hwnd(&ui).map(HWND) {
                     forcar_repaint_completo(hwnd);
                 }
+            }
+        });
+    }
+
+    {
+        let estado = estado.clone();
+        let ui_fraca = ui.as_weak();
+        ui.on_trocar_idioma(move |idioma| {
+            if let Some(ui) = ui_fraca.upgrade() {
+                let mut e = estado.borrow_mut();
+                e.idioma = idioma.to_string();
+                let lang = translations::get_translations(&e.idioma);
+                ui.set_texto_loop(texto_loop(e.modo_loop, &lang).into());
+                ui.set_texto_shuffle(texto_shuffle(e.modo_shuffle, &lang).into());
+                let t = idioma.to_string();
+                drop(e);
+                aplicar_idioma(&t, &ui);
+                let e = estado.borrow_mut();
+                salvar_configuracao(&e);
             }
         });
     }

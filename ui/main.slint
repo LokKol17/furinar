@@ -1,4 +1,5 @@
 import { Tema, BotaoIcone, BotaoTitulo, BarraDeslizante, CampoBusca, CaixaSelecao } from "theme.slint";
+import { I18n } from "i18n.slint";
 
 export component MainWindow inherits Window {
     title: "Furinar Audio Player";
@@ -60,6 +61,7 @@ export component MainWindow inherits Window {
     callback minimizar();
     callback alternar_maximizado();
     callback trocar_tema(bool);
+    callback trocar_idioma(string);
 
     // Auto-update
     in-out property <bool> update_disponivel: false;
@@ -163,7 +165,7 @@ export component MainWindow inherits Window {
                     height: 20px;
                 }
                 Text {
-                    text: "Furinar";
+                    text: I18n.app_name;
                     color: Tema.texto;
                     font-size: 13px;
                     font-weight: 600;
@@ -174,12 +176,12 @@ export component MainWindow inherits Window {
 
                 BotaoTitulo {
                     icone: @image-url("icons/minimizar.svg");
-                    dica: "Minimizar";
+                    dica: I18n.tip_minimize;
                     clicado => { minimizar(); }
                 }
                 BotaoTitulo {
                     icone: @image-url("icons/x.svg");
-                    dica: "Fechar";
+                    dica: I18n.tip_close;
                     perigo: true;
                     clicado => { fecha_janela(); }
                 }
@@ -208,12 +210,12 @@ export component MainWindow inherits Window {
 
                 BotaoIcone {
                     icone: @image-url("icons/abrir.svg");
-                    dica: "Abrir pasta";
+                    dica: I18n.tip_open_folder;
                     clicado => { abrir_pasta(); }
                 }
                 BotaoIcone {
                     icone: @image-url("icons/anterior.svg");
-                    dica: "Anterior";
+                    dica: I18n.tip_previous;
                     clicado => { anterior(); }
                 }
                 BotaoIcone {
@@ -224,12 +226,12 @@ export component MainWindow inherits Window {
                 }
                 BotaoIcone {
                     icone: @image-url("icons/stop.svg");
-                    dica: "Parar";
+                    dica: I18n.tip_stop;
                     clicado => { parar(); }
                 }
                 BotaoIcone {
                     icone: @image-url("icons/proxima.svg");
-                    dica: "Próxima";
+                    dica: I18n.tip_next;
                     clicado => { proxima(); }
                 }
             }
@@ -256,13 +258,13 @@ export component MainWindow inherits Window {
                 }
                 BotaoIcone {
                     icone: @image-url("icons/letra.svg");
-                    dica: "Letra";
+                    dica: I18n.tip_lyrics;
                     ativo: mostrar_letra;
                     clicado => { mostrar_letra = !mostrar_letra; }
                 }
                 BotaoIcone {
                     icone: @image-url("icons/config.svg");
-                    dica: "Configurações";
+                    dica: I18n.tip_settings;
                     clicado => { config_popup.show(); }
                 }
             }
@@ -300,7 +302,7 @@ export component MainWindow inherits Window {
         // -------------------------------------------------------------
         busca := CampoBusca {
             texto <=> texto_busca;
-            placeholder: "Buscar por título ou artista...";
+            placeholder: I18n.search_placeholder;
             editado(t) => { busca_mudou(t); }
             // Enter na busca devolve o foco aos atalhos
             aceito(t) => { atalhos.focus(); }
@@ -523,7 +525,7 @@ export component MainWindow inherits Window {
                     padding: 20px;
 
                     Text {
-                        text: "Sem letra disponível para esta faixa.";
+                        text: I18n.no_lyrics;
                         color: Tema.texto_suave;
                         font-size: 13px;
                         horizontal-alignment: center;
@@ -595,7 +597,7 @@ export component MainWindow inherits Window {
                 spacing: 12px;
 
                 Text {
-                    text: "\u{1F4E6} Nova vers\u{00E3}o dispon\u{00ED}vel!";
+                    text: I18n.update_title;
                     font-size: 16px;
                     font-weight: 700;
                     color: Tema.texto;
@@ -630,7 +632,7 @@ export component MainWindow inherits Window {
                             clicked => { baixar_atualizacao(); }
                         }
                         Text {
-                            text: atualizando ? "Baixando..." : "Atualizar";
+                            text: atualizando ? I18n.update_downloading : I18n.update_button;
                             color: white;
                             font-size: 13px;
                             font-weight: 600;
@@ -650,7 +652,7 @@ export component MainWindow inherits Window {
                             clicked => { update_disponivel = false; }
                         }
                         Text {
-                            text: "Depois";
+                            text: I18n.update_later;
                             color: Tema.texto;
                             font-size: 13px;
                             horizontal-alignment: center;
@@ -677,31 +679,53 @@ export component MainWindow inherits Window {
                 spacing: 12px;
 
                 Text {
-                    text: "Configurações";
+                    text: I18n.config_title;
                     font-size: 16px;
                     font-weight: 700;
                     color: Tema.texto;
                 }
 
                 CaixaSelecao {
-                    rotulo: tema_escuro ? "Tema: Escuro" : "Tema: Claro";
+                    rotulo: tema_escuro ? I18n.theme_dark : I18n.theme_light;
                     marcado <=> tema_escuro;
                     alternado(v) => { trocar_tema(v); }
                 }
 
                 CaixaSelecao {
-                    rotulo: "Escaneia subpastas";
+                    rotulo: I18n.scan_subfolders;
                     marcado <=> escanear_subpastas;
                     alternado(v) => { alternar_escanear_subpastas(v); }
                 }
 
                 Text {
-                    text: "Inclui arquivos de áudio de subpastas ao abrir uma pasta.";
+                    text: I18n.scan_subfolders_desc;
                     font-size: 12px;
                     color: Tema.texto_suave;
                     wrap: word-wrap;
+                }
+
+                Rectangle {
+                    width: 100%;
+                    height: 32px;
+                    border-radius: 8px;
+                    background: ta_lang.has-hover ? Tema.neutro_hover : transparent;
+                    animate background { duration: 120ms; }
+
+                    ta_lang := TouchArea {
+                        clicked => { trocar_idioma(I18n.idioma == "en" ? "pt-br" : "en"); }
+                    }
+
+                    Text {
+                        text: I18n.idioma == "en" ? "Idioma: Português" : "Language: English";
+                        color: Tema.texto;
+                        font-size: 13px;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
                 }
             }
         }
     }
 }
+
+export { I18n }
