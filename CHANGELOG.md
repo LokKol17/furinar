@@ -7,7 +7,7 @@ e o projeto adere ao [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-## [1.3.0] — 2026-09-21
+## [1.4.0] — 2026-09-21
 
 ### Adicionado
 - **Auto-update** via GitHub Releases — checa novas versões no startup e mostra popup para atualizar
@@ -18,9 +18,13 @@ e o projeto adere ao [Semantic Versioning](https://semver.org/).
 - Documentação de instalação em README (EN e PT-BR)
 - Convenção de nomenclatura para releases (`docs/RELEASE_CONVENTION.md`)
 - Changelog (`CHANGELOG.md`)
+- Landing page do projeto (`docs/index.html`)
+- GitHub Actions CI — builds automatizados Windows + Linux no push de tags
 
 ### Corrigido
-- `in property` no popup de update mudado para `in-out property` (botão "Depois" não fechava)
+- `in property` no popup de update mudado para `in-out property`
+- `install.sh` agora gera arquivos `.desktop`/`.metainfo.xml` inline para funcionar via `curl`
+- Bloco `HWND`/`forcar_repaint_completo` no callback `on_trocar_tema` protegido com `#[cfg]` para Linux
 
 ## [0.1.0] — 2026-09-21
 
@@ -42,6 +46,6 @@ e o projeto adere ao [Semantic Versioning](https://semver.org/).
 - Retoma última faixa e posição ao reabrir
 - Migración automática do campo `pasta` → `pastas` na config
 
-[Unreleased]: https://github.com/LokKol17/furinar/compare/v1.3.0...HEAD
-[1.3.0]: https://github.com/LokKol17/furinar/compare/v0.1.0...v1.3.0
+[Unreleased]: https://github.com/LokKol17/furinar/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/LokKol17/furinar/compare/v0.1.0...v1.4.0
 [0.1.0]: https://github.com/LokKol17/furinar/releases/tag/v0.1.0
