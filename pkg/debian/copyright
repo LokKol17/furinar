@@ -1,7 +1,7 @@
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: furinar
 Upstream-Contact: dev@furinar.dev
-Source: https://github.com/user/furinar
+Source: https://github.com/LokKol17/furinar
 
 Files: *
 Copyright: 2026 Furinar Dev
