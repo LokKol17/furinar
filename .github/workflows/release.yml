@@ -68,9 +68,7 @@ jobs:
         run: |
           cd windows
           sha256sum furinar-windows-x86_64.exe > SHA256SUMS
-          cd ../linux
-          sha256sum furinar-linux-x86_64.tar.gz >> ../windows/SHA256SUMS
-          mv windows/SHA256SUMS .
+          sha256sum ../linux/furinar-linux-x86_64.tar.gz >> SHA256SUMS
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
