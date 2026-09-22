@@ -45,6 +45,34 @@ Faça upload de todos os arquivos de `dist/release/` como assets da release no G
 6. Copiar o título do CHANGELOG como descrição da release
 7. Upload dos assets gerados
 
+### Comandos para fazer push e criar tag
+
+```bash
+# 1. Salvar e commitar todas as alterações
+git add -A
+git commit -m "Bump version to X.Y.Z"
+
+# 2. Push do commit para o master
+git push origin master
+
+# 3. Criar a tag
+git tag vX.Y.Z
+
+# 4. Push da tag (dispara o GitHub Actions)
+git push origin vX.Y.Z
+```
+
+> **Importante:** O push da tag (passo 4) é o que dispara o GitHub Actions para
+> buildar os binários e criar a release automaticamente.
+>
+> Para alterar a versão alvo, basta recriar a tag:
+> ```bash
+> git tag -d vX.Y.Z
+> git push origin :refs/tags/vX.Y.Z
+> git tag vX.Y.Z
+> git push origin vX.Y.Z
+> ```
+
 ## Auto-update
 
 O mecanismo de auto-update (`src/updates.rs`) usa a API do GitHub Releases para:
