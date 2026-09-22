@@ -1,0 +1,11 @@
+furinar (0.1.0-1) unstable; urgency=low
+
+  * Initial release
+  * MP3, WAV, FLAC, OGG/Vorbis, M4A support
+  * Multiple folders as tabs
+  * Synced lyrics via .lrc files
+  * Light and dark themes
+  * MPRIS media controls
+  * Search/filter by title or artist
+
+ -- Furinar Dev <dev@furinar.dev>  Sun, 21 Sep 2026 00:00:00 +0000

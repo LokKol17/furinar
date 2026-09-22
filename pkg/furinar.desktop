@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Furinar
+GenericName=Music Player
+Comment=A light, fast, and beautiful audio player
+Exec=furinar %f
+Icon=furinar
+Terminal=false
+Categories=Audio;Music;Player;
+MimeType=audio/mpeg;audio/x-flac;audio/ogg;audio/wav;audio/mp4;
+Keywords=music;player;audio;mp3;flac;ogg;
+StartupWMClass=furinar

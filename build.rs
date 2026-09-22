@@ -97,12 +97,15 @@ fn embutir_icone(quadrado: image::RgbaImage) {
         return;
     }
 
-    let caminho = destino.to_string_lossy().to_string();
-    if let Err(erro) = tauri_winres::WindowsResource::new()
-        .set_icon(&caminho)
-        .compile()
+    #[cfg(target_os = "windows")]
     {
-        println!("cargo:warning=falha ao embutir o ícone no executável: {erro}");
+        let caminho = destino.to_string_lossy().to_string();
+        if let Err(erro) = tauri_winres::WindowsResource::new()
+            .set_icon(&caminho)
+            .compile()
+        {
+            println!("cargo:warning=falha ao embutir o ícone no executável: {erro}");
+        }
     }
 }
 

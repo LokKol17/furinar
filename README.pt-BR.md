@@ -6,7 +6,7 @@
 
 **Um player de áudio leve, rápido e bonito — inspirado na Hydro Archon.**
 
-![Windows](https://img.shields.io/badge/plataforma-Windows-3da9d6?style=flat-square)
+![Windows](https://img.shields.io/badge/plataforma-Windows%20%7C%20Linux-3da9d6?style=flat-square)
 ![Rust](https://img.shields.io/badge/feito%20com-Rust-c9a050?style=flat-square)
 ![RAM](https://img.shields.io/badge/RAM-2--10MB-0b1a2b?style=flat-square)
 ![Licença](https://img.shields.io/badge/licença-BSD--3--Clause-lightgrey?style=flat-square)
@@ -76,9 +76,56 @@ A paleta visual — azul-marinho profundo, ciano e dourado (ou azul-bebê e bran
 
 ## 🚀 Como usar
 
+### Windows
+
 1. Baixe o `furinar.exe` mais recente (ou compile — veja abaixo).
 2. Abra o app e clique em **Abrir pasta** pra apontar pra onde estão suas músicas.
 3. Pronto — o Furinar lembra tudo sozinho da próxima vez que você abrir.
+
+### Linux
+
+**Opção 1 — Instalador universal:**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/user/furinar/main/pkg/install.sh | bash
+```
+
+Ou clone e instale a partir do código-fonte:
+
+```bash
+git clone https://github.com/LokKol17/furinar.git
+cd furinar
+make tarball
+cd dist/furinar-0.1.0
+sudo ./install.sh --from-source
+```
+
+**Opção 2 — Pacotes nativos:**
+
+| Distro | Comando |
+|---|---|
+| Debian/Ubuntu | `make deb && sudo dpkg -i dist/furinar_0.1.0_amd64.deb` |
+| Fedora | `make rpm && sudo rpm -i dist/rpm/RPMS/x86_64/*.rpm` |
+| Arch/Manjaro | `makepkg -si` (usando `pkg/arch/PKGBUILD`) |
+
+**Opção 3 — cargo-deb:**
+
+```bash
+# Instalar cargo-deb
+cargo install cargo-deb
+
+# Compilar e gerar .deb
+cargo build --release
+cargo deb
+```
+
+**Dependências do sistema (todas as distros):**
+
+| Distro | Comando de instalação |
+|---|---|
+| Debian/Ubuntu | `sudo apt install libasound2 libgtk-3-0` |
+| Fedora | `sudo dnf install alsa-lib gtk3` |
+| Arch/Manjaro | `sudo pacman -S alsa-lib gtk3` |
 
 ---
 
@@ -87,7 +134,7 @@ A paleta visual — azul-marinho profundo, ciano e dourado (ou azul-bebê e bran
 <details>
 <summary>Compilar e rodar</summary>
 
-**Requisitos:** Rust (edition 2024) e Windows.
+**Requisitos:** Rust (edition 2024).
 
 ```bash
 cargo run
@@ -97,6 +144,19 @@ Build otimizada:
 
 ```bash
 cargo build --release
+```
+
+O binário final fica em:
+- **Windows:** `target/release/furinar.exe`
+- **Linux:** `target/release/furinar`
+
+**Empacotamento para Linux:**
+
+```bash
+make help          # Veja todos os comandos disponíveis
+make deb           # Gera pacote .deb (Debian/Ubuntu)
+make rpm           # Gera pacote .rpm (Fedora)
+make tarball       # Gera tarball com script de instalação
 ```
 
 O binário final fica em `target/release/furinar.exe`.

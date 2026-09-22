@@ -1,6 +1,9 @@
 /target
+/dist
 
 # Ícone derivado, gerado pelo build.rs a partir de ui/assets/furinar_icon.png
 /ui/assets/furinar_icon_quadrado.png
 furinar_config.json
 ROADMAP.md
+check_err.txt
+check_exit.txt

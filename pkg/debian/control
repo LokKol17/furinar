@@ -1,0 +1,17 @@
+Package: furinar
+Version: 0.1.0
+Section: sound
+Priority: optional
+Architecture: amd64
+Maintainer: Furinar Dev <dev@furinar.dev>
+Homepage: https://github.com/LokKol17/furinar
+Depends: libasound2, libgtk-3-0 | libgtk-3-0t64
+Description: A light, fast, and beautiful audio player
+ Furinar is a lightweight audio player inspired by the Hydro Archon.
+ It opens in milliseconds and uses only 2-10 MB of RAM while covering
+ everything a real player needs: tags, synced lyrics, multiple libraries,
+ and native system integration.
+ .
+ Supports MP3, WAV, FLAC, OGG/Vorbis, and M4A.
+ Features include multiple folder tabs, synced lyrics via .lrc files,
+ light/dark themes, and MPRIS media controls.

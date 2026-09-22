@@ -1,0 +1,31 @@
+# Maintainer: Furinar Dev <dev@furinar.dev>
+pkgname=furinar
+pkgver=0.1.0
+pkgrel=1
+pkgdesc='A light, fast, and beautiful audio player'
+arch=('x86_64')
+url='https://github.com/LokKol17/furinar'
+license=('BSD-3-Clause')
+depends=('alsa-lib' 'gtk3')
+makedepends=('cargo')
+source=("$pkgname-$pkgver.tar.gz::https://github.com/LokKol17/furinar/archive/v$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+prepare() {
+    cd "$pkgname-$pkgver"
+    cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
+}
+
+build() {
+    cd "$pkgname-$pkgver"
+    cargo build --frozen --release
+}
+
+package() {
+    cd "$pkgname-$pkgver"
+    install -Dm755 target/release/furinar "$pkgdir/usr/bin/furinar"
+    install -Dm644 ui/assets/furinar_icon.png "$pkgdir/usr/share/icons/hicolor/256x256/apps/furinar.png"
+    install -Dm644 pkg/furinar.desktop "$pkgdir/usr/share/applications/furinar.desktop"
+    install -Dm644 pkg/furinar.metainfo.xml "$pkgdir/usr/share/metainfo/dev.furinar.Furinar.metainfo.xml"
+    install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

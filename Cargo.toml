@@ -2,6 +2,23 @@
 name = "furinar"
 version = "0.1.0"
 edition = "2024"
+license = "BSD-3-Clause"
+description = "A light, fast, and beautiful audio player — inspired by the Hydro Archon"
+repository = "https://github.com/LokKol17/furinar"
+
+[package.metadata.deb]
+maintainer = "Furinar Dev <dev@furinar.dev>"
+copyright = "2026, Furinar Dev"
+license-file = ["LICENSE", "0"]
+assets = [
+    ["target/release/furinar", "usr/bin/furinar", "755"],
+    ["ui/assets/furinar_icon.png", "usr/share/icons/hicolor/256x256/apps/furinar.png", "644"],
+    ["pkg/furinar.desktop", "usr/share/applications/furinar.desktop", "644"],
+    ["pkg/furinar.metainfo.xml", "usr/share/metainfo/dev.furinar.furinar.metainfo.xml", "644"],
+]
+depends = "libasound2, libgtk-3-0 | libgtk-3-0t64"
+section = "sound"
+priority = "optional"
 
 [dependencies]
 slint = { version = "1", default-features = false, features = [
@@ -22,9 +39,12 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 souvlaki = "0.8"
 raw-window-handle = "0.6"
+
+[target.'cfg(target_os = "windows")'.dependencies]
 windows = { version = "0.62", features = [
     "Win32_Foundation",
     "Win32_Graphics_Dwm",
+    "Win32_Graphics_Gdi",
     "Win32_System_Com",
     "Win32_System_LibraryLoader",
     "Win32_UI_Controls",
@@ -36,4 +56,6 @@ windows = { version = "0.62", features = [
 slint-build = "1"
 # Só para gerar o .ico do executável a partir do PNG em ui/assets/
 image = { version = "0.25", default-features = false, features = ["png", "ico"] }
+
+[target.'cfg(target_os = "windows")'.build-dependencies]
 tauri-winres = "0.3"

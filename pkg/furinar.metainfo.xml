@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>dev.furinar.Furinar</id>
+  <name>Furinar</name>
+  <summary>A light, fast, and beautiful audio player</summary>
+  <metadata_license>BSD-3-Clause</metadata_license>
+  <project_license>BSD-3-Clause</project_license>
+  <description>
+    <p>
+      Furinar is a lightweight audio player inspired by the Hydro Archon.
+      It opens in milliseconds and uses only 2–10 MB of RAM while covering
+      everything a real player needs: tags, synced lyrics, multiple libraries,
+      and native system integration.
+    </p>
+    <p>Features:</p>
+    <ul>
+      <li>MP3, WAV, FLAC, OGG/Vorbis, and M4A support</li>
+      <li>Multiple folders as tabs</li>
+      <li>Synced lyrics via .lrc files</li>
+      <li>Light and dark themes</li>
+      <li>System media controls (MPRIS on Linux)</li>
+      <li>Search/filter by title or artist</li>
+    </ul>
+  </description>
+  <launchable type="desktop-id">furinar.desktop</launchable>
+  <url type="homepage">https://github.com/LokKol17/furinar</url>
+  <url type="bugtracker">https://github.com/LokKol17/furinar/issues</url>
+  <provides>
+    <binary>furinar</binary>
+  </provides>
+  <categories>
+    <category>Audio</category>
+    <category>Music</category>
+    <category>Player</category>
+  </categories>
+  <keywords>
+    <keyword>music</keyword>
+    <keyword>player</keyword>
+    <keyword>audio</keyword>
+    <keyword>mp3</keyword>
+    <keyword>flac</keyword>
+  </keywords>
+  <content_rating type="oars-1.1" />
+  <releases>
+    <release version="0.1.0" date="2026-09-21">
+      <description>
+        <p>Initial release with full feature set.</p>
+      </description>
+    </release>
+  </releases>
+</component>

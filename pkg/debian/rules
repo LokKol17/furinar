@@ -1,0 +1,13 @@
+#!/usr/bin/make -f
+exportdh_builddeb
+override_dh_auto_build:
+	cargo build --release --locked
+
+override_dh_auto_install:
+	install -Dm755 target/release/furinar debian/furinar/usr/bin/furinar
+	install -Dm644 ui/assets/furinar_icon.png debian/furinar/usr/share/icons/hicolor/256x256/apps/furinar.png
+	install -Dm644 pkg/furinar.desktop debian/furinar/usr/share/applications/furinar.desktop
+	install -Dm644 pkg/furinar.metainfo.xml debian/furinar/usr/share/metainfo/dev.furinar.Furinar.metainfo.xml
+
+override_dh_auto_test:
+	# Tests require audio devices, skip in packaging

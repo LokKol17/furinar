@@ -17,6 +17,7 @@ use lofty::probe::Probe;
 use rand::seq::SliceRandom;
 use rodio::{Decoder, OutputStream, Sink, Source};
 use serde::{Deserialize, Serialize};
+#[cfg(target_os = "windows")]
 use slint::winit_030::winit::platform::windows::EventLoopBuilderExtWindows;
 use slint::{ModelRc, SharedString, Timer, TimerMode, VecModel};
 use souvlaki::{
@@ -25,23 +26,31 @@ use souvlaki::{
 };
 use unicode_normalization::UnicodeNormalization;
 use unicode_normalization::char::is_combining_mark;
+#[cfg(target_os = "windows")]
 use windows::Win32::Foundation::{HINSTANCE, HWND};
+#[cfg(target_os = "windows")]
 use windows::Win32::Graphics::Dwm::{
     DWM_WINDOW_CORNER_PREFERENCE, DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND,
     DwmSetWindowAttribute,
 };
+#[cfg(target_os = "windows")]
 use windows::Win32::Graphics::Gdi::{
     RDW_ALLCHILDREN, RDW_ERASE, RDW_INVALIDATE, RDW_UPDATENOW, RedrawWindow,
 };
+#[cfg(target_os = "windows")]
 use windows::Win32::System::Com::{CLSCTX_INPROC_SERVER, CoCreateInstance};
+#[cfg(target_os = "windows")]
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
+#[cfg(target_os = "windows")]
 use windows::Win32::UI::Controls::{
     HIMAGELIST, ILC_COLOR32, ILC_MASK, ImageList_Create, ImageList_Destroy, ImageList_ReplaceIcon,
 };
+#[cfg(target_os = "windows")]
 use windows::Win32::UI::Shell::{
     ITaskbarList3, THB_BITMAP, THB_FLAGS, THB_ICON, THB_TOOLTIP, THBF_ENABLED, THBN_CLICKED,
     THUMBBUTTON, TaskbarList,
 };
+#[cfg(target_os = "windows")]
 use windows::Win32::UI::WindowsAndMessaging::{
     CreateIcon, DestroyIcon, GetSystemMetrics, HICON, MSG, SM_CXSMICON, WM_COMMAND,
     WM_DISPLAYCHANGE, WM_DWMCOMPOSITIONCHANGED, WM_EXITSIZEMOVE,
@@ -1095,6 +1104,7 @@ fn atualizar_progresso(estado: &mut EstadoAudio, ui: &MainWindow) {
 /// forçar o redesenho daquele pedaço. `RedrawWindow` com essas flags força
 /// um repaint completo e imediato, sem esperar o rastreamento de região
 /// suja decidir sozinho.
+#[cfg(target_os = "windows")]
 fn forcar_repaint_completo(hwnd: HWND) {
     unsafe {
         let _ = RedrawWindow(
@@ -1122,11 +1132,11 @@ fn configurar_controles_multimidia(
     ui: &MainWindow,
     tx: Sender<MediaControlEvent>,
 ) -> Option<MediaControls> {
-    let hwnd = obter_hwnd(ui)?;
+    let hwnd = obter_hwnd(ui);
     let config = PlatformConfig {
         display_name: "Furinar",
         dbus_name: "furinar",
-        hwnd: Some(hwnd),
+        hwnd,
     };
     let mut controles = MediaControls::new(config).ok()?;
     controles
@@ -1235,18 +1245,26 @@ fn sincronizar_controles(controles: &Rc<RefCell<Option<MediaControls>>>, estado:
 // ---------------------------------------------------------------------
 
 // IDs dos botões (viram LOWORD(wParam) no WM_COMMAND).
+#[cfg(target_os = "windows")]
 const BTN_ANTERIOR: u32 = 0x100;
+#[cfg(target_os = "windows")]
 const BTN_PLAY_PAUSE: u32 = 0x101;
+#[cfg(target_os = "windows")]
 const BTN_PROXIMA: u32 = 0x102;
 
 // Índices dos ícones na HIMAGELIST, na ordem em que são inseridos.
+#[cfg(target_os = "windows")]
 const IDX_ICONE_ANTERIOR: u32 = 0;
+#[cfg(target_os = "windows")]
 const IDX_ICONE_PLAY: u32 = 1;
+#[cfg(target_os = "windows")]
 const IDX_ICONE_PAUSE: u32 = 2;
+#[cfg(target_os = "windows")]
 const IDX_ICONE_PROXIMA: u32 = 3;
 
 /// Recursos dos botões da taskbar. Precisam continuar vivos enquanto o app
 /// roda: a shell referencia a HIMAGELIST e os HICONs são nossos.
+#[cfg(target_os = "windows")]
 struct BotoesTaskbar {
     taskbar: ITaskbarList3,
     hwnd: HWND,
@@ -1255,6 +1273,7 @@ struct BotoesTaskbar {
     pausado: bool,
 }
 
+#[cfg(target_os = "windows")]
 impl BotoesTaskbar {
     /// Troca o ícone do botão central entre play e pause.
     fn atualizar_play_pause(&mut self, pausado: bool) {
@@ -1279,6 +1298,7 @@ impl BotoesTaskbar {
     }
 }
 
+#[cfg(target_os = "windows")]
 impl Drop for BotoesTaskbar {
     fn drop(&mut self) {
         unsafe {
@@ -1291,6 +1311,7 @@ impl Drop for BotoesTaskbar {
 }
 
 /// Triângulo com ápice em `apex_x` e base vertical em `base_x`.
+#[cfg(target_os = "windows")]
 fn forma_triangulo(x: i32, y: i32, apex_x: i32, base_x: i32) -> bool {
     let (esq, dir) = if apex_x < base_x {
         (apex_x, base_x)
@@ -1304,18 +1325,22 @@ fn forma_triangulo(x: i32, y: i32, apex_x: i32, base_x: i32) -> bool {
     (y - 8).abs() <= meia_altura
 }
 
+#[cfg(target_os = "windows")]
 fn forma_play(x: i32, y: i32) -> bool {
     forma_triangulo(x, y, 12, 4)
 }
 
+#[cfg(target_os = "windows")]
 fn forma_pause(x: i32, y: i32) -> bool {
     ((4..=6).contains(&x) || (9..=11).contains(&x)) && (3..=12).contains(&y)
 }
 
+#[cfg(target_os = "windows")]
 fn forma_anterior(x: i32, y: i32) -> bool {
     ((2..=3).contains(&x) && (3..=12).contains(&y)) || forma_triangulo(x, y, 5, 13)
 }
 
+#[cfg(target_os = "windows")]
 fn forma_proxima(x: i32, y: i32) -> bool {
     forma_triangulo(x, y, 10, 2) || ((11..=12).contains(&x) && (3..=12).contains(&y))
 }
@@ -1323,6 +1348,7 @@ fn forma_proxima(x: i32, y: i32) -> bool {
 /// Gera as máscaras AND/XOR de um ícone monocromático 1bpp.
 ///
 /// Fundo: AND=1 e XOR=0 (transparente). Forma: AND=0 e XOR=1 (branco).
+#[cfg(target_os = "windows")]
 fn mascaras_icone(tamanho: i32, dentro: impl Fn(i32, i32) -> bool) -> (Vec<u8>, Vec<u8>) {
     // Cada linha é preenchida até múltiplo de 2 bytes (WORD)
     let bytes_por_linha = ((tamanho + 15) / 16 * 2) as usize;
@@ -1344,6 +1370,7 @@ fn mascaras_icone(tamanho: i32, dentro: impl Fn(i32, i32) -> bool) -> (Vec<u8>, 
     (mascara_and, mascara_xor)
 }
 
+#[cfg(target_os = "windows")]
 fn criar_icone(tamanho: i32, dentro: impl Fn(i32, i32) -> bool) -> windows::core::Result<HICON> {
     let (mascara_and, mascara_xor) = mascaras_icone(tamanho, dentro);
     let modulo = unsafe { GetModuleHandleW(None)? };
@@ -1360,6 +1387,7 @@ fn criar_icone(tamanho: i32, dentro: impl Fn(i32, i32) -> bool) -> windows::core
     }
 }
 
+#[cfg(target_os = "windows")]
 fn criar_botao(id: u32, indice_icone: u32, icone: HICON, dica: &str) -> THUMBBUTTON {
     let mut sz_tip = [0u16; 260];
     for (i, c) in dica.encode_utf16().take(259).enumerate() {
@@ -1377,6 +1405,7 @@ fn criar_botao(id: u32, indice_icone: u32, icone: HICON, dica: &str) -> THUMBBUT
 
 /// Cria a barra de botões na miniatura da taskbar. Devolve `None` (sem quebrar
 /// o app) se qualquer passo falhar.
+#[cfg(target_os = "windows")]
 fn configurar_botoes_taskbar(ui: &MainWindow) -> Option<BotoesTaskbar> {
     let hwnd = HWND(obter_hwnd(ui)?);
 
@@ -1469,6 +1498,7 @@ fn configurar_botoes_taskbar(ui: &MainWindow) -> Option<BotoesTaskbar> {
 }
 
 /// Trata os cliques que o message hook mandou pelo canal.
+#[cfg(target_os = "windows")]
 fn processar_eventos_taskbar(rx: &Receiver<u32>, estado: &mut EstadoAudio, ui: &MainWindow) {
     for id in rx.try_iter() {
         match id {
@@ -1481,6 +1511,7 @@ fn processar_eventos_taskbar(rx: &Receiver<u32>, estado: &mut EstadoAudio, ui: &
 }
 
 /// Mantém o ícone do botão central coerente com o estado de reprodução.
+#[cfg(target_os = "windows")]
 fn atualizar_icone_taskbar(botoes: &Rc<RefCell<Option<BotoesTaskbar>>>, estado: &EstadoAudio) {
     let pausado = match &estado.audio_player {
         Some((_, sink)) => sink.is_paused(),
@@ -1494,6 +1525,7 @@ fn atualizar_icone_taskbar(botoes: &Rc<RefCell<Option<BotoesTaskbar>>>, estado: 
 
 /// Cantos arredondados nativos (Windows 11). Em versões que não conhecem o
 /// atributo a chamada falha e é simplesmente ignorada.
+#[cfg(target_os = "windows")]
 fn arredondar_cantos(ui: &MainWindow) {
     let Some(hwnd) = obter_hwnd(ui).map(HWND) else {
         return;
@@ -1511,43 +1543,68 @@ fn arredondar_cantos(ui: &MainWindow) {
 }
 
 // ---------------------------------------------------------------------
+// Stubs para Linux/Outros (funções da taskbar)
+// ---------------------------------------------------------------------
+
+#[cfg(not(target_os = "windows"))]
+fn processar_eventos_taskbar(_rx: &Receiver<u32>, _estado: &mut EstadoAudio, _ui: &MainWindow) {}
+
+#[cfg(not(target_os = "windows"))]
+fn atualizar_icone_taskbar(_botoes: &Rc<RefCell<Option<()>>>, _estado: &EstadoAudio) {}
+
+#[cfg(not(target_os = "windows"))]
+fn configurar_botoes_taskbar(_ui: &MainWindow) -> Option<()> {
+    None
+}
+
+#[cfg(not(target_os = "windows"))]
+fn arredondar_cantos(_ui: &MainWindow) {}
+
+// ---------------------------------------------------------------------
 // main
 // ---------------------------------------------------------------------
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Canal dos cliques nos botões da miniatura da taskbar
+    #[cfg(target_os = "windows")]
     let (tx_taskbar, rx_taskbar) = mpsc::channel::<u32>();
 
     // Injeta um message hook no event loop do winit (via backend do Slint) para
     // observar o `WM_COMMAND` que a shell manda ao clicar nos botões. Precisa
     // ser antes de qualquer janela existir.
-    let mut construtor_eventos: slint::winit_030::EventLoopBuilder =
-        slint::winit_030::winit::event_loop::EventLoop::with_user_event();
-    construtor_eventos.with_msg_hook(move |msg| {
-        // Só observa: retorna `false` para o winit despachar a mensagem normal.
-        let msg = msg as *const MSG;
-        if !msg.is_null() {
-            let msg = unsafe { &*msg };
-            if msg.message == WM_COMMAND {
-                let id = (msg.wParam.0 & 0xFFFF) as u32;
-                let codigo = ((msg.wParam.0 >> 16) & 0xFFFF) as u32;
-                if codigo == THBN_CLICKED && (BTN_ANTERIOR..=BTN_PROXIMA).contains(&id) {
-                    let _ = tx_taskbar.send(id);
+    #[cfg(target_os = "windows")]
+    {
+        let mut construtor_eventos: slint::winit_030::EventLoopBuilder =
+            slint::winit_030::winit::event_loop::EventLoop::with_user_event();
+        construtor_eventos.with_msg_hook(move |msg| {
+            // Só observa: retorna `false` para o winit despachar a mensagem normal.
+            let msg = msg as *const MSG;
+            if !msg.is_null() {
+                let msg = unsafe { &*msg };
+                if msg.message == WM_COMMAND {
+                    let id = (msg.wParam.0 & 0xFFFF) as u32;
+                    let codigo = ((msg.wParam.0 >> 16) & 0xFFFF) as u32;
+                    if codigo == THBN_CLICKED && (BTN_ANTERIOR..=BTN_PROXIMA).contains(&id) {
+                        let _ = tx_taskbar.send(id);
+                    }
+                } else if matches!(
+                    msg.message,
+                    WM_EXITSIZEMOVE | WM_DWMCOMPOSITIONCHANGED | WM_DISPLAYCHANGE
+                ) {
+                    // Gatilhos conhecidos do bug de redraw parcial do renderer
+                    // de software (ver `forcar_repaint_completo`).
+                    forcar_repaint_completo(msg.hwnd);
                 }
-            } else if matches!(
-                msg.message,
-                WM_EXITSIZEMOVE | WM_DWMCOMPOSITIONCHANGED | WM_DISPLAYCHANGE
-            ) {
-                // Gatilhos conhecidos do bug de redraw parcial do renderer
-                // de software (ver `forcar_repaint_completo`).
-                forcar_repaint_completo(msg.hwnd);
             }
-        }
-        false
-    });
-    slint::BackendSelector::new()
-        .with_winit_event_loop_builder(construtor_eventos)
-        .select()?;
+            false
+        });
+        slint::BackendSelector::new()
+            .with_winit_event_loop_builder(construtor_eventos)
+            .select()?;
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    slint::BackendSelector::new().select()?;
 
     let ui = MainWindow::new()?;
     let estado = Rc::new(RefCell::new(EstadoAudio::default()));
@@ -1555,7 +1612,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Canal para os eventos dos controles multimídia do sistema (SMTC)
     let (tx, rx) = mpsc::channel::<MediaControlEvent>();
     let controles = Rc::new(RefCell::new(None::<MediaControls>));
+    #[cfg(target_os = "windows")]
     let botoes_taskbar = Rc::new(RefCell::new(None::<BotoesTaskbar>));
+    #[cfg(not(target_os = "windows"))]
+    let botoes_taskbar = Rc::new(RefCell::new(None::<()>));
 
     let config = AppConfig::carregar();
 
@@ -1873,6 +1933,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let ui_fraca = ui.as_weak();
         let controles = controles.clone();
         let botoes_taskbar = botoes_taskbar.clone();
+        #[cfg(target_os = "windows")]
         let mut tentativas_taskbar = 0u32;
         let mut cantos_arredondados = false;
         timer.start(TimerMode::Repeated, Duration::from_millis(250), move || {
@@ -1895,6 +1956,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                 // Idem para os botões da taskbar: só quando a janela já existe,
                 // e com poucas tentativas para não recriar recursos à toa.
+                #[cfg(target_os = "windows")]
                 if botoes_taskbar.borrow().is_none()
                     && tentativas_taskbar < 3
                     && obter_hwnd(&ui).is_some()
@@ -1906,9 +1968,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
 
                 processar_eventos_multimidia(&rx, &mut e, &ui);
+                #[cfg(target_os = "windows")]
                 processar_eventos_taskbar(&rx_taskbar, &mut e, &ui);
                 atualizar_progresso(&mut e, &ui);
                 sincronizar_controles(&controles, &mut e);
+                #[cfg(target_os = "windows")]
                 atualizar_icone_taskbar(&botoes_taskbar, &e);
             }
         });
