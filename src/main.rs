@@ -2110,15 +2110,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     {
         let update_result = update_result.clone();
         std::thread::spawn(move || {
-            eprintln!("[Furinar] Checking for updates...");
-            match updates::check_for_update() {
-                Some(info) => {
-                    eprintln!("[Furinar] Update available: v{}", info.version);
-                    *update_result.lock().unwrap() = Some(info);
-                }
-                None => {
-                    eprintln!("[Furinar] No update available or check failed.");
-                }
+            if let Some(info) = updates::check_for_update() {
+                *update_result.lock().unwrap() = Some(info);
             }
         });
     }
@@ -2129,13 +2122,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         update_timer.start(TimerMode::Repeated, Duration::from_millis(250), move || {
             let mut guard = update_result.lock().unwrap();
             if let Some(info) = guard.take() {
-                eprintln!("[Furinar] Timer got update: v{}", info.version);
                 if let Some(ui) = ui_weak.upgrade() {
-                    eprintln!("[Furinar] Setting update UI...");
                     ui.set_update_versao(info.version.into());
                     ui.set_update_descricao(info.body.into());
                     ui.set_update_disponivel(true);
-                    eprintln!("[Furinar] Update UI set!");
                 }
             }
         });
