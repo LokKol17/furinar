@@ -21,7 +21,9 @@ jobs:
         run: cargo build --release
 
       - name: Rename binary
-        run: copy target\release\furinar.exe dist\furinar-windows-x86_64.exe
+        run: |
+          if not exist dist mkdir dist
+          copy target\release\furinar.exe dist\furinar-windows-x86_64.exe
         shell: cmd
 
       - name: Upload artifact
