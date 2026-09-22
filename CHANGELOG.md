@@ -7,6 +7,8 @@ e o projeto adere ao [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.3.0] — 2026-09-21
+
 ### Adicionado
 - **Auto-update** via GitHub Releases — checa novas versões no startup e mostra popup para atualizar
 - Suporte a **Linux** — compila e roda em Debian/Ubuntu, Arch/Manjaro e Fedora
@@ -14,6 +16,8 @@ e o projeto adere ao [Semantic Versioning](https://semver.org/).
 - `Makefile` com targets `deb`, `rpm`, `tarball`, `release`, `install`
 - Desktop entry e metadados AppStream para integração com launchers Linux
 - Documentação de instalação em README (EN e PT-BR)
+- Convenção de nomenclatura para releases (`docs/RELEASE_CONVENTION.md`)
+- Changelog (`CHANGELOG.md`)
 
 ### Corrigido
 - `in property` no popup de update mudado para `in-out property` (botão "Depois" não fechava)
@@ -38,5 +42,6 @@ e o projeto adere ao [Semantic Versioning](https://semver.org/).
 - Retoma última faixa e posição ao reabrir
 - Migración automática do campo `pasta` → `pastas` na config
 
-[Unreleased]: https://github.com/LokKol17/furinar/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/LokKol17/furinar/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/LokKol17/furinar/compare/v0.1.0...v1.3.0
 [0.1.0]: https://github.com/LokKol17/furinar/releases/tag/v0.1.0
