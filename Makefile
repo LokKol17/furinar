@@ -121,6 +121,21 @@ help:
 	@echo "  make deb            Gera pacote .deb (Debian/Ubuntu)"
 	@echo "  make rpm            Gera pacote .rpm (Fedora)"
 	@echo "  make tarball        Gera tarball com install.sh"
+	@echo "  make release        Gera artefatos para GitHub Releases"
 	@echo ""
 	@echo "  make help           Mostra esta mensagem"
 	@echo ""
+
+# ---------------------------------------------------------------------------
+# Release artifacts (GitHub Releases)
+# ---------------------------------------------------------------------------
+
+release: build
+	@mkdir -p dist/release
+	@cp $(BIN).exe dist/release/furinar-windows-x86_64.exe 2>/dev/null || \
+	cp $(BIN) dist/release/furinar-windows-x86_64.exe
+	@tar -czf dist/release/furinar-linux-x86_64.tar.gz -C target/release $(NAME)
+	@cd dist/release && sha256sum * > SHA256SUMS
+	@echo ""
+	@echo "  Release artifacts in dist/release/"
+	@echo "  Upload to GitHub Releases with tag v$(VERSION)"

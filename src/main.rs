@@ -3,12 +3,17 @@
 
 slint::include_modules!();
 
+mod updates;
+
 use std::cell::RefCell;
 use std::fs::{self, File};
 use std::io::BufReader;
 use std::path::PathBuf;
 use std::rc::Rc;
-use std::sync::mpsc::{self, Receiver, Sender};
+use std::sync::{
+    Arc, Mutex,
+    mpsc::{self, Receiver, Sender},
+};
 use std::time::Duration;
 
 use lofty::config::ParseOptions;
@@ -2006,6 +2011,62 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 // Mesmo comportamento de antes: salva e deixa o event loop sair
                 salvar_configuracao(&estado.borrow());
                 let _ = ui.hide();
+            }
+        });
+    }
+
+    // Check for updates on startup — spawn a background thread, then use
+    // a polling timer on the main thread to push data into the UI.
+    let update_result: Arc<Mutex<Option<updates::UpdateInfo>>> = Arc::new(Mutex::new(None));
+    {
+        let update_result = update_result.clone();
+        std::thread::spawn(move || {
+            if let Some(info) = updates::check_for_update() {
+                *update_result.lock().unwrap() = Some(info);
+            }
+        });
+    }
+    {
+        let ui_weak = ui.as_weak();
+        let update_result = update_result.clone();
+        let update_timer = Timer::default();
+        update_timer.start(TimerMode::Repeated, Duration::from_millis(250), move || {
+            let mut guard = update_result.lock().unwrap();
+            if let Some(info) = guard.take() {
+                if let Some(ui) = ui_weak.upgrade() {
+                    ui.set_update_versao(info.version.into());
+                    ui.set_update_descricao(info.body.into());
+                    ui.set_update_disponivel(true);
+                }
+            }
+        });
+    }
+
+    // Wire up the update download callback
+    {
+        let ui_weak = ui.as_weak();
+        let update_result = update_result.clone();
+        ui.on_baixar_atualizacao(move || {
+            if let Some(ui) = ui_weak.upgrade() {
+                ui.set_atualizando(true);
+                let ui_weak2 = ui.as_weak();
+                let update_result2 = update_result.clone();
+                std::thread::spawn(move || {
+                    let result = updates::perform_update();
+                    if let Some(ui) = ui_weak2.upgrade() {
+                        ui.set_atualizando(false);
+                        match result {
+                            Ok(()) => {
+                                ui.set_update_disponivel(false);
+                                println!("Update complete! Please restart Furinar.");
+                            }
+                            Err(e) => {
+                                eprintln!("Update failed: {e}");
+                            }
+                        }
+                    }
+                    drop(update_result2);
+                });
             }
         });
     }

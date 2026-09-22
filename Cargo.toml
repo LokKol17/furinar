@@ -39,6 +39,8 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 souvlaki = "0.8"
 raw-window-handle = "0.6"
+self_update = { version = "0.41", features = ["archive-tar", "compression-flate2"] }
+semver = "1"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows = { version = "0.62", features = [

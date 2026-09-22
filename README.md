@@ -159,6 +159,15 @@ make rpm           # Generate .rpm package (Fedora)
 make tarball       # Generate tarball with install script
 ```
 
+**Creating a release:**
+
+```bash
+make release
+# Upload files from dist/release/ to GitHub Releases
+# Tag format: v0.1.0, v0.2.0, etc.
+# Asset names: furinar-windows-x86_64.exe, furinar-linux-x86_64.tar.gz
+```
+
 </details>
 
 <details>

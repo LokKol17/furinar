@@ -61,6 +61,13 @@ export component MainWindow inherits Window {
     callback alternar_maximizado();
     callback trocar_tema(bool);
 
+    // Auto-update
+    in-out property <bool> update_disponivel: false;
+    in property <string> update_versao: "";
+    in property <string> update_descricao: "";
+    in-out property <bool> atualizando: false;
+    callback baixar_atualizacao();
+
     // Altura de cada linha da playlist
     private property <length> altura_linha: 30px;
     private property <length> largura_aba: 150px;
@@ -572,6 +579,89 @@ export component MainWindow inherits Window {
     // -------------------------------------------------------------
     // Configurações
     // -------------------------------------------------------------
+    update_popup := PopupWindow {
+        x: 170px;
+        y: 200px;
+
+        Rectangle {
+            visible: update_disponivel;
+            background: Tema.painel;
+            border-radius: 12px;
+            border-width: 1px;
+            border-color: Tema.borda;
+
+            VerticalLayout {
+                padding: 20px;
+                spacing: 12px;
+
+                Text {
+                    text: "\u{1F4E6} Nova vers\u{00E3}o dispon\u{00ED}vel!";
+                    font-size: 16px;
+                    font-weight: 700;
+                    color: Tema.texto;
+                }
+
+                Text {
+                    text: "v" + update_versao;
+                    font-size: 14px;
+                    color: Tema.oceano;
+                    font-weight: 600;
+                }
+
+                Text {
+                    text: update_descricao;
+                    font-size: 12px;
+                    color: Tema.texto_suave;
+                    wrap: word-wrap;
+                    overflow: elide;
+                    max-height: 80px;
+                }
+
+                HorizontalLayout {
+                    spacing: 8px;
+                    alignment: center;
+
+                    Rectangle {
+                        width: 120px;
+                        height: 32px;
+                        border-radius: 8px;
+                        background: Tema.oceano;
+                        TouchArea {
+                            clicked => { baixar_atualizacao(); }
+                        }
+                        Text {
+                            text: atualizando ? "Baixando..." : "Atualizar";
+                            color: white;
+                            font-size: 13px;
+                            font-weight: 600;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                    }
+
+                    Rectangle {
+                        width: 80px;
+                        height: 32px;
+                        border-radius: 8px;
+                        border-width: 1px;
+                        border-color: Tema.borda;
+                        background: Tema.painel;
+                        TouchArea {
+                            clicked => { update_disponivel = false; }
+                        }
+                        Text {
+                            text: "Depois";
+                            color: Tema.texto;
+                            font-size: 13px;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     config_popup := PopupWindow {
         x: 170px;
         y: 299px;

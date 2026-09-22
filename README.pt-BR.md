@@ -159,6 +159,15 @@ make rpm           # Gera pacote .rpm (Fedora)
 make tarball       # Gera tarball com script de instalação
 ```
 
+**Criando um release:**
+
+```bash
+make release
+# Envie os arquivos de dist/release/ para o GitHub Releases
+# Formato da tag: v0.1.0, v0.2.0, etc.
+# Nomes dos assets: furinar-windows-x86_64.exe, furinar-linux-x86_64.tar.gz
+```
+
 O binário final fica em `target/release/furinar.exe`.
 
 </details>
