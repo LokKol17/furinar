@@ -7,24 +7,28 @@ e o projeto adere ao [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-## [1.4.0] — 2026-09-21
+## [1.5.1] — 2026-09-22
 
 ### Adicionado
-- **Auto-update** via GitHub Releases — checa novas versões no startup e mostra popup para atualizar
-- Suporte a **Linux** — compila e roda em Debian/Ubuntu, Arch/Manjaro e Fedora
-- Scripts de instalação: `pkg/install.sh` (universal), `.deb`, `.rpm`, `PKGBUILD`
-- `Makefile` com targets `deb`, `rpm`, `tarball`, `release`, `install`
-- Desktop entry e metadados AppStream para integração com launchers Linux
-- Documentação de instalação em README (EN e PT-BR)
-- Convenção de nomenclatura para releases (`docs/RELEASE_CONVENTION.md`)
-- Changelog (`CHANGELOG.md`)
-- Landing page do projeto (`docs/index.html`)
-- GitHub Actions CI — builds automatizados Windows + Linux no push de tags
+- **i18n** — suporte a múltiplos idiomas (PT-BR e English)
+- Toggle de idioma no popup de configurações
+
+### Corrigido
+- Auto-update: Timer de polling estava sendo dropped prematuramente (dentro de bloco `{}`)
+
+## [1.5.0] — 2026-09-22
+
+### Adicionado
+- **Auto-update** via GitHub Releases
+- Suporte a **Linux**
+- Scripts de instalação, Makefile, GitHub Actions CI
+- Landing page do projeto
+- Changelog e convenção de releases
 
 ### Corrigido
 - `in property` no popup de update mudado para `in-out property`
-- `install.sh` agora gera arquivos `.desktop`/`.metainfo.xml` inline para funcionar via `curl`
-- Bloco `HWND`/`forcar_repaint_completo` no callback `on_trocar_tema` protegido com `#[cfg]` para Linux
+- `install.sh` funciona via `curl` (gera arquivos inline)
+- Bloco `HWND`/`forcar_repaint_completo` protegido com `#[cfg]` para Linux
 
 ## [0.1.0] — 2026-09-21
 
