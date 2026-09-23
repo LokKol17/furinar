@@ -1703,7 +1703,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     #[cfg(not(target_os = "windows"))]
-    slint::BackendSelector::new().select()?;
+    {
+        std::env::set_var("WINIT_UNIX_BACKEND", "x11");
+        slint::BackendSelector::new().select()?;
+    }
 
     let ui = MainWindow::new()?;
     let estado = Rc::new(RefCell::new(EstadoAudio::default()));

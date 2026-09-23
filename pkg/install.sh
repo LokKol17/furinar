@@ -85,18 +85,23 @@ install_deps() {
 # Download binary from GitHub Release
 # ---------------------------------------------------------------------------
 download_binary() {
-    local url="https://github.com/LokKol17/furinar/releases/download/v${VERSION}/furinar-linux-x86_64"
+    local tarball="furinar-linux-x86_64.tar.gz"
+    local url="https://github.com/LokKol17/furinar/releases/download/v${VERSION}/${tarball}"
     local dest="/tmp/furinar"
 
     info "Downloading furinar v${VERSION}..."
     if command -v curl &>/dev/null; then
-        curl -fSL "$url" -o "$dest"
+        curl -fSL "$url" -o "/tmp/${tarball}"
     elif command -v wget &>/dev/null; then
-        wget -q "$url" -O "$dest"
+        wget -q "$url" -O "/tmp/${tarball}"
     else
         err "curl or wget is required for download."
         exit 1
     fi
+
+    info "Extraindo binário..."
+    tar -xzf "/tmp/${tarball}" -C /tmp
+    rm -f "/tmp/${tarball}"
     chmod +x "$dest"
 
     # Download the icon as well
@@ -123,7 +128,7 @@ Type=Application
 Name=Furinar
 GenericName=Music Player
 Comment=A light, fast, and beautiful audio player
-Exec=furinar %f
+Exec=env WINIT_UNIX_BACKEND=x11 furinar %f
 Icon=furinar
 Terminal=false
 Categories=Audio;Music;Player;
