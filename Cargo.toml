@@ -20,6 +20,10 @@ depends = "libasound2, libgtk-3-0 | libgtk-3-0t64"
 section = "sound"
 priority = "optional"
 
+[features]
+default = ["mpris"]
+mpris = ["dep:souvlaki"]
+
 [dependencies]
 slint = { version = "1", default-features = false, features = [
     "std",
@@ -37,7 +41,7 @@ mp3-duration = "0.1"
 rand = "0.8"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-souvlaki = "0.8"
+souvlaki = { version = "0.8", optional = true }
 raw-window-handle = "0.6"
 self_update = { version = "0.41", features = ["archive-tar", "compression-flate2"] }
 semver = "1"

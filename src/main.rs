@@ -26,6 +26,7 @@ use serde::{Deserialize, Serialize};
 #[cfg(target_os = "windows")]
 use slint::winit_030::winit::platform::windows::EventLoopBuilderExtWindows;
 use slint::{ModelRc, SharedString, Timer, TimerMode, VecModel};
+#[cfg(feature = "mpris")]
 use souvlaki::{
     MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, MediaPosition, PlatformConfig,
     SeekDirection,
@@ -375,7 +376,9 @@ struct EstadoAudio {
     /// Índice absoluto da primeira linha do recorte que está na UI. Serve para
     /// traduzir o clique numa linha do painel de volta para o timestamp.
     letra_janela_inicio: usize,
+    #[cfg(feature = "mpris")]
     faixa_controles: Option<String>,
+    #[cfg(feature = "mpris")]
     status_controles: Option<MediaPlayback>,
 }
 
@@ -403,7 +406,9 @@ impl Default for EstadoAudio {
             letra_atual: Vec::new(),
             letra_indice: -1,
             letra_janela_inicio: 0,
+            #[cfg(feature = "mpris")]
             faixa_controles: None,
+            #[cfg(feature = "mpris")]
             status_controles: None,
         }
     }
@@ -1227,6 +1232,7 @@ fn obter_hwnd(ui: &MainWindow) -> Option<*mut std::ffi::c_void> {
     }
 }
 
+#[cfg(feature = "mpris")]
 fn configurar_controles_multimidia(
     ui: &MainWindow,
     tx: Sender<MediaControlEvent>,
@@ -1246,6 +1252,7 @@ fn configurar_controles_multimidia(
     Some(controles)
 }
 
+#[cfg(feature = "mpris")]
 fn processar_eventos_multimidia(
     rx: &Receiver<MediaControlEvent>,
     estado: &mut EstadoAudio,
@@ -1294,6 +1301,7 @@ fn processar_eventos_multimidia(
     }
 }
 
+#[cfg(feature = "mpris")]
 fn sincronizar_controles(controles: &Rc<RefCell<Option<MediaControls>>>, estado: &mut EstadoAudio) {
     let mut guard = controles.borrow_mut();
     let Some(c) = guard.as_mut() else { return };
@@ -1704,7 +1712,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     #[cfg(not(target_os = "windows"))]
     {
-        std::env::set_var("WINIT_UNIX_BACKEND", "x11");
+        // SAFETY: chamado antes de qualquer thread ser spawned
+        unsafe { std::env::set_var("WINIT_UNIX_BACKEND", "x11") };
         slint::BackendSelector::new().select()?;
     }
 
@@ -1712,8 +1721,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let estado = Rc::new(RefCell::new(EstadoAudio::default()));
 
     // Canal para os eventos dos controles multimídia do sistema (SMTC)
+    #[cfg(feature = "mpris")]
     let (tx, rx) = mpsc::channel::<MediaControlEvent>();
+    #[cfg(feature = "mpris")]
     let controles = Rc::new(RefCell::new(None::<MediaControls>));
+    #[cfg(not(feature = "mpris"))]
+    let controles = Rc::new(RefCell::new(None::<()>));
     #[cfg(target_os = "windows")]
     let botoes_taskbar = Rc::new(RefCell::new(None::<BotoesTaskbar>));
     #[cfg(not(target_os = "windows"))]
@@ -2077,6 +2090,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                 // Configura os controles multimídia na primeira oportunidade:
                 // a janela winit só existe depois que o event loop inicia
+                #[cfg(feature = "mpris")]
                 if controles.borrow().is_none() {
                     if let Some(c) = configurar_controles_multimidia(&ui, tx.clone()) {
                         *controles.borrow_mut() = Some(c);
@@ -2096,10 +2110,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 }
 
+                #[cfg(feature = "mpris")]
                 processar_eventos_multimidia(&rx, &mut e, &ui);
                 #[cfg(target_os = "windows")]
                 processar_eventos_taskbar(&rx_taskbar, &mut e, &ui);
                 atualizar_progresso(&mut e, &ui);
+                #[cfg(feature = "mpris")]
                 sincronizar_controles(&controles, &mut e);
                 #[cfg(target_os = "windows")]
                 atualizar_icone_taskbar(&botoes_taskbar, &e);
