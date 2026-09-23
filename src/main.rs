@@ -11,10 +11,7 @@ use std::fs::{self, File};
 use std::io::BufReader;
 use std::path::PathBuf;
 use std::rc::Rc;
-use std::sync::{
-    Arc, Mutex,
-    mpsc::{self, Receiver, Sender},
-};
+use std::sync::mpsc::{self, Receiver, Sender};
 use std::time::Duration;
 
 use lofty::config::ParseOptions;
@@ -212,6 +209,8 @@ fn aplicar_idioma(idioma: &str, ui: &MainWindow) {
     i18n.set_update_downloading(g("update_downloading"));
     i18n.set_update_button(g("update_button"));
     i18n.set_update_later(g("update_later"));
+    i18n.set_update_check(g("update_check"));
+    i18n.set_update_checking(g("update_checking"));
     i18n.set_play_label(g("play"));
     i18n.set_pause_label(g("pause"));
     i18n.set_loop_off(g("loop_off"));
@@ -2104,57 +2103,35 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
     }
 
-    // Check for updates on startup — spawn a background thread, then use
-    // a polling timer on the main thread to push data into the UI.
-    let update_result: Arc<Mutex<Option<updates::UpdateInfo>>> = Arc::new(Mutex::new(None));
-    {
-        let update_result = update_result.clone();
-        std::thread::spawn(move || {
-            if let Some(info) = updates::check_for_update() {
-                *update_result.lock().unwrap() = Some(info);
-            }
-        });
-    }
-    let update_timer = Timer::default();
+    // Verificar atualizações sob demanda (chamado pelo botão nas config)
     {
         let ui_weak = ui.as_weak();
-        let update_result = update_result.clone();
-        update_timer.start(TimerMode::Repeated, Duration::from_millis(250), move || {
-            let mut guard = update_result.lock().unwrap();
-            if let Some(info) = guard.take() {
-                if let Some(ui) = ui_weak.upgrade() {
-                    ui.set_update_versao(info.version.into());
-                    ui.set_update_descricao(info.body.into());
-                    ui.set_update_disponivel(true);
-                }
-            }
-        });
-    }
-
-    // Wire up the update download callback
-    {
-        let ui_weak = ui.as_weak();
-        let update_result = update_result.clone();
-        ui.on_baixar_atualizacao(move || {
+        ui.on_verificar_atualizacao(move || {
+            eprintln!("[update] Button clicked!");
             if let Some(ui) = ui_weak.upgrade() {
-                ui.set_atualizando(true);
+                ui.set_verificando_update(true);
+                ui.set_update_mensagem("".into());
                 let ui_weak2 = ui.as_weak();
-                let update_result2 = update_result.clone();
                 std::thread::spawn(move || {
-                    let result = updates::perform_update();
-                    if let Some(ui) = ui_weak2.upgrade() {
-                        ui.set_atualizando(false);
-                        match result {
-                            Ok(()) => {
-                                ui.set_update_disponivel(false);
-                                println!("Update complete! Please restart Furinar.");
-                            }
-                            Err(e) => {
-                                eprintln!("Update failed: {e}");
-                            }
+                    eprintln!("[update] Thread started, calling check_for_update...");
+                    let msg = match updates::check_for_update() {
+                        Some(info) => {
+                            eprintln!("[update] Result: update available v{}", info.version);
+                            format!("Nova versão disponível: v{}", info.version)
                         }
-                    }
-                    drop(update_result2);
+                        None => {
+                            eprintln!("[update] Result: no update");
+                            "Você já está na versão mais recente.".to_string()
+                        }
+                    };
+                    eprintln!("[update] Scheduling UI update via invoke_from_event_loop...");
+                    let _ = slint::invoke_from_event_loop(move || {
+                        if let Some(ui) = ui_weak2.upgrade() {
+                            ui.set_verificando_update(false);
+                            ui.set_update_mensagem(msg.into());
+                            eprintln!("[update] UI updated!");
+                        }
+                    });
                 });
             }
         });

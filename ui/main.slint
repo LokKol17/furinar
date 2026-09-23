@@ -64,11 +64,10 @@ export component MainWindow inherits Window {
     callback trocar_idioma(string);
 
     // Auto-update
-    in-out property <bool> update_disponivel: false;
-    in property <string> update_versao: "";
-    in property <string> update_descricao: "";
-    in-out property <bool> atualizando: false;
-    callback baixar_atualizacao();
+    in-out property <string> update_mensagem: "";
+    in-out property <bool> verificando_update: false;
+    in-out property <bool> config_aberto: false;
+    callback verificar_atualizacao();
 
     // Altura de cada linha da playlist
     private property <length> altura_linha: 30px;
@@ -265,7 +264,7 @@ export component MainWindow inherits Window {
                 BotaoIcone {
                     icone: @image-url("icons/config.svg");
                     dica: I18n.tip_settings;
-                    clicado => { config_popup.show(); }
+                    clicado => { config_aberto = !config_aberto; }
                 }
             }
         }
@@ -580,93 +579,11 @@ export component MainWindow inherits Window {
 
     // -------------------------------------------------------------
     // Configurações
-    // -------------------------------------------------------------
-    update_popup := PopupWindow {
-        x: 170px;
-        y: 200px;
 
-        Rectangle {
-            visible: update_disponivel;
-            background: Tema.painel;
-            border-radius: 12px;
-            border-width: 1px;
-            border-color: Tema.borda;
-
-            VerticalLayout {
-                padding: 20px;
-                spacing: 12px;
-
-                Text {
-                    text: I18n.update_title;
-                    font-size: 16px;
-                    font-weight: 700;
-                    color: Tema.texto;
-                }
-
-                Text {
-                    text: "v" + update_versao;
-                    font-size: 14px;
-                    color: Tema.oceano;
-                    font-weight: 600;
-                }
-
-                Text {
-                    text: update_descricao;
-                    font-size: 12px;
-                    color: Tema.texto_suave;
-                    wrap: word-wrap;
-                    overflow: elide;
-                    max-height: 80px;
-                }
-
-                HorizontalLayout {
-                    spacing: 8px;
-                    alignment: center;
-
-                    Rectangle {
-                        width: 120px;
-                        height: 32px;
-                        border-radius: 8px;
-                        background: Tema.oceano;
-                        TouchArea {
-                            clicked => { baixar_atualizacao(); }
-                        }
-                        Text {
-                            text: atualizando ? I18n.update_downloading : I18n.update_button;
-                            color: white;
-                            font-size: 13px;
-                            font-weight: 600;
-                            horizontal-alignment: center;
-                            vertical-alignment: center;
-                        }
-                    }
-
-                    Rectangle {
-                        width: 80px;
-                        height: 32px;
-                        border-radius: 8px;
-                        border-width: 1px;
-                        border-color: Tema.borda;
-                        background: Tema.painel;
-                        TouchArea {
-                            clicked => { update_disponivel = false; }
-                        }
-                        Text {
-                            text: I18n.update_later;
-                            color: Tema.texto;
-                            font-size: 13px;
-                            horizontal-alignment: center;
-                            vertical-alignment: center;
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    config_popup := PopupWindow {
+    config_popup := Rectangle {
         x: 170px;
         y: 299px;
+        visible: config_aberto;
 
         Rectangle {
             background: Tema.painel;
@@ -722,6 +639,35 @@ export component MainWindow inherits Window {
                         horizontal-alignment: center;
                         vertical-alignment: center;
                     }
+                }
+
+                Rectangle {
+                    width: 100%;
+                    height: 32px;
+                    border-radius: 8px;
+                    background: ta_update.has-hover ? Tema.neutro_hover : transparent;
+                    animate background { duration: 120ms; }
+
+                    ta_update := TouchArea {
+                        clicked => { verificar_atualizacao(); }
+                    }
+
+                    Text {
+                        text: verificando_update ? I18n.update_checking : I18n.update_check;
+                        color: Tema.texto;
+                        font-size: 13px;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                }
+
+                Text {
+                    visible: update_mensagem != "";
+                    text: update_mensagem;
+                    font-size: 12px;
+                    color: Tema.oceano;
+                    wrap: word-wrap;
+                    horizontal-alignment: center;
                 }
             }
         }
