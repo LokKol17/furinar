@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ============================================================================
-# Furinar — Instalador universal para Linux
-# Suporta: Debian/Ubuntu, Arch/Manjaro, Fedora
+# Furinar — Universal installer for Linux
+# Supports: Debian/Ubuntu, Arch/Manjaro, Fedora
 # ============================================================================
 set -euo pipefail
 
@@ -23,7 +23,7 @@ warn()  { echo -e "${YELLOW}[WARN]${NC}  $*"; }
 err()   { echo -e "${RED}[ERROR]${NC} $*" >&2; }
 
 # ---------------------------------------------------------------------------
-# Detectar distro
+# Detect distro
 # ---------------------------------------------------------------------------
 detect_distro() {
     if [ -f /etc/os-release ]; then
@@ -44,19 +44,19 @@ detect_distro() {
             *)
                 DISTRO_FAMILY="unknown" ;;
         esac
-        info "Distribuição detectada: ${PRETTY_NAME:-$DISTRO_ID}"
-        info "Família: $DISTRO_FAMILY"
+        info "Detected distribution: ${PRETTY_NAME:-$DISTRO_ID}"
+        info "Family: $DISTRO_FAMILY"
     else
-        err "Não foi possível detectar a distribuição."
+        err "Could not detect the distribution."
         exit 1
     fi
 }
 
 # ---------------------------------------------------------------------------
-# Instalar dependências do sistema
+# Install system dependencies
 # ---------------------------------------------------------------------------
 install_deps() {
-    info "Instalando dependências do sistema..."
+    info "Installing system dependencies..."
     case "$DISTRO_FAMILY" in
         debian)
             sudo apt-get update -qq
@@ -73,33 +73,33 @@ install_deps() {
             sudo zypper install -y libasound2 gtk3 2>/dev/null || true
             ;;
         *)
-            warn "Distribuição não reconhecida. Instale manualmente:"
+            warn "Unrecognized distribution. Install manually:"
             warn "  - libasound2 (ALSA)"
             warn "  - libgtk-3 (file dialogs)"
             ;;
     esac
-    ok "Dependências verificadas."
+    ok "Dependencies verified."
 }
 
 # ---------------------------------------------------------------------------
-# Baixar binário do GitHub Release
+# Download binary from GitHub Release
 # ---------------------------------------------------------------------------
 download_binary() {
     local url="https://github.com/LokKol17/furinar/releases/download/v${VERSION}/furinar-linux-x86_64"
     local dest="/tmp/furinar"
 
-    info "Baixando furinar v${VERSION}..."
+    info "Downloading furinar v${VERSION}..."
     if command -v curl &>/dev/null; then
         curl -fSL "$url" -o "$dest"
     elif command -v wget &>/dev/null; then
         wget -q "$url" -O "$dest"
     else
-        err "curl ou wget necessário para download."
+        err "curl or wget is required for download."
         exit 1
     fi
     chmod +x "$dest"
 
-    # Baixar ícone junto
+    # Download the icon as well
     local icon_url="https://raw.githubusercontent.com/LokKol17/furinar/master/ui/assets/furinar_icon.png"
     local icon_dest="/tmp/furinar_icon.png"
     if command -v curl &>/dev/null; then
@@ -108,11 +108,11 @@ download_binary() {
         wget -q "$icon_url" -O "$icon_dest" 2>/dev/null || true
     fi
 
-    ok "Binário baixado."
+    ok "Binary downloaded."
 }
 
 # ---------------------------------------------------------------------------
-# Gerar desktop entry e metadados inline (quando não estamos no repo)
+# Generate desktop entry and metadata inline (when not inside the repo)
 # ---------------------------------------------------------------------------
 generate_desktop_files() {
     # Desktop entry
@@ -152,14 +152,14 @@ META
 }
 
 # ---------------------------------------------------------------------------
-# Instalar arquivos
+# Install files
 # ---------------------------------------------------------------------------
 install_files() {
-    info "Instalando furinar..."
+    info "Installing furinar..."
     sudo install -Dm755 /tmp/furinar "${INSTALL_DIR}/furinar"
     sudo rm -f /tmp/furinar
 
-    # Ícone — tenta do repo, senão usa o baixado
+    # Icon — try from the repo, otherwise use the downloaded one
     local icon_src=""
     if [ -f "ui/assets/furinar_icon.png" ]; then
         icon_src="ui/assets/furinar_icon.png"
@@ -173,7 +173,7 @@ install_files() {
         fi
     fi
 
-    # Desktop entry — tenta do repo, senão usa o gerado
+    # Desktop entry — try from the repo, otherwise use the generated one
     local desktop_src=""
     if [ -f "pkg/furinar.desktop" ]; then
         desktop_src="pkg/furinar.desktop"
@@ -198,29 +198,29 @@ install_files() {
         sudo install -Dm644 "$meta_src" "${METADATA_DIR}/dev.furinar.Furinar.metainfo.xml"
     fi
 
-    ok "Furinar instalado em ${INSTALL_DIR}/furinar"
+    ok "Furinar installed at ${INSTALL_DIR}/furinar"
 }
 
 # ---------------------------------------------------------------------------
-# Desinstalar
+# Uninstall
 # ---------------------------------------------------------------------------
 uninstall() {
-    info "Desinstalando furinar..."
+    info "Uninstalling furinar..."
     sudo rm -f "${INSTALL_DIR}/furinar"
     sudo rm -f "${ICON_DIR}/furinar.png"
     sudo rm -f "${DESKTOP_DIR}/furinar.desktop"
     sudo rm -f "${METADATA_DIR}/dev.furinar.Furinar.metainfo.xml"
-    ok "Furinar desinstalado."
+    ok "Furinar uninstalled."
 }
 
 # ---------------------------------------------------------------------------
-# Copiar binário local (para instalação a partir do source)
+# Copy local binary (for source installation)
 # ---------------------------------------------------------------------------
 install_from_source() {
     local src="target/release/furinar"
     if [ ! -f "$src" ]; then
-        err "Binário não encontrado em $src"
-        err "Execute 'cargo build --release' primeiro."
+        err "Binary not found at $src"
+        err "Run 'cargo build --release' first."
         exit 1
     fi
     cp "$src" /tmp/furinar
@@ -231,14 +231,14 @@ install_from_source() {
 # Main
 # ---------------------------------------------------------------------------
 usage() {
-    echo "Uso: $0 [OPÇÕES]"
+    echo "Usage: $0 [OPTIONS]"
     echo ""
-    echo "Opções:"
-    echo "  (sem args)     Instala furinar (baixa do GitHub Releases)"
-    echo "  --deps         Apenas instala dependências"
-    echo "  --from-source  Instala a partir do binário local (target/release/furinar)"
-    echo "  --uninstall    Remove furinar"
-    echo "  --help         Mostra esta mensagem"
+    echo "Options:"
+    echo "  (no args)      Install furinar (downloads from GitHub Releases)"
+    echo "  --deps         Only install dependencies"
+    echo "  --from-source  Install from the local binary (target/release/furinar)"
+    echo "  --uninstall    Uninstall furinar"
+    echo "  --help         Show this message"
 }
 
 main() {
@@ -249,7 +249,7 @@ main() {
             --deps)       mode="deps" ;;
             --from-source) mode="source" ;;
             --uninstall)  mode="uninstall" ;;
-            *)            err "Opção desconhecida: $arg"; usage; exit 1 ;;
+            *)            err "Unknown option: $arg"; usage; exit 1 ;;
         esac
     done
 
@@ -277,7 +277,7 @@ main() {
     esac
 
     echo ""
-    ok "Pronto! Execute 'furinar' para iniciar."
+    ok "Done! Run 'furinar' to start."
 }
 
 main "$@"
