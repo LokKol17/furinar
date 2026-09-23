@@ -1,6 +1,6 @@
 # Maintainer: Furinar Dev <dev@furinar.dev>
 pkgname=furinar
-pkgver=1.5.2
+pkgver=1.5.3
 pkgrel=1
 pkgdesc='A light, fast, and beautiful audio player'
 arch=('x86_64')

@@ -5,7 +5,7 @@
 # ============================================================================
 set -euo pipefail
 
-VERSION="${FURINAR_VERSION:-1.5.2}"
+VERSION="${FURINAR_VERSION:-1.5.3}"
 INSTALL_DIR="/usr/local/bin"
 ICON_DIR="/usr/share/icons/hicolor/256x256/apps"
 DESKTOP_DIR="/usr/share/applications"

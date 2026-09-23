@@ -1,6 +1,6 @@
 [package]
 name = "furinar"
-version = "1.5.2"
+version = "1.5.3"
 edition = "2024"
 license = "BSD-3-Clause"
 description = "A light, fast, and beautiful audio player — inspired by the Hydro Archon"
