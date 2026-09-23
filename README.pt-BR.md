@@ -8,7 +8,7 @@
 
 ![Windows](https://img.shields.io/badge/plataforma-Windows%20%7C%20Linux-3da9d6?style=flat-square)
 ![Rust](https://img.shields.io/badge/feito%20com-Rust-c9a050?style=flat-square)
-![RAM](https://img.shields.io/badge/RAM-2--10MB-0b1a2b?style=flat-square)
+![RAM](https://img.shields.io/badge/RAM-5--15MB-0b1a2b?style=flat-square)
 ![Licença](https://img.shields.io/badge/licença-BSD--3--Clause-lightgrey?style=flat-square)
 
 [🇺🇸 English](README.md) | 🇧🇷 Português
@@ -26,7 +26,9 @@
 
 ## Por que Furinar?
 
-A maioria dos players de música pra desktop hoje em dia carrega um navegador inteiro por baixo do capô só pra tocar um MP3. O Furinar faz o oposto: abre em milissegundos e some no fundo usando **2 a 10 MB de RAM** — menos que uma aba do seu navegador gasta parada — e ainda assim tem tudo que um player de verdade precisa: tags, letras sincronizadas, múltiplas bibliotecas, integração nativa com o Windows.
+A maioria dos players de música pra desktop hoje em dia carrega um navegador inteiro por baixo do capô só pra tocar um MP3. O Furinar faz o oposto: abre em milissegundos e some no fundo usando **5 a 15 MB de RAM** no Windows — menos que uma aba do seu navegador gasta parada — e ainda assim tem tudo que um player de verdade precisa: tags, letras sincronizadas, múltiplas bibliotecas, integração nativa com o Windows.
+
+No Linux, o consumo de RAM pode ser um pouco maior (chegando a cerca de 40 MB em alguns casos). Não é culpa do app: as DEs simplesmente mantêm mais itens carregados por aplicação.
 
 A paleta visual — azul-marinho profundo, ciano e dourado (ou azul-bebê e branco pérola, no tema claro) — é uma homenagem à **Furina**, de *Genshin Impact*. Sem relação oficial com a HoYoverse, só um tributo de fã.
 

@@ -8,7 +8,7 @@
 
 ![Windows and Linux](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-3da9d6?style=flat-square)
 ![Rust](https://img.shields.io/badge/built%20with-Rust-c9a050?style=flat-square)
-![RAM](https://img.shields.io/badge/RAM-2--10MB-0b1a2b?style=flat-square)
+![RAM](https://img.shields.io/badge/RAM-5--15MB-0b1a2b?style=flat-square)
 ![License](https://img.shields.io/badge/license-BSD--3--Clause-lightgrey?style=flat-square)
 
 🇺🇸 English | [🇧🇷 Português](README.pt-BR.md)
@@ -26,7 +26,9 @@
 
 ## Why Furinar?
 
-Most desktop music players these days ship an entire browser engine just to play an MP3. Furinar does the opposite: it opens in milliseconds and sits in the background using **2 to 10 MB of RAM** — less than a single browser tab — while still covering everything a real player needs: tags, synced lyrics, multiple libraries, and native Windows integration.
+Most desktop music players these days ship an entire browser engine just to play an MP3. Furinar does the opposite: it opens in milliseconds and sits in the background using **5 to 15 MB of RAM** on Windows — less than a single browser tab — while still covering everything a real player needs: tags, synced lyrics, multiple libraries, and native Windows integration.
+
+On Linux, RAM usage can be somewhat higher (reaching around 40 MB in some cases). That isn't the app itself: desktop environments simply keep more per-application items loaded.
 
 The visual palette — deep navy, cyan, and gold (or baby blue and pearl white in light mode) — is a tribute to **Furina**, from *Genshin Impact*. No official affiliation, just a fan project.
 
