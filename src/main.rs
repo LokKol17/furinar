@@ -100,7 +100,7 @@ struct AppConfig {
 }
 
 fn default_idioma() -> String {
-    "pt-br".to_string()
+    "en".to_string()
 }
 
 fn config_path() -> PathBuf {
@@ -397,7 +397,7 @@ impl Default for EstadoAudio {
             sacola_shuffle: Vec::new(),
             escanear_subpastas: false,
             tema_claro: false,
-            idioma: "pt-br".to_string(),
+            idioma: "en".to_string(),
             indices_visiveis: Vec::new(),
             filtro: String::new(),
             letra_atual: Vec::new(),

@@ -76,7 +76,7 @@ pub fn en() -> Translations {
 
 pub fn get_translations(lang: &str) -> Translations {
     match lang {
-        "en" => en(),
-        _ => pt_br(),
+        "pt-br" | "pt" => pt_br(),
+        _ => en(),
     }
 }

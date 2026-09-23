@@ -7,6 +7,9 @@ e o projeto adere ao [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Alterado
+- Idioma padrão agora é inglês (`en`); antes era português (`pt-br`). Configs já salvas com `pt-br` continuam em português
+
 ## [1.5.3] — 2026-09-23
 
 ### Adicionado
