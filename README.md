@@ -87,7 +87,7 @@ The visual palette — deep navy, cyan, and gold (or baby blue and pearl white i
 **Option 1 — Universal installer:**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/LokKol17/furinar/master/pkg/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/LokKol17/furinar/main/pkg/install.sh | bash
 ```
 
 Or clone and install from source:

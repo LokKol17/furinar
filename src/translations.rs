@@ -27,8 +27,6 @@ pub fn pt_br() -> Translations {
     t.insert("update_downloading", "Baixando...");
     t.insert("update_button", "Atualizar");
     t.insert("update_later", "Depois");
-    t.insert("update_check", "Verificar atualizações");
-    t.insert("update_checking", "Verificando...");
     t.insert("play", "Play");
     t.insert("pause", "Pausar");
     t.insert("loop_off", "Loop: Desl");
@@ -65,8 +63,6 @@ pub fn en() -> Translations {
     t.insert("update_downloading", "Downloading...");
     t.insert("update_button", "Update");
     t.insert("update_later", "Later");
-    t.insert("update_check", "Check for updates");
-    t.insert("update_checking", "Checking...");
     t.insert("play", "Play");
     t.insert("pause", "Pause");
     t.insert("loop_off", "Loop: Off");

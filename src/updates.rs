@@ -1,8 +1,10 @@
 pub struct UpdateInfo {
     pub version: String,
+    pub body: String,
 }
 
 /// Check if this installation was made via a package manager on Linux.
+/// Package managers install to /usr/bin, /usr/local/bin, /snap, etc.
 fn is_package_install() -> bool {
     #[cfg(target_os = "windows")]
     {
@@ -54,97 +56,56 @@ fn get_target() -> &'static str {
     }
 }
 
+/// Strip the leading "v" from a tag like "v0.2.0" → "0.2.0".
 fn strip_tag_prefix(tag: &str) -> &str {
     tag.strip_prefix('v').unwrap_or(tag)
 }
 
-/// Check for a newer release on GitHub using a single API call.
+/// Check for a newer release on GitHub.
+///
+/// Uses the `ReleaseList` API to fetch releases without downloading anything,
+/// then compares the latest semver version against the compiled-in version.
 pub fn check_for_update() -> Option<UpdateInfo> {
-    eprintln!("[update] Starting update check...");
-
     if is_package_install() {
-        eprintln!("[update] Package install detected, skipping.");
         return None;
     }
 
     let current_version = env!("CARGO_PKG_VERSION");
-    eprintln!("[update] Current version: {current_version}");
     let current = semver::Version::parse(current_version).ok()?;
     let target = get_target();
-    eprintln!("[update] Target asset: {target}");
 
-    let url = "https://api.github.com/repos/LokKol17/furinar/releases/latest";
-    eprintln!("[update] Fetching {url}...");
-
-    let client = reqwest::blocking::Client::builder()
-        .timeout(std::time::Duration::from_secs(15))
-        .user_agent(format!("furinar/{current_version}"))
+    // Fetch the release list from GitHub (non-blocking in the sense that it
+    // only does an HTTP GET for the release metadata).
+    let releases = self_update::backends::github::ReleaseList::configure()
+        .repo_owner("LokKol17")
+        .repo_name("furinar")
         .build()
+        .ok()?
+        .fetch()
         .ok()?;
 
-    let resp = match client.get(url).send() {
-        Ok(r) => {
-            eprintln!("[update] HTTP status: {}", r.status());
-            r
-        }
-        Err(e) => {
-            eprintln!("[update] HTTP error: {e}");
-            return None;
-        }
-    };
+    // Find the latest release that has an asset matching our target name.
+    let latest = releases
+        .iter()
+        .find(|r| r.assets.iter().any(|a| a.name == target))
+        .or_else(|| releases.first())?;
 
-    let json: serde_json::Value = match resp.json() {
-        Ok(v) => v,
-        Err(e) => {
-            eprintln!("[update] JSON parse error: {e}");
-            return None;
-        }
-    };
+    let latest_version = semver::Version::parse(strip_tag_prefix(&latest.version)).ok()?;
 
-    let tag = match json["tag_name"].as_str() {
-        Some(t) => {
-            eprintln!("[update] Latest tag: {t}");
-            t
-        }
-        None => {
-            eprintln!("[update] No tag_name in response");
-            return None;
-        }
-    };
-
-    let latest_version = match semver::Version::parse(strip_tag_prefix(tag)) {
-        Ok(v) => v,
-        Err(e) => {
-            eprintln!("[update] Version parse error: {e}");
-            return None;
-        }
-    };
-
-    eprintln!("[update] Latest version: {latest_version}, current: {current}");
-
-    if latest_version <= current {
-        eprintln!("[update] Already up to date.");
-        return None;
+    if latest_version > current {
+        return Some(UpdateInfo {
+            version: strip_tag_prefix(&latest.version).to_string(),
+            body: latest.body.clone().unwrap_or_default(),
+        });
     }
 
-    let has_asset = json["assets"]
-        .as_array()
-        .map(|arr| arr.iter().any(|a| a["name"].as_str() == Some(target)))
-        .unwrap_or(false);
-
-    eprintln!("[update] Has target asset: {has_asset}");
-
-    if !has_asset {
-        return None;
-    }
-
-    eprintln!("[update] Update available: v{latest_version}");
-    Some(UpdateInfo {
-        version: strip_tag_prefix(tag).to_string(),
-    })
+    None
 }
 
-#[allow(dead_code)]
+/// Download and install the latest release.
+///
+/// Uses `self_update`'s `Update` builder which handles downloading the
+/// correct asset, extracting (if archived), and replacing the current binary.
 pub fn perform_update() -> Result<(), Box<dyn std::error::Error>> {
     let status = self_update::backends::github::Update::configure()
         .repo_owner("LokKol17")
