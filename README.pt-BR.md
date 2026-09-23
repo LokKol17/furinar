@@ -87,8 +87,9 @@ A paleta visual — azul-marinho profundo, ciano e dourado (ou azul-bebê e bran
 **Opção 1 — Instalador universal:**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/LokKol17/furinar/main/pkg/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/LokKol17/furinar/master/pkg/install.sh | bash
 ```
+O instalador detecta automaticamente sua distro, instala as dependências e coloca o binário em `/usr/local/bin`.
 
 Ou clone e instale a partir do código-fonte:
 
@@ -104,7 +105,7 @@ sudo ./install.sh --from-source
 
 | Distro | Comando |
 |---|---|
-| Debian/Ubuntu | `make deb && sudo dpkg -i dist/furinar_0.1.0_amd64.deb` |
+| Debian/Ubuntu | `make deb && sudo dpkg -i dist/furinar_1.5.2_amd64.deb` |
 | Fedora | `make rpm && sudo rpm -i dist/rpm/RPMS/x86_64/*.rpm` |
 | Arch/Manjaro | `makepkg -si` (usando `pkg/arch/PKGBUILD`) |
 
@@ -126,6 +127,10 @@ cargo deb
 | Debian/Ubuntu | `sudo apt install libasound2 libgtk-3-0` |
 | Fedora | `sudo dnf install alsa-lib gtk3` |
 | Arch/Manjaro | `sudo pacman -S alsa-lib gtk3` |
+
+**Configuração (Linux):**
+
+O arquivo de configuração é salvo em `~/.config/furinar/furinar_config.json`, seguindo a especificação [XDG Base Directory](https://specifications.freedesktop.org/basedir-spec/latest/).
 
 ---
 
@@ -184,7 +189,7 @@ Pra trocar o ícone, é só substituir o arquivo de origem — o build cuida do 
 <details>
 <summary>Arquivo de configuração</summary>
 
-As preferências são salvas automaticamente em `furinar_config.json`, na raiz do projeto:
+As preferências são salvas automaticamente em `furinar_config.json`. No Linux, o caminho segue XDG: `~/.config/furinar/furinar_config.json`. No Windows, fica na raiz do projeto.
 
 ```json
 {
@@ -202,6 +207,8 @@ As preferências são salvas automaticamente em `furinar_config.json`, na raiz d
 ```
 
 O campo antigo `pasta` (singular, de versões anteriores) ainda é lido: se `pastas` estiver vazio e ele existir, é migrado automaticamente pra lista na primeira execução.
+
+No Linux, o arquivo de configuração fica em `~/.config/furinar/` (XDG). No Windows, fica ao lado do executável.
 
 Dá pra editar o arquivo manualmente — o player relê as configurações a cada início.
 

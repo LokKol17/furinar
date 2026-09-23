@@ -1,5 +1,5 @@
 Name:           furinar
-Version:        0.1.0
+Version:        1.5.2
 Release:        1%{?dist}
 Summary:        A light, fast, and beautiful audio player
 
@@ -41,5 +41,5 @@ install -Dm644 pkg/furinar.metainfo.xml %{buildroot}%{_datadir}/metainfo/dev.fur
 %{_datadir}/metainfo/dev.furinar.Furinar.metainfo.xml
 
 %changelog
-* Sun Sep 21 2026 Furinar Dev <dev@furinar.dev> - 0.1.0-1
+* Sun Sep 21 2026 Furinar Dev <dev@furinar.dev> - 1.5.2-1
 - Initial release

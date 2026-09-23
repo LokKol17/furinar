@@ -87,8 +87,9 @@ The visual palette — deep navy, cyan, and gold (or baby blue and pearl white i
 **Option 1 — Universal installer:**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/LokKol17/furinar/main/pkg/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/LokKol17/furinar/master/pkg/install.sh | bash
 ```
+The installer automatically detects your distro, installs dependencies, and places the binary in `/usr/local/bin`.
 
 Or clone and install from source:
 
@@ -104,7 +105,7 @@ sudo ./install.sh --from-source
 
 | Distro | Command |
 |---|---|
-| Debian/Ubuntu | `make deb && sudo dpkg -i dist/furinar_0.1.0_amd64.deb` |
+| Debian/Ubuntu | `make deb && sudo dpkg -i dist/furinar_1.5.2_amd64.deb` |
 | Fedora | `make rpm && sudo rpm -i dist/rpm/RPMS/x86_64/*.rpm` |
 | Arch/Manjaro | `makepkg -si` (from `pkg/arch/PKGBUILD`) |
 
@@ -126,6 +127,10 @@ cargo deb
 | Debian/Ubuntu | `sudo apt install libasound2 libgtk-3-0` |
 | Fedora | `sudo dnf install alsa-lib gtk3` |
 | Arch/Manjaro | `sudo pacman -S alsa-lib gtk3` |
+
+**Configuration (Linux):**
+
+The config file is saved to `~/.config/furinar/furinar_config.json` following the [XDG Base Directory](https://specifications.freedesktop.org/basedir-spec/latest/) specification.
 
 ---
 
@@ -182,7 +187,7 @@ To change the icon, just replace the source file — the build handles the rest.
 <details>
 <summary>Config file</summary>
 
-Preferences are saved automatically to `furinar_config.json`, in the project root:
+Preferences are saved automatically to `furinar_config.json`. On Linux, the path follows XDG: `~/.config/furinar/furinar_config.json`. On Windows, it's in the project root.
 
 ```json
 {
@@ -200,6 +205,8 @@ Preferences are saved automatically to `furinar_config.json`, in the project roo
 ```
 
 The old singular `pasta` field (from earlier versions) is still read: if `pastas` is empty and it exists, it's automatically migrated into the list on first run.
+
+On Linux, the config is stored in `~/.config/furinar/` (XDG). On Windows it lives next to the executable.
 
 You can edit the file by hand — the player re-reads the config on every launch.
 

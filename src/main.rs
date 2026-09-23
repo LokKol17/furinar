@@ -103,9 +103,37 @@ fn default_idioma() -> String {
     "pt-br".to_string()
 }
 
+fn config_path() -> PathBuf {
+    #[cfg(target_os = "linux")]
+    {
+        if let Ok(xdg) = std::env::var("XDG_CONFIG_HOME") {
+            PathBuf::from(xdg)
+                .join("furinar")
+                .join("furinar_config.json")
+        } else {
+            if let Ok(home) = std::env::var("HOME") {
+                PathBuf::from(home)
+                    .join(".config")
+                    .join("furinar")
+                    .join("furinar_config.json")
+            } else {
+                PathBuf::from("furinar_config.json")
+            }
+        }
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        PathBuf::from("furinar_config.json")
+    }
+}
+
 impl AppConfig {
     fn carregar() -> Self {
-        let mut config = if let Ok(conteudo) = fs::read_to_string("furinar_config.json") {
+        let config_path = config_path();
+        if let Some(parent) = config_path.parent() {
+            let _ = fs::create_dir_all(parent);
+        }
+        let mut config = if let Ok(conteudo) = fs::read_to_string(&config_path) {
             serde_json::from_str(&conteudo).unwrap_or_default()
         } else {
             Self {
@@ -133,8 +161,12 @@ impl AppConfig {
     }
 
     fn salvar(&self) {
+        let config_path = config_path();
+        if let Some(parent) = config_path.parent() {
+            let _ = fs::create_dir_all(parent);
+        }
         if let Ok(json) = serde_json::to_string_pretty(self) {
-            let _ = fs::write("furinar_config.json", json);
+            let _ = fs::write(&config_path, json);
         }
     }
 }

@@ -98,6 +98,16 @@ download_binary() {
         exit 1
     fi
     chmod +x "$dest"
+
+    # Baixar ícone junto
+    local icon_url="https://raw.githubusercontent.com/LokKol17/furinar/master/ui/assets/furinar_icon.png"
+    local icon_dest="/tmp/furinar_icon.png"
+    if command -v curl &>/dev/null; then
+        curl -fSL "$icon_url" -o "$icon_dest" 2>/dev/null || true
+    elif command -v wget &>/dev/null; then
+        wget -q "$icon_url" -O "$icon_dest" 2>/dev/null || true
+    fi
+
     ok "Binário baixado."
 }
 
@@ -148,6 +158,20 @@ install_files() {
     info "Instalando furinar..."
     sudo install -Dm755 /tmp/furinar "${INSTALL_DIR}/furinar"
     sudo rm -f /tmp/furinar
+
+    # Ícone — tenta do repo, senão usa o baixado
+    local icon_src=""
+    if [ -f "ui/assets/furinar_icon.png" ]; then
+        icon_src="ui/assets/furinar_icon.png"
+    elif [ -f /tmp/furinar_icon.png ]; then
+        icon_src="/tmp/furinar_icon.png"
+    fi
+    if [ -n "$icon_src" ]; then
+        sudo install -Dm644 "$icon_src" "${ICON_DIR}/furinar.png"
+        if command -v gtk-update-icon-cache &>/dev/null; then
+            sudo gtk-update-icon-cache -f -t /usr/share/icons/hicolor 2>/dev/null || true
+        fi
+    fi
 
     # Desktop entry — tenta do repo, senão usa o gerado
     local desktop_src=""

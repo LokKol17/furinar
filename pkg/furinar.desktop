@@ -7,6 +7,6 @@ Exec=furinar %f
 Icon=furinar
 Terminal=false
 Categories=Audio;Music;Player;
-MimeType=audio/mpeg;audio/x-flac;audio/ogg;audio/wav;audio/mp4;
+MimeType=audio/mpeg;audio/x-flac;audio/ogg;audio/wav;audio/mp4;audio/x-wav;audio/x-m4a;
 Keywords=music;player;audio;mp3;flac;ogg;
 StartupWMClass=furinar
