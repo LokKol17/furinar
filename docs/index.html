@@ -1,150 +1,728 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
+﻿<!DOCTYPE html>
+<html lang="en">
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Furinar — A light, fast, and beautiful audio player</title>
-    <link rel="stylesheet" href="styles.css">
-    <link rel="icon" type="image/png" href="screenshot-player.png">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Primary Meta -->
+  <title>Furinar — A light, fast, local music player</title>
+  <meta name="description"
+    content="Furinar is a lightweight, native desktop music player built with Rust. Opens in milliseconds, uses 2–10 MB of RAM, and plays your local music library beautifully. Windows & Linux.">
+  <meta name="author" content="LokKol17">
+  <meta name="keywords"
+    content="music player, local music, lightweight, desktop app, Rust, Windows, Linux, audio player, Furinar">
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="Furinar — A light, fast, local music player">
+  <meta property="og:description"
+    content="A native desktop music player that opens in milliseconds and uses 2–10 MB of RAM. Tags, synced lyrics, multiple libraries, and system integration.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://lokkol17.github.io/furinar/">
+  <meta property="og:image" content="screenshot-player-dark.png">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Furinar — A light, fast, local music player">
+  <meta name="twitter:description" content="Native desktop music player. 2–10 MB RAM. Windows & Linux.">
+  <meta name="twitter:image" content="screenshot-player-dark.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="furinar_icon.png">
+
+  <!-- Fonts: Clean modern sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+    rel="stylesheet">
+
+  <link rel="stylesheet" href="styles.css">
 </head>
+
 <body>
-    <nav class="navbar">
-        <div class="container">
-            <a href="#" class="logo">🎵 Furinar</a>
-            <div class="nav-links">
-                <a href="#features">Features</a>
-                <a href="#download">Download</a>
-                <a href="https://github.com/LokKol17/furinar" target="_blank">GitHub</a>
-            </div>
+
+  <!-- ===== NAVBAR ===== -->
+  <nav class="navbar" role="navigation" aria-label="Main navigation">
+    <div class="nav-inner">
+      <a href="#" class="nav-logo" aria-label="Furinar — home">
+        <img src="furinar_icon.png" alt="Furinar logo" class="nav-logo-icon" width="24" height="24">
+        <span class="nav-logo-text">FURINAR</span>
+      </a>
+      <div class="nav-links">
+        <a href="#features" data-i18n="nav.features">Features</a>
+        <a href="#showcase" data-i18n="nav.gallery">Gallery</a>
+        <a href="#download" data-i18n="nav.download">Download</a>
+        <a href="https://github.com/LokKol17/furinar" target="_blank" rel="noopener noreferrer" class="nav-github">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path
+              d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z" />
+          </svg>
+          GitHub
+        </a>
+        <div class="lang-switcher">
+          <button type="button" class="lang-btn" id="lang-btn" aria-label="Toggle language">
+            <span class="lang-opt lang-en active">EN</span>
+            <span class="lang-sep">/</span>
+            <span class="lang-opt lang-pt">PT</span>
+          </button>
         </div>
-    </nav>
+        <a href="#download" class="nav-cta" data-i18n="nav.cta">Download</a>
+      </div>
+      <button class="nav-burger" aria-label="Open menu" aria-expanded="false" aria-controls="mobile-menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+    <div class="mobile-menu" id="mobile-menu" aria-hidden="true">
+      <a href="#features" data-i18n="nav.features">Features</a>
+      <a href="#showcase" data-i18n="nav.gallery">Gallery</a>
+      <a href="#download" data-i18n="nav.download">Download</a>
+      <a href="https://github.com/LokKol17/furinar" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <div class="mobile-lang-wrap">
+        <button type="button" class="mobile-lang-btn" id="mobile-lang-btn" aria-label="Toggle language">
+          <span class="lang-opt lang-en active">English</span>
+          <span class="lang-sep">·</span>
+          <span class="lang-opt lang-pt">Português</span>
+        </button>
+      </div>
+    </div>
+  </nav>
 
-    <header class="hero">
-        <div class="container">
-            <h1>Furinar</h1>
-            <p class="tagline">A light, fast, and beautiful audio player</p>
-            <p class="subtitle">Inspired by the Hydro Archon. Opens in milliseconds, uses 2–10 MB of RAM.</p>
-            <div class="hero-buttons">
-                <a href="#download" class="btn btn-primary">Download</a>
-                <a href="https://github.com/LokKol17/furinar" target="_blank" class="btn btn-secondary">View on GitHub</a>
-            </div>
-            <div class="hero-screenshot">
-                <img src="screenshot-player.png" alt="Furinar Player" class="screenshot">
-            </div>
+  <!-- ===== HERO ===== -->
+  <header class="hero" role="banner">
+    <div class="container hero-content">
+      <div class="hero-icon-wrap">
+        <img src="furinar_icon.png" alt="Furinar" class="hero-icon" width="130" height="130">
+      </div>
+
+      <h1 class="hero-title" data-i18n="hero.title">
+        Your music.<br>
+        <em>Nothing else.</em>
+      </h1>
+
+      <p class="hero-subtitle" data-i18n="hero.subtitle">
+        A native desktop music player that opens in milliseconds
+        and stays out of your way — no browser engine, no unnecessary overhead.
+      </p>
+
+      <div class="hero-stat-row" aria-label="Memory usage">
+        <div class="hero-stat">
+          <span class="stat-value">2–10</span>
+          <span class="stat-unit">MB</span>
+          <span class="stat-label" data-i18n="hero.ram">of RAM</span>
         </div>
-    </header>
+        <div class="stat-divider" aria-hidden="true"></div>
+        <p class="stat-context" data-i18n="hero.tab">Less than a single browser tab</p>
+      </div>
 
-    <section id="features" class="features">
-        <div class="container">
-            <h2>Features</h2>
-            <div class="features-grid">
-                <div class="feature-card">
-                    <div class="feature-icon">⚡</div>
-                    <h3>Lightweight</h3>
-                    <p>Opens in milliseconds and uses only 2–10 MB of RAM — less than a single browser tab.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">🎵</div>
-                    <h3>Multi-format</h3>
-                    <p>MP3, WAV, FLAC, OGG/Vorbis, and M4A support out of the box.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">📂</div>
-                    <h3>Multiple Libraries</h3>
-                    <p>Open as many folders as tabs. Switching tabs never interrupts playback.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">📝</div>
-                    <h3>Synced Lyrics</h3>
-                    <p>Display synchronized lyrics via .lrc files, scrolling along with the track.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">🎨</div>
-                    <h3>Light & Dark Themes</h3>
-                    <p>Switch instantly between beautiful light and dark themes.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">🔍</div>
-                    <h3>Smart Search</h3>
-                    <p>Filter by title or artist, accent- and case-insensitive.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">⌨️</div>
-                    <h3>Keyboard Shortcuts</h3>
-                    <p>Space, arrows, Enter — full control without touching the mouse.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">🖥️</div>
-                    <h3>System Integration</h3>
-                    <p>Media controls on Windows and Linux (MPRIS). Taskbar buttons on Windows.</p>
-                </div>
-            </div>
+      <div class="hero-ctas">
+        <a href="https://github.com/LokKol17/furinar/releases/latest/download/furinar-windows-x86_64.exe"
+          class="btn btn-primary" id="hero-download-btn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+          <span data-i18n="hero.download_win">Download for Windows</span>
+        </a>
+        <a href="https://github.com/LokKol17/furinar" target="_blank" rel="noopener noreferrer" class="btn btn-ghost"
+          id="hero-github-btn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path
+              d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z" />
+          </svg>
+          <span data-i18n="hero.view_github">View on GitHub</span>
+        </a>
+      </div>
+
+      <div class="hero-platforms">
+        <span class="platform-tag">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path
+              d="M3 5.557L10.294 4.5v7.07H3v-6.013zM11.168 4.374L21 3v8.57h-9.832V4.374zM3 12.432h7.294v7.029L3 18.443V12.432zM11.168 12.572H21v8.47l-9.832-1.38V12.572z" />
+          </svg>
+          Windows
+        </span>
+        <span class="platform-tag">
+          <svg width="13" height="13" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true">
+            <path
+              d="M15.6 8.1c0 .1-.1.1-.1.1h-.1c-.1 0-.1-.1-.2-.2 0 0-.1-.1-.1-.2s0-.1.1-.1l.2.1c.1.1.2.2.2.3m-1.9-1c0-.5-.2-.8-.5-.8 0 0 0 .1-.1.1v.2h.3c0 .2.1.3.1.5h.2m3.6-.5c.2 0 .3.2.4.5h.2c-.1-.1-.1-.2-.1-.3 0-.1 0-.2-.1-.3-.1-.1-.2-.2-.3-.2 0 0-.1.1-.2.1 0 .1.1.1.1.2m-3.1 1.6c-.1 0-.1 0-.1-.1s0-.2.1-.3c.2 0 .3-.1.3-.1.1 0 .1.1.1.1 0 .1-.1.2-.3.4h-.1m-1.1-.1c-.4-.2-.5-.5-.5-1 0-.3 0-.5.2-.7.1-.2.3-.3.5-.3s.3.1.5.3c.1.3.2.6.2.9v.2h.1v-.1c.1 0 .1-.2.1-.6 0-.3 0-.6-.2-.9-.2-.3-.4-.5-.8-.5-.3 0-.6.2-.7.5-.2.4-.2.7-.2 1.2 0 .4.1.8.6 1.2 0-.1.1-.1.2-.2m12.8 14.5c.1 0 .1 0 .1-.1 0-.2-.1-.5-.4-.8-.3-.3-.8-.5-1.4-.6h-.4c-.1 0-.3 0-.4-.1.3-1 .4-1.8.4-2.5 0-1-.2-1.7-.6-2.4-.4-.6-.8-.9-1.3-1-.1.1-.1.1-.1.2.5.2 1 .6 1.3 1.2.3.7.4 1.3.4 2.1 0 .6-.1 1.4-.5 2.5-.4.2-.8.5-1.1 1.1 0 .1 0 .1.1.1 0 0 .1-.1.2-.3l.5-.5c.3-.2.5-.3.8-.3.5 0 1 .1 1.3.2.4.1.6.3.7.4.1.2.2.3.3.4 0 .3.1.4.1.4M16.5 7.7c-.1-.1-.1-.3-.1-.5 0-.4 0-.6.2-.9.2-.2.4-.3.6-.3.3 0 .5.2.7.4.1.3.2.5.2.8 0 .5-.2.8-.6.9 0 0 .1.1.2.1.2 0 .3.1.5.2.1-.6.2-1 .2-1.5 0-.6-.1-1-.3-1.3-.3-.3-.6-.4-1-.4-.3 0-.6.1-.9.3-.2.3-.3.5-.3.8 0 .5.1.9.3 1.3.1 0 .2.1.3.1m1.2 1.7c-1.3.9-2.4 1.3-3.2 1.3-.7 0-1.4-.3-2.1-.8.1.2.2.4.3.5l.6.6c.4.4.9.6 1.4.6.7 0 1.5-.4 2.6-1.1l.9-.6c.2-.2.4-.4.4-.7 0-.1 0-.2-.1-.2 0-.3-.5-.6-1.5-.9-.9-.4-1.6-.6-2.1-.6-.3 0-.8.2-1.5.6-.6.4-1 .8-1 1.2 0 0 .1.1.2.3.6.5 1.2.8 1.8.8.8 0 1.8-.4 3.2-1.4v.2c.1.1.1.2.1.2m2.4 20.7c.4.8 1.1 1.2 1.9 1.2.2 0 .4 0 .6-.1.2 0 .4-.1.5-.2.1-.1.2-.1.3-.2.2-.1.2-.1.3-.2l1.7-1.5c.4-.3.8-.6 1.3-.9l1-.5c.3-.1.5-.2.7-.4.1-.2.2-.3.2-.6s-.2-.5-.4-.7c-.2-.2-.4-.3-.6-.3-.2-.1-.4-.2-.7-.5-.2-.3-.4-.6-.5-1.1l-.1-.6c-.1-.3-.1-.5-.2-.6H26c-.1 0-.3.1-.4.3l-.6.6c-.1.2-.4.4-.6.6-.3.2-.6.3-.8.3-.8 0-1.2-.2-1.5-.7-.2-.3-.3-.7-.4-1.1-.2-.2-.3-.3-.5-.3-.5 0-.7.5-.7 1.6V27.3c0 .1-.1.3-.1.6-.1.3-.1.7-.1 1.1l-.2 1.1m-14.9-.6c1 .1 2.1.4 3.3.9 1.2.5 2 .7 2.3.7.7 0 1.3-.3 1.8-.9.1-.2.1-.4.1-.7 0-1-.6-2.2-1.8-3.7l-.7-.9c-.1-.2-.3-.5-.5-.9s-.4-.7-.6-.9c-.1-.2-.3-.5-.6-.7-.3-.2-.6-.4-.9-.5-.4.1-.7.2-.9.4s-.2.4-.2.6c0 .2-.1.4-.2.4-.1.1-.3.1-.5.2h-.6c-.5 0-.9.1-1.1.2-.3.3-.4.6-.4 1 0 .2 0 .4.1.8s.1.7.1.9c0 .4-.1.8-.4 1.3-.3.4-.4.8-.4 1 .2.4.9.7 2.1.8m3.4-9.3c0-.7.2-1.5.6-2.4.4-.9.7-1.5 1.1-1.9 0-.1-.1-.1-.2-.1l-.1-.2c-.3.3-.7 1-1.1 2.1-.4.9-.7 1.8-.7 2.4 0 .5.1.9.3 1.2.2.3.8.8 1.6 1.5l1.1.7c1.2 1 1.8 1.7 1.8 2.1 0 .2-.1.4-.4.7-.2.2-.5.4-.7.4v.1l.3.6c.4.6 1.4.9 2.6.9 2.3 0 4-.9 5.3-2.8 0-.5 0-.8-.1-1v-.4c0-.7.1-1.2.3-1.5.2-.3.4-.5.7-.5.2 0 .4.1.6.2.1-.8.1-1.5.1-2.1 0-.9 0-1.7-.2-2.4-.1-.6-.3-1.1-.5-1.5l-.6-.9c-.2-.3-.3-.6-.5-.9-.1-.4-.2-.7-.2-1.2-.3-.5-.5-1-.8-1.5-.2-.5-.4-1-.6-1.4l-.9.7c-1 .7-1.8 1-2.6 1-.6 0-1.1-.1-1.4-.5l-.6-.5c0 .3-.1.7-.3 1.1l-.6 1.2c-.3.7-.4 1.1-.5 1.4 0 .2-.1.4-.1.4l-.8 1.5c-.8 1.5-1.3 3-1.3 4.1 0 .2 0 .5.1.7-.5-.3-.7-.7-.7-1.3m7.4 9.7c-1.3 0-2.4.2-3.1.5-.5.6-1.1.9-1.9.9-.5 0-1.3-.2-2.4-.6-1.1-.4-2-.7-2.9-.8-.1 0-.3-.1-.6-.1s-.6-.1-.8-.1c-.2 0-.5-.1-.7-.2-.3-.1-.5-.2-.6-.3-.1-.1-.2-.3-.2-.4 0-.2 0-.3.1-.5s.2-.3.3-.4c.1-.1.1-.2.2-.3.1-.1.1-.2.1-.3 0-.1.1-.2.1-.3v-.3s0-.4-.1-1c-.1-.5-.1-.9-.1-1 0-.5.1-.8.3-1.1.2-.3.4-.4.7-.4h1.2c.1 0 .2-.1.5-.2.1-.2.1-.3.2-.4.1-.1.1-.2.1-.3 0-.1 0-.1.1-.2 0-.1.1-.2.2-.2-.1-.1-.1-.2-.1-.4v-.3c0-.4.2-.9.5-1.6l.4-.6.7-1.4c.2-.4.4-1 .6-1.8.2-.7.6-1.4 1.2-2.2l.8-.9c.5-.6.9-1.1 1.1-1.5.2-.4.3-.9.3-1.3 0-.2-.1-.8-.2-1.8s-.2-2.1-.2-3c0-.7.1-1.2.2-1.7s.4-1 .7-1.4c.3-.4.7-.8 1.3-1 .6-.2 1.3-.3 2.2-.3.3 0 .6 0 .9.1.3 0 .7.1 1.2.3.4.2.8.4 1.1.7.2.2.6.7.9 1.2.2.6.4 1.2.5 2.1.1.5.1 1 .2 1.7 0 .6.1 1 .1 1.3.1.3.1.7.2 1.2.1.4.2.8.4 1.1.2.4.4.8.7 1.2.3.5.7 1 1.1 1.6.9 1 1.6 2.2 2.1 3.3.5 1 .8 2.4.8 3.8 0 .7-.1 1.4-.3 2.1.2 0 .3.1.4.2s.2.5.3.9l.1.8c.1.2.2.4.5.6.2.2.4.3.7.5.2.1.5.2.7.4.2.2.3.4.3.6 0 .3-.1.6-.3.8-.2.2-.4.3-.7.4l-1.2.6c-.5.3-1 .7-1.5 1.1l-1 .9c-.4.4-.8.7-1.1.9-.3.2-.7.3-1.1.3l-.7-.1c-.8-.2-1.3-.6-1.6-1.3-1.8 0-3.1-.1-3.9-.1" />
+          </svg>
+          Linux
+        </span>
+        <span class="platform-tag">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="16 18 22 12 16 6" />
+            <polyline points="8 6 2 12 8 18" />
+          </svg>
+          <span data-i18n="hero.built_rust">Built with Rust</span>
+        </span>
+      </div>
+    </div>
+
+    <div class="hero-screenshot-wrap">
+      <div class="screenshot-frame" aria-label="Furinar player screenshot">
+        <img src="screenshot-player-dark.png"
+          alt="Furinar music player — dark theme showing playlist and playback controls" class="hero-screenshot"
+          loading="eager" width="500">
+      </div>
+    </div>
+  </header>
+
+  <!-- ===== LIGHTWEIGHT SECTION ===== -->
+  <section class="section-light" aria-label="Lightweight philosophy">
+    <div class="container">
+      <div class="light-inner">
+        <div class="light-text reveal">
+          <p class="section-label" data-i18n="light.label">Philosophy</p>
+          <h2 class="section-title" data-i18n="light.title">No browser engine.<br>No unnecessary overhead.</h2>
+          <p class="section-body" data-i18n="light.body">
+            Most music players ship an entire browser runtime to render their interface.
+            Furinar is built natively with <strong>Rust and Slint</strong> — a compiled UI toolkit
+            that produces a lean binary. The result: instant launch, minimal footprint,
+            and a player that stays quietly in the background.
+          </p>
+          <ul class="light-pillars" role="list">
+            <li>
+              <span class="pillar-dot" aria-hidden="true"></span>
+              <span data-i18n="light.p1">Opens in milliseconds</span>
+            </li>
+            <li>
+              <span class="pillar-dot" aria-hidden="true"></span>
+              <span data-i18n="light.p2">2–10 MB of RAM — consistently</span>
+            </li>
+            <li>
+              <span class="pillar-dot" aria-hidden="true"></span>
+              <span data-i18n="light.p3">A single portable executable</span>
+            </li>
+            <li>
+              <span class="pillar-dot" aria-hidden="true"></span>
+              <span data-i18n="light.p4">No runtime dependencies on Windows</span>
+            </li>
+          </ul>
         </div>
-    </section>
-
-    <section id="screenshots" class="screenshots">
-        <div class="container">
-            <h2>Screenshots</h2>
-            <div class="screenshot-grid">
-                <div class="screenshot-item">
-                    <img src="screenshot-player.png" alt="Furinar - Light Theme">
-                    <p>Light Theme</p>
-                </div>
-                <div class="screenshot-item">
-                    <img src="screenshot-player-dark.png" alt="Furinar - Dark Theme">
-                    <p>Dark Theme</p>
-                </div>
-                <div class="screenshot-item">
-                    <img src="screenshot-lyrics.png" alt="Furinar - Synced Lyrics">
-                    <p>Synced Lyrics</p>
-                </div>
+        <div class="light-visual reveal reveal-delay-1" aria-hidden="true">
+          <div class="weight-card">
+            <div class="weight-label">Furinar</div>
+            <div class="weight-bar-wrap">
+              <div class="weight-bar weight-bar--furinar">
+                <span class="weight-bar-value">~6 MB</span>
+              </div>
             </div>
-        </div>
-    </section>
-
-    <section id="download" class="download">
-        <div class="container">
-            <h2>Download</h2>
-            <p class="download-subtitle">Available for Windows and Linux</p>
-            <div class="download-cards">
-                <div class="download-card">
-                    <div class="download-icon">🪟</div>
-                    <h3>Windows</h3>
-                    <p>furinar-windows-x86_64.exe</p>
-                    <a href="https://github.com/LokKol17/furinar/releases/latest/download/furinar-windows-x86_64.exe" class="btn btn-primary">Download .exe</a>
-                </div>
-                <div class="download-card">
-                    <div class="download-icon">🐧</div>
-                    <h3>Linux</h3>
-                    <p>furinar-linux-x86_64.tar.gz</p>
-                    <a href="https://github.com/LokKol17/furinar/releases/latest/download/furinar-linux-x86_64.tar.gz" class="btn btn-primary">Download .tar.gz</a>
-                </div>
+          </div>
+          <div class="weight-card">
+            <div class="weight-label" data-i18n="light.card_browser">Browser tab</div>
+            <div class="weight-bar-wrap">
+              <div class="weight-bar weight-bar--browser">
+                <span class="weight-bar-value">~200 MB+</span>
+              </div>
             </div>
-            <div class="install-methods">
-                <h3>Other install methods</h3>
-                <pre><code># Universal installer
-curl -fsSL https://raw.githubusercontent.com/LokKol17/furinar/main/pkg/install.sh | bash
+          </div>
+          <p class="weight-note" data-i18n="light.card_note">Approximate RAM usage — your music stays yours.</p>
+        </div>
+      </div>
+    </div>
+  </section>
 
-# Debian/Ubuntu
-make deb && sudo dpkg -i dist/furinar_*.deb
+  <!-- ===== FEATURES SECTION ===== -->
+  <section id="features" class="section-features" aria-labelledby="features-heading">
+    <div class="container">
+      <div class="section-header reveal">
+        <p class="section-label" data-i18n="features.label">Features</p>
+        <h2 id="features-heading" class="section-title" data-i18n="features.title">Everything a real player needs.</h2>
+        <p class="section-body section-body--center" data-i18n="features.sub">
+          No cloud sync, no subscriptions, no tracking. Just your local library, played right.
+        </p>
+      </div>
 
-# Fedora
-make rpm && sudo rpm -i dist/rpm/RPMS/x86_64/*.rpm
+      <div class="features-editorial">
 
-# Arch/Manjaro
-cd pkg/arch && makepkg -si</code></pre>
+        <!-- Feature block: Playback -->
+        <div class="feature-row reveal">
+          <div class="feature-row-text">
+            <span class="feature-number" aria-hidden="true">01</span>
+            <h3 class="feature-title" data-i18n="feat1.title">Full Playback Control</h3>
+            <p class="feature-desc" data-i18n="feat1.desc">
+              Play, pause, stop, seek, adjust volume, and navigate tracks with clean controls.
+              Loop modes — off, single track, or full playlist — plus shuffle. Furinar picks up
+              exactly where you left off on every reopen.
+            </p>
+            <ul class="feature-tags" role="list" aria-label="Supported formats">
+              <li>MP3</li>
+              <li>FLAC</li>
+              <li>WAV</li>
+              <li>OGG</li>
+              <li>M4A</li>
+            </ul>
+          </div>
+          <div class="feature-row-visual">
+            <div class="control-demo" id="control-demo" aria-hidden="true">
+              <div class="demo-track-info" id="demo-track-info">
+                <span class="demo-track-name" id="demo-track-name">my!lane — This Feeling</span>
+              </div>
+              <div class="demo-bar">
+                <div class="demo-progress" id="demo-progress"></div>
+                <div class="demo-thumb" id="demo-thumb"></div>
+              </div>
+              <div class="demo-time">
+                <span id="demo-time-cur">00:00</span>
+                <span id="demo-time-dur">03:21</span>
+              </div>
+              <div class="demo-controls">
+                <button class="demo-btn" tabindex="-1" aria-label="Previous track">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M6 6h2v12H6zm3.5 6 8.5 6V6z" />
+                  </svg>
+                </button>
+                <button class="demo-btn demo-btn--play" id="demo-play-btn" tabindex="-1" aria-label="Play/Pause">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+                  </svg>
+                </button>
+                <button class="demo-btn" tabindex="-1" aria-label="Next track">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
+                  </svg>
+                </button>
+              </div>
+              <div class="demo-badges">
+                <span class="demo-badge demo-badge--active">Shuffle</span>
+                <span class="demo-badge">Repeat</span>
+                <span class="demo-badge">Loop</span>
+              </div>
             </div>
+          </div>
         </div>
-    </section>
 
-    <footer class="footer">
-        <div class="container">
-            <p>Made with ❤️ by <a href="https://github.com/LokKol17">LokKol17</a> and contributors</p>
-            <p>Inspired by <a href="https://genshin-impact.fandom.com/wiki/Furina" target="_blank">Furina</a> from Genshin Impact</p>
-            <p class="license">Licensed under BSD-3-Clause</p>
+        <div class="feature-divider" aria-hidden="true"></div>
+
+        <!-- Feature block: Libraries -->
+        <div class="feature-row feature-row--reverse reveal">
+          <div class="feature-row-text">
+            <span class="feature-number" aria-hidden="true">02</span>
+            <h3 class="feature-title" data-i18n="feat2.title">Multiple Libraries as Tabs</h3>
+            <p class="feature-desc" data-i18n="feat2.desc">
+              Open as many folders as you want — each becomes its own tab. Switching between
+              libraries never interrupts what's currently playing. Optional recursive subfolder
+              scanning means no track is left behind.
+            </p>
+            <ul class="feature-list" role="list">
+              <li data-i18n="feat2.l1">Folder tabs — each library independent</li>
+              <li data-i18n="feat2.l2">Recursive subfolder scanning</li>
+              <li data-i18n="feat2.l3">ID3 / Vorbis tag reading — title, artist</li>
+              <li data-i18n="feat2.l4">Falls back gracefully to filename</li>
+            </ul>
+          </div>
+          <div class="feature-row-visual">
+            <div class="tabs-demo" id="tabs-demo" aria-hidden="true">
+              <div class="tabs-bar" id="tabs-bar">
+                <div class="tab tab--active" data-tab="0">
+                  <span class="tab-dot"></span>
+                  Music
+                </div>
+                <div class="tab" data-tab="1">Podcasts</div>
+                <div class="tab" data-tab="2">Favorites</div>
+                <div class="tab-add">+</div>
+              </div>
+              <div class="tab-list" id="tab-list">
+                <div class="tab-item tab-item--playing">
+                  <span class="tab-indicator"></span>
+                  my!lane — This Feeling
+                </div>
+                <div class="tab-item">TWISTED feat. Oliver Tree — WORTH NOTHING</div>
+                <div class="tab-item">FORGOTTENAGE — Valhalla</div>
+                <div class="tab-item">Eve — 夜の楽ジークレット</div>
+                <div class="tab-item">ギガプ feat. れをる — ヒビカセ</div>
+              </div>
+            </div>
+          </div>
         </div>
-    </footer>
+      </div>
 
-    <script src="script.js"></script>
+      <div class="feature-divider" aria-hidden="true"></div>
+
+      <!-- Feature block: Search & Tags -->
+      <div class="feature-row reveal">
+        <div class="feature-row-text">
+          <span class="feature-number" aria-hidden="true">03</span>
+          <h3 class="feature-title" data-i18n="feat3.title">Instant Search &amp; Navigation</h3>
+          <p class="feature-desc" data-i18n="feat3.desc">
+            Search by track title or artist across your active library. Type directly into the search
+            field and results filter in real time with zero delay.
+          </p>
+          <ul class="feature-list" role="list">
+            <li data-i18n="feat3.l1">Live filtering as you type</li>
+            <li data-i18n="feat3.l2">Matches on title, artist, or filename</li>
+            <li data-i18n="feat3.l3">Preserves your active playlist state</li>
+          </ul>
+        </div>
+        <div class="feature-row-visual">
+          <div class="search-demo" id="search-demo" aria-hidden="true">
+            <div class="search-input-wrap">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="8" />
+                <path d="m21 21-4.35-4.35" />
+              </svg>
+              <span class="search-input-text" id="search-typed"></span>
+              <span class="search-cursor"></span>
+            </div>
+            <div class="search-results" id="search-results">
+              <div class="search-result-item">PinocchioP — Isn't it "A"</div>
+              <div class="search-result-item search-result-item--active">ビノキオP — 腐れ外道とチョコレゐト</div>
+              <div class="search-result-item">ビノキオP — 腐れ外道とチョコレゐト</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="feature-divider" aria-hidden="true"></div>
+
+      <!-- Feature block: Synced Lyrics -->
+      <div class="feature-row feature-row--reverse reveal">
+        <div class="feature-row-text">
+          <span class="feature-number" aria-hidden="true">04</span>
+          <h3 class="feature-title" data-i18n="feat4.title">Synchronized Lyrics (LRC)</h3>
+          <p class="feature-desc" data-i18n="feat4.desc">
+            Furinar automatically detects and loads synced .lrc files alongside your tracks.
+            The lyrics view highlights lines in sync with playback time.
+          </p>
+          <ul class="feature-list" role="list">
+            <li data-i18n="feat4.l1">Auto-loads .lrc files with same basename</li>
+            <li data-i18n="feat4.l2">Real-time line synchronization</li>
+            <li data-i18n="feat4.l3">Clean scrolling lyrics view</li>
+          </ul>
+        </div>
+        <div class="feature-row-visual">
+          <div class="lyrics-demo" id="lyrics-demo" aria-hidden="true">
+            <div class="lyrics-header">
+              <span class="lyrics-track-title">PinocchioP — Isn't it "A"</span>
+            </div>
+            <div class="lyrics-viewport">
+              <div class="lyrics-track" id="lyrics-track">
+                <div class="lyrics-line">あなたにとってのloveが</div>
+                <div class="lyrics-line">私にとっての悪だった</div>
+                <div class="lyrics-line">A, A, A, A, A, Aじゃないか</div>
+                <div class="lyrics-line">これ最高 good マジ天才</div>
+                <div class="lyrics-line">いや最低 bad はいジェイサイド</div>
+                <div class="lyrics-line">愛されたいから 歌ってるんだ</div>
+                <div class="lyrics-line">愛されたいから 生きてるんだ</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="feature-divider" aria-hidden="true"></div>
+
+      <!-- Feature block: System integration -->
+      <div class="feature-row reveal">
+        <div class="feature-row-text">
+          <span class="feature-number" aria-hidden="true">05</span>
+          <h3 class="feature-title" data-i18n="feat5.title">Native System Integration</h3>
+          <p class="feature-desc" data-i18n="feat5.desc">
+            Furinar feels like part of the OS. On Windows, playback controls appear directly
+            in the taskbar thumbnail and in the system media overlay. On Linux, MPRIS
+            integration connects it to desktop media controls.
+          </p>
+          <ul class="feature-list" role="list">
+            <li data-i18n="feat5.l1">Windows taskbar thumbnail controls</li>
+            <li data-i18n="feat5.l2">SMTC — system media keys &amp; action center</li>
+            <li data-i18n="feat5.l3">MPRIS on Linux</li>
+            <li><span data-i18n="feat5.kbd_prefix">Keyboard:</span> <kbd>Space</kbd> <kbd>&larr;</kbd> <kbd>&rarr;</kbd>
+              <kbd>&uarr;</kbd> <kbd>&darr;</kbd> <kbd>Enter</kbd></li>
+          </ul>
+        </div>
+        <div class="feature-row-visual">
+          <div class="kbd-demo" aria-hidden="true">
+            <div class="kbd-row">
+              <div class="kbd-key kbd-key--wide">Space</div>
+              <span class="kbd-action" data-i18n="kbd.play_pause">Play / Pause</span>
+            </div>
+            <div class="kbd-row">
+              <div class="kbd-key">&larr;</div>
+              <div class="kbd-key">&rarr;</div>
+              <span class="kbd-action" data-i18n="kbd.seek">Seek ± 5s</span>
+            </div>
+            <div class="kbd-row">
+              <div class="kbd-key">&uarr;</div>
+              <div class="kbd-key">&darr;</div>
+              <span class="kbd-action" data-i18n="kbd.nav">Navigate list</span>
+            </div>
+            <div class="kbd-row">
+              <div class="kbd-key kbd-key--wide">Enter</div>
+              <span class="kbd-action" data-i18n="kbd.play_sel">Play selected</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /features-editorial -->
+    </div>
+  </section>
+
+  <!-- ===== SHOWCASE / SCREENSHOTS SECTION ===== -->
+  <section id="showcase" class="section-showcase" aria-labelledby="showcase-heading">
+    <div class="container">
+      <div class="section-header reveal">
+        <p class="section-label" data-i18n="showcase.label">Gallery</p>
+        <h2 id="showcase-heading" class="section-title" data-i18n="showcase.title">See it in action.</h2>
+      </div>
+
+      <div class="showcase-grid">
+        <div class="showcase-item showcase-item--large reveal">
+          <figure>
+            <img src="screenshot-player-dark.png"
+              alt="Furinar dark theme — showing playlist, tabs, playback controls and progress bar" loading="lazy"
+              class="showcase-img">
+            <figcaption data-i18n="showcase.cap1">Dark Theme — Playlist &amp; Controls</figcaption>
+          </figure>
+        </div>
+        <div class="showcase-col">
+          <div class="showcase-item reveal reveal-delay-1">
+            <figure>
+              <img src="screenshot-player.png" alt="Furinar light theme — showing playlist and playback controls"
+                loading="lazy" class="showcase-img">
+              <figcaption data-i18n="showcase.cap2">Light Theme</figcaption>
+            </figure>
+          </div>
+          <div class="showcase-item reveal reveal-delay-2">
+            <figure>
+              <img src="screenshot-lyrics.png" alt="Furinar synchronized lyrics view — active line highlighted in gold"
+                loading="lazy" class="showcase-img">
+              <figcaption data-i18n="showcase.cap3">Synchronized Lyrics (.lrc)</figcaption>
+            </figure>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== DESKTOP / NATIVE FEEL ===== -->
+  <section class="section-native" aria-label="Desktop-native application">
+    <div class="container">
+      <div class="native-inner">
+        <div class="native-text reveal">
+          <p class="section-label" data-i18n="native.label">Native</p>
+          <h2 class="section-title" data-i18n="native.title">A desktop app.<br>Actually a desktop app.</h2>
+          <p class="section-body" data-i18n="native.body">
+            Furinar is a compiled binary — not an Electron wrapper, not a web view.
+            It integrates cleanly with the OS: frameless window, custom title bar,
+            Aero Snap, rounded corners on Windows 11, and native media controls on both platforms.
+            Configuration is a plain JSON file you can edit by hand.
+          </p>
+        </div>
+        <div class="native-details reveal reveal-delay-1">
+          <div class="native-detail">
+            <div class="detail-line" aria-hidden="true"></div>
+            <div class="detail-label" data-i18n="native.d1">Built with</div>
+            <div class="detail-value">Rust + Slint</div>
+          </div>
+          <div class="native-detail">
+            <div class="detail-line" aria-hidden="true"></div>
+            <div class="detail-label" data-i18n="native.d2">Config</div>
+            <div class="detail-value" data-i18n="native.v2">JSON file, editable by hand</div>
+          </div>
+          <div class="native-detail">
+            <div class="detail-line" aria-hidden="true"></div>
+            <div class="detail-label" data-i18n="native.d3">Theme</div>
+            <div class="detail-value" data-i18n="native.v3">Light &amp; Dark — switch instantly</div>
+          </div>
+          <div class="native-detail">
+            <div class="detail-line" aria-hidden="true"></div>
+            <div class="detail-label" data-i18n="native.d4">Updates</div>
+            <div class="detail-value" data-i18n="native.v4">Built-in auto-update mechanism</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== DOWNLOAD CTA ===== -->
+  <section id="download" class="section-download" aria-labelledby="download-heading">
+    <div class="container">
+      <div class="download-inner reveal">
+        <p class="section-label" data-i18n="download.label">Download</p>
+        <h2 id="download-heading" class="download-title" data-i18n="download.title">Ready to listen?</h2>
+        <p class="download-sub" data-i18n="download.sub">Free, open source, and ready to run. No installation wizard, no
+          account.</p>
+
+        <div class="download-cards" role="list">
+          <!-- Windows -->
+          <div class="dl-card" role="listitem">
+            <div class="dl-card-icon" aria-hidden="true">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
+                <path
+                  d="M3 5.557L10.294 4.5v7.07H3v-6.013zM11.168 4.374L21 3v8.57h-9.832V4.374zM3 12.432h7.294v7.029L3 18.443V12.432zM11.168 12.572H21v8.47l-9.832-1.38V12.572z" />
+              </svg>
+            </div>
+            <div class="dl-card-info">
+              <h3 class="dl-card-title">Windows</h3>
+              <code class="dl-card-file">furinar-windows-x86_64.exe</code>
+              <p class="dl-card-note" data-i18n="download.win_note">x86-64 · Single executable</p>
+            </div>
+            <a href="https://github.com/LokKol17/furinar/releases/latest/download/furinar-windows-x86_64.exe"
+              class="btn btn-primary dl-btn" id="dl-windows-btn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+              <span data-i18n="download.btn_win">Download .exe</span>
+            </a>
+          </div>
+
+          <!-- Linux -->
+          <div class="dl-card" role="listitem">
+            <div class="dl-card-icon" aria-hidden="true">
+              <svg width="28" height="28" viewBox="0 0 32 32" fill="currentColor">
+                <path
+                  d="M15.6 8.1c0 .1-.1.1-.1.1h-.1c-.1 0-.1-.1-.2-.2 0 0-.1-.1-.1-.2s0-.1.1-.1l.2.1c.1.1.2.2.2.3m-1.9-1c0-.5-.2-.8-.5-.8 0 0 0 .1-.1.1v.2h.3c0 .2.1.3.1.5h.2m3.6-.5c.2 0 .3.2.4.5h.2c-.1-.1-.1-.2-.1-.3 0-.1 0-.2-.1-.3-.1-.1-.2-.2-.3-.2 0 0-.1.1-.2.1 0 .1.1.1.1.2m-3.1 1.6c-.1 0-.1 0-.1-.1s0-.2.1-.3c.2 0 .3-.1.3-.1.1 0 .1.1.1.1 0 .1-.1.2-.3.4h-.1m-1.1-.1c-.4-.2-.5-.5-.5-1 0-.3 0-.5.2-.7.1-.2.3-.3.5-.3s.3.1.5.3c.1.3.2.6.2.9v.2h.1v-.1c.1 0 .1-.2.1-.6 0-.3 0-.6-.2-.9-.2-.3-.4-.5-.8-.5-.3 0-.6.2-.7.5-.2.4-.2.7-.2 1.2 0 .4.1.8.6 1.2 0-.1.1-.1.2-.2m12.8 14.5c.1 0 .1 0 .1-.1 0-.2-.1-.5-.4-.8-.3-.3-.8-.5-1.4-.6h-.4c-.1 0-.3 0-.4-.1.3-1 .4-1.8.4-2.5 0-1-.2-1.7-.6-2.4-.4-.6-.8-.9-1.3-1-.1.1-.1.1-.1.2.5.2 1 .6 1.3 1.2.3.7.4 1.3.4 2.1 0 .6-.1 1.4-.5 2.5-.4.2-.8.5-1.1 1.1 0 .1 0 .1.1.1 0 0 .1-.1.2-.3l.5-.5c.3-.2.5-.3.8-.3.5 0 1 .1 1.3.2.4.1.6.3.7.4.1.2.2.3.3.4 0 .3.1.4.1.4M16.5 7.7c-.1-.1-.1-.3-.1-.5 0-.4 0-.6.2-.9.2-.2.4-.3.6-.3.3 0 .5.2.7.4.1.3.2.5.2.8 0 .5-.2.8-.6.9 0 0 .1.1.2.1.2 0 .3.1.5.2.1-.6.2-1 .2-1.5 0-.6-.1-1-.3-1.3-.3-.3-.6-.4-1-.4-.3 0-.6.1-.9.3-.2.3-.3.5-.3.8 0 .5.1.9.3 1.3.1 0 .2.1.3.1m1.2 1.7c-1.3.9-2.4 1.3-3.2 1.3-.7 0-1.4-.3-2.1-.8.1.2.2.4.3.5l.6.6c.4.4.9.6 1.4.6.7 0 1.5-.4 2.6-1.1l.9-.6c.2-.2.4-.4.4-.7 0-.1 0-.2-.1-.2 0-.3-.5-.6-1.5-.9-.9-.4-1.6-.6-2.1-.6-.3 0-.8.2-1.5.6-.6.4-1 .8-1 1.2 0 0 .1.1.2.3.6.5 1.2.8 1.8.8.8 0 1.8-.4 3.2-1.4v.2c.1.1.1.2.1.2m2.4 20.7c.4.8 1.1 1.2 1.9 1.2.2 0 .4 0 .6-.1.2 0 .4-.1.5-.2.1-.1.2-.1.3-.2.2-.1.2-.1.3-.2l1.7-1.5c.4-.3.8-.6 1.3-.9l1-.5c.3-.1.5-.2.7-.4.1-.2.2-.3.2-.6s-.2-.5-.4-.7c-.2-.2-.4-.3-.6-.3-.2-.1-.4-.2-.7-.5-.2-.3-.4-.6-.5-1.1l-.1-.6c-.1-.3-.1-.5-.2-.6H26c-.1 0-.3.1-.4.3l-.6.6c-.1.2-.4.4-.6.6-.3.2-.6.3-.8.3-.8 0-1.2-.2-1.5-.7-.2-.3-.3-.7-.4-1.1-.2-.2-.3-.3-.5-.3-.5 0-.7.5-.7 1.6V27.3c0 .1-.1.3-.1.6-.1.3-.1.7-.1 1.1l-.2 1.1m-14.9-.6c1 .1 2.1.4 3.3.9 1.2.5 2 .7 2.3.7.7 0 1.3-.3 1.8-.9.1-.2.1-.4.1-.7 0-1-.6-2.2-1.8-3.7l-.7-.9c-.1-.2-.3-.5-.5-.9s-.4-.7-.6-.9c-.1-.2-.3-.5-.6-.7-.3-.2-.6-.4-.9-.5-.4.1-.7.2-.9.4s-.2.4-.2.6c0 .2-.1.4-.2.4-.1.1-.3.1-.5.2h-.6c-.5 0-.9.1-1.1.2-.3.3-.4.6-.4 1 0 .2 0 .4.1.8s.1.7.1.9c0 .4-.1.8-.4 1.3-.3.4-.4.8-.4 1 .2.4.9.7 2.1.8m3.4-9.3c0-.7.2-1.5.6-2.4.4-.9.7-1.5 1.1-1.9 0-.1-.1-.1-.2-.1l-.1-.2c-.3.3-.7 1-1.1 2.1-.4.9-.7 1.8-.7 2.4 0 .5.1.9.3 1.2.2.3.8.8 1.6 1.5l1.1.7c1.2 1 1.8 1.7 1.8 2.1 0 .2-.1.4-.4.7-.2.2-.5.4-.7.4v.1l.3.6c.4.6 1.4.9 2.6.9 2.3 0 4-.9 5.3-2.8 0-.5 0-.8-.1-1v-.4c0-.7.1-1.2.3-1.5.2-.3.4-.5.7-.5.2 0 .4.1.6.2.1-.8.1-1.5.1-2.1 0-.9 0-1.7-.2-2.4-.1-.6-.3-1.1-.5-1.5l-.6-.9c-.2-.3-.3-.6-.5-.9-.1-.4-.2-.7-.2-1.2-.3-.5-.5-1-.8-1.5-.2-.5-.4-1-.6-1.4l-.9.7c-1 .7-1.8 1-2.6 1-.6 0-1.1-.1-1.4-.5l-.6-.5c0 .3-.1.7-.3 1.1l-.6 1.2c-.3.7-.4 1.1-.5 1.4 0 .2-.1.4-.1.4l-.8 1.5c-.8 1.5-1.3 3-1.3 4.1 0 .2 0 .5.1.7-.5-.3-.7-.7-.7-1.3m7.4 9.7c-1.3 0-2.4.2-3.1.5-.5.6-1.1.9-1.9.9-.5 0-1.3-.2-2.4-.6-1.1-.4-2-.7-2.9-.8-.1 0-.3-.1-.6-.1s-.6-.1-.8-.1c-.2 0-.5-.1-.7-.2-.3-.1-.5-.2-.6-.3-.1-.1-.2-.3-.2-.4 0-.2 0-.3.1-.5s.2-.3.3-.4c.1-.1.1-.2.2-.3.1-.1.1-.2.1-.3 0-.1.1-.2.1-.3v-.3s0-.4-.1-1c-.1-.5-.1-.9-.1-1 0-.5.1-.8.3-1.1.2-.3.4-.4.7-.4h1.2c.1 0 .2-.1.5-.2.1-.2.1-.3.2-.4.1-.1.1-.2.1-.3 0-.1 0-.1.1-.2 0-.1.1-.2.2-.2-.1-.1-.1-.2-.1-.4v-.3c0-.4.2-.9.5-1.6l.4-.6.7-1.4c.2-.4.4-1 .6-1.8.2-.7.6-1.4 1.2-2.2l.8-.9c.5-.6.9-1.1 1.1-1.5.2-.4.3-.9.3-1.3 0-.2-.1-.8-.2-1.8s-.2-2.1-.2-3c0-.7.1-1.2.2-1.7s.4-1 .7-1.4c.3-.4.7-.8 1.3-1 .6-.2 1.3-.3 2.2-.3.3 0 .6 0 .9.1.3 0 .7.1 1.2.3.4.2.8.4 1.1.7.2.2.6.7.9 1.2.2.6.4 1.2.5 2.1.1.5.1 1 .2 1.7 0 .6.1 1 .1 1.3.1.3.1.7.2 1.2.1.4.2.8.4 1.1.2.4.4.8.7 1.2.3.5.7 1 1.1 1.6.9 1 1.6 2.2 2.1 3.3.5 1 .8 2.4.8 3.8 0 .7-.1 1.4-.3 2.1.2 0 .3.1.4.2s.2.5.3.9l.1.8c.1.2.2.4.5.6.2.2.4.3.7.5.2.1.5.2.7.4.2.2.3.4.3.6 0 .3-.1.6-.3.8-.2.2-.4.3-.7.4l-1.2.6c-.5.3-1 .7-1.5 1.1l-1 .9c-.4.4-.8.7-1.1.9-.3.2-.7.3-1.1.3l-.7-.1c-.8-.2-1.3-.6-1.6-1.3-1.8 0-3.1-.1-3.9-.1" />
+              </svg>
+            </div>
+            <div class="dl-card-info">
+              <h3 class="dl-card-title">Linux</h3>
+              <code class="dl-card-file">furinar-linux-x86_64.tar.gz</code>
+              <p class="dl-card-note" data-i18n="download.linux_note">x86-64 · Tarball with install script</p>
+            </div>
+            <a href="https://github.com/LokKol17/furinar/releases/latest/download/furinar-linux-x86_64.tar.gz"
+              class="btn btn-secondary dl-btn" id="dl-linux-btn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+              <span data-i18n="download.btn_linux">Download .tar.gz</span>
+            </a>
+          </div>
+        </div>
+
+        <!-- Linux install methods with copy button -->
+        <details class="install-details" id="linux-install-details">
+          <summary data-i18n="download.other">Other install methods for Linux</summary>
+          <div class="install-methods">
+            <div class="install-method">
+              <div class="install-method-header">
+                <span class="install-label" data-i18n="install.universal">Universal installer</span>
+                <button type="button" class="copy-btn"
+                  data-copy="curl -fsSL https://raw.githubusercontent.com/LokKol17/furinar/main/pkg/install.sh | bash"
+                  aria-label="Copy command">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round" class="copy-icon" aria-hidden="true">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                  </svg>
+                  <span class="copy-text" data-i18n="copy.btn">Copy</span>
+                </button>
+              </div>
+              <pre><code>curl -fsSL https://raw.githubusercontent.com/LokKol17/furinar/main/pkg/install.sh | bash</code></pre>
+            </div>
+            <div class="install-method">
+              <div class="install-method-header">
+                <span class="install-label">Debian / Ubuntu</span>
+                <button type="button" class="copy-btn" data-copy="make deb &amp;&amp; sudo dpkg -i dist/furinar_*.deb"
+                  aria-label="Copy command">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round" class="copy-icon" aria-hidden="true">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                  </svg>
+                  <span class="copy-text" data-i18n="copy.btn">Copy</span>
+                </button>
+              </div>
+              <pre><code>make deb &amp;&amp; sudo dpkg -i dist/furinar_*.deb</code></pre>
+            </div>
+            <div class="install-method">
+              <div class="install-method-header">
+                <span class="install-label">Fedora</span>
+                <button type="button" class="copy-btn"
+                  data-copy="make rpm &amp;&amp; sudo rpm -i dist/rpm/RPMS/x86_64/*.rpm" aria-label="Copy command">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round" class="copy-icon" aria-hidden="true">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                  </svg>
+                  <span class="copy-text" data-i18n="copy.btn">Copy</span>
+                </button>
+              </div>
+              <pre><code>make rpm &amp;&amp; sudo rpm -i dist/rpm/RPMS/x86_64/*.rpm</code></pre>
+            </div>
+            <div class="install-method">
+              <div class="install-method-header">
+                <span class="install-label">Arch / Manjaro</span>
+                <button type="button" class="copy-btn" data-copy="cd pkg/arch &amp;&amp; makepkg -si"
+                  aria-label="Copy command">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round" class="copy-icon" aria-hidden="true">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                  </svg>
+                  <span class="copy-text" data-i18n="copy.btn">Copy</span>
+                </button>
+              </div>
+              <pre><code>cd pkg/arch &amp;&amp; makepkg -si</code></pre>
+            </div>
+          </div>
+        </details>
+
+        <div class="download-links">
+          <a href="https://github.com/LokKol17/furinar/releases" target="_blank" rel="noopener noreferrer"
+            class="text-link" data-i18n="links.releases">All releases</a>
+          <span class="link-sep" aria-hidden="true">·</span>
+          <a href="https://github.com/LokKol17/furinar" target="_blank" rel="noopener noreferrer" class="text-link"
+            data-i18n="links.github">GitHub repository</a>
+          <span class="link-sep" aria-hidden="true">·</span>
+          <a href="https://github.com/LokKol17/furinar/blob/main/docs/README.md" target="_blank"
+            rel="noopener noreferrer" class="text-link" data-i18n="links.docs">Documentation</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== FOOTER ===== -->
+  <footer class="footer" role="contentinfo">
+    <div class="container">
+      <div class="footer-inner">
+        <div class="footer-brand">
+          <div class="footer-brand-header">
+            <a href="#" class="footer-logo-link" aria-label="Furinar home">
+              <img src="furinar_icon.png" alt="" class="footer-logo-icon" width="24" height="24" aria-hidden="true">
+              <span class="footer-logo-text">FURINAR</span>
+            </a>
+            <span class="footer-pill">Rust + Slint</span>
+          </div>
+          <p class="footer-tagline" data-i18n="footer.tagline">A light, fast, and beautiful audio player.</p>
+        </div>
+
+        <div class="footer-actions">
+          <nav class="footer-nav" aria-label="Footer navigation">
+            <a href="https://github.com/LokKol17/furinar" target="_blank" rel="noopener noreferrer">GitHub</a>
+            <a href="https://github.com/LokKol17/furinar/releases" target="_blank" rel="noopener noreferrer"
+              data-i18n="links.releases">Releases</a>
+            <a href="https://github.com/LokKol17/furinar/blob/main/docs/README.md" target="_blank"
+              rel="noopener noreferrer" data-i18n="links.docs">Documentation</a>
+            <a href="https://github.com/LokKol17/furinar/blob/main/LICENSE" target="_blank" rel="noopener noreferrer"
+              data-i18n="links.license">License</a>
+          </nav>
+          <a href="#" class="back-to-top" id="back-to-top" aria-label="Back to top">
+            <span data-i18n="footer.back_to_top">Back to top ↑</span>
+          </a>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p data-i18n="footer.copy">BSD-3-Clause · Open source · Fan project inspired by Furina from <em>Genshin
+            Impact</em> (HoYoverse) · No official affiliation</p>
+        <p class="footer-built">Maintained by <a href="https://github.com/LokKol17" target="_blank"
+            rel="noopener noreferrer">LokKol17</a></p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
 </body>
+
 </html>
