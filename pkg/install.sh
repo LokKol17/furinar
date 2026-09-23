@@ -85,18 +85,23 @@ install_deps() {
 # Baixar binário do GitHub Release
 # ---------------------------------------------------------------------------
 download_binary() {
-    local url="https://github.com/LokKol17/furinar/releases/download/v${VERSION}/furinar-linux-x86_64"
+    local tarball="furinar-linux-x86_64.tar.gz"
+    local url="https://github.com/LokKol17/furinar/releases/download/v${VERSION}/${tarball}"
     local dest="/tmp/furinar"
 
     info "Baixando furinar v${VERSION}..."
     if command -v curl &>/dev/null; then
-        curl -fSL "$url" -o "$dest"
+        curl -fSL "$url" -o "/tmp/${tarball}"
     elif command -v wget &>/dev/null; then
-        wget -q "$url" -O "$dest"
+        wget -q "$url" -O "/tmp/${tarball}"
     else
         err "curl ou wget necessário para download."
         exit 1
     fi
+
+    info "Extraindo binário..."
+    tar -xzf "/tmp/${tarball}" -C /tmp
+    rm -f "/tmp/${tarball}"
     chmod +x "$dest"
 
     # Baixar ícone junto
