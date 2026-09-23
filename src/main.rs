@@ -1704,7 +1704,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     #[cfg(not(target_os = "windows"))]
     {
-        std::env::set_var("WINIT_UNIX_BACKEND", "x11");
+        unsafe {
+            std::env::set_var("WINIT_UNIX_BACKEND", "x11");
+        }
         slint::BackendSelector::new().select()?;
     }
 
