@@ -128,7 +128,7 @@ Type=Application
 Name=Furinar
 GenericName=Music Player
 Comment=A light, fast, and beautiful audio player
-Exec=furinar %f
+Exec=env WINIT_UNIX_BACKEND=x11 furinar %f
 Icon=furinar
 Terminal=false
 Categories=Audio;Music;Player;
