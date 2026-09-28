@@ -278,20 +278,44 @@ choose_mode_interactive() {
 }
 
 main() {
-    local mode="install"
+    local mode=""
+
     if [ "$#" -eq 0 ]; then
         mode="$(choose_mode_interactive)"
     else
         for arg in "$@"; do
             case "$arg" in
-                --help|-h)    usage; exit 0 ;;
-                --deps)       mode="deps" ;;
-                --from-source) mode="source" ;;
-                --uninstall)  mode="uninstall" ;;
-                *)            err "Unknown option: $arg"; usage; exit 1 ;;
+                --help|-h)
+                    usage
+                    exit 0
+                    ;;
+                --deps)
+                    mode="deps"
+                    ;;
+                --from-source)
+                    mode="source"
+                    ;;
+                --uninstall)
+                    mode="uninstall"
+                    ;;
+                *)
+                    err "Unknown option: $arg"
+                    usage
+                    exit 1
+                    ;;
             esac
         done
     fi
+
+    # Garante que o menu retornou uma opção válida
+    case "$mode" in
+        deps|source|uninstall|install)
+            ;;
+        *)
+            err "Invalid mode: $mode"
+            exit 1
+            ;;
+    esac
 
     detect_distro
 
