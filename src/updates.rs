@@ -124,3 +124,41 @@ pub fn perform_update() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn strip_tag_prefix_remove_so_o_v_inicial() {
+        assert_eq!(strip_tag_prefix("v1.2.3"), "1.2.3");
+        assert_eq!(strip_tag_prefix("1.2.3"), "1.2.3");
+        assert_eq!(strip_tag_prefix("vv1.0.0"), "v1.0.0");
+        assert_eq!(strip_tag_prefix("1.0.0-rc1"), "1.0.0-rc1");
+    }
+
+    #[test]
+    fn get_target_monta_o_nome_do_asset_da_plataforma() {
+        let alvo = get_target();
+
+        #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
+        assert_eq!(alvo, "furinar-windows-x86_64.exe");
+        #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+        assert_eq!(alvo, "furinar-linux-x86_64.tar.gz");
+        #[cfg(target_os = "macos")]
+        assert!(alvo.starts_with("furinar-macos-"), "veio {alvo}");
+
+        // O nome precisa ser compatível com o alvo usado nas releases
+        assert!(!alvo.is_empty());
+        assert!(alvo.starts_with("furinar"));
+    }
+
+    #[test]
+    fn versao_compilada_e_semver_valido() {
+        let versao = env!("CARGO_PKG_VERSION");
+        assert!(
+            semver::Version::parse(versao).is_ok(),
+            "{versao} não é semver; check_for_update falharia"
+        );
+    }
+}

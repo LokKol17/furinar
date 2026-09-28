@@ -80,3 +80,39 @@ pub fn get_translations(lang: &str) -> Translations {
         _ => pt_br(),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Uma chave só em um idioma aparece crua na UI do outro — o fallback é a
+    /// própria chave, então a paridade é o que garante a tradução.
+    #[test]
+    fn idiomas_tem_as_mesmas_chaves() {
+        let pt: Vec<&str> = pt_br().into_keys().collect();
+        let en: Vec<&str> = en().into_keys().collect();
+
+        let mut pt = pt;
+        let mut en = en;
+        pt.sort_unstable();
+        en.sort_unstable();
+        assert_eq!(pt, en);
+    }
+
+    #[test]
+    fn nenhum_texto_esta_vazio() {
+        for (idioma, t) in [("pt-br", pt_br()), ("en", en())] {
+            for (chave, texto) in t {
+                assert!(!texto.is_empty(), "{idioma}: {chave} vazio");
+            }
+        }
+    }
+
+    #[test]
+    fn idioma_desconhecido_cai_no_pt_br() {
+        assert_eq!(get_translations("en").get("tip_stop"), Some(&"Stop"));
+        assert_eq!(get_translations("pt-br").get("tip_stop"), Some(&"Parar"));
+        assert_eq!(get_translations("fr").get("tip_stop"), Some(&"Parar"));
+        assert_eq!(get_translations("").get("tip_stop"), Some(&"Parar"));
+    }
+}
