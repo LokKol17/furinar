@@ -14,10 +14,11 @@ use std::fs::{self, File};
 use std::io::BufReader;
 use std::path::PathBuf;
 use std::rc::Rc;
-use std::sync::{
-    Arc, Mutex,
-    mpsc::{self, Receiver, Sender},
-};
+#[cfg(feature = "mpris")]
+use std::sync::mpsc::Sender;
+#[cfg(any(feature = "mpris", target_os = "windows"))]
+use std::sync::mpsc::{self, Receiver};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use config::AppConfig;
@@ -364,10 +365,10 @@ fn fechar_pasta(estado: &mut EstadoAudio, ui: &MainWindow, idx: usize) {
         estado.pasta_reproducao = None;
         estado.indice_atual = None;
         estado.arquivo_atual = None;
-    } else if let Some(p) = estado.pasta_reproducao {
-        if p > idx {
-            estado.pasta_reproducao = Some(p - 1);
-        }
+    } else if let Some(p) = estado.pasta_reproducao
+        && p > idx
+    {
+        estado.pasta_reproducao = Some(p - 1);
     }
 
     estado.pastas.remove(idx);
@@ -647,14 +648,10 @@ fn seek_mantendo_pausa(estado: &mut EstadoAudio, ui: &MainWindow, alvo_secs: u64
 
     executar_seek(estado, ui, alvo_secs);
 
-    if estava_pausado {
-        if let Some((_, ref sink)) = estado.audio_player {
-            sink.pause();
-            ui.set_texto_play_pause(
-                texto_play(&translations::get_translations(&estado.idioma)).into(),
-            );
-            ui.set_tocando(false);
-        }
+    if estava_pausado && let Some((_, ref sink)) = estado.audio_player {
+        sink.pause();
+        ui.set_texto_play_pause(texto_play(&translations::get_translations(&estado.idioma)).into());
+        ui.set_tocando(false);
     }
 }
 
@@ -703,27 +700,27 @@ fn alternar_play_pause(estado: &EstadoAudio, ui: &MainWindow) {
     }
 }
 
+#[cfg(feature = "mpris")]
 fn pausar(estado: &EstadoAudio, ui: &MainWindow) {
-    if let Some((_, ref sink)) = estado.audio_player {
-        if !sink.is_paused() {
-            sink.pause();
-            ui.set_texto_play_pause(
-                texto_play(&translations::get_translations(&estado.idioma)).into(),
-            );
-            ui.set_tocando(false);
-        }
+    if let Some((_, ref sink)) = estado.audio_player
+        && !sink.is_paused()
+    {
+        sink.pause();
+        ui.set_texto_play_pause(texto_play(&translations::get_translations(&estado.idioma)).into());
+        ui.set_tocando(false);
     }
 }
 
+#[cfg(feature = "mpris")]
 fn reproduzir(estado: &EstadoAudio, ui: &MainWindow) {
-    if let Some((_, ref sink)) = estado.audio_player {
-        if sink.is_paused() {
-            sink.play();
-            ui.set_texto_play_pause(
-                texto_pause(&translations::get_translations(&estado.idioma)).into(),
-            );
-            ui.set_tocando(true);
-        }
+    if let Some((_, ref sink)) = estado.audio_player
+        && sink.is_paused()
+    {
+        sink.play();
+        ui.set_texto_play_pause(
+            texto_pause(&translations::get_translations(&estado.idioma)).into(),
+        );
+        ui.set_tocando(true);
     }
 }
 
@@ -1338,17 +1335,6 @@ fn arredondar_cantos(ui: &MainWindow) {
 // ---------------------------------------------------------------------
 
 #[cfg(not(target_os = "windows"))]
-fn processar_eventos_taskbar(_rx: &Receiver<u32>, _estado: &mut EstadoAudio, _ui: &MainWindow) {}
-
-#[cfg(not(target_os = "windows"))]
-fn atualizar_icone_taskbar(_botoes: &Rc<RefCell<Option<()>>>, _estado: &EstadoAudio) {}
-
-#[cfg(not(target_os = "windows"))]
-fn configurar_botoes_taskbar(_ui: &MainWindow) -> Option<()> {
-    None
-}
-
-#[cfg(not(target_os = "windows"))]
 fn arredondar_cantos(_ui: &MainWindow) {}
 
 // ---------------------------------------------------------------------
@@ -1409,12 +1395,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (tx, rx) = mpsc::channel::<MediaControlEvent>();
     #[cfg(feature = "mpris")]
     let controles = Rc::new(RefCell::new(None::<MediaControls>));
-    #[cfg(not(feature = "mpris"))]
-    let controles = Rc::new(RefCell::new(None::<()>));
     #[cfg(target_os = "windows")]
     let botoes_taskbar = Rc::new(RefCell::new(None::<BotoesTaskbar>));
-    #[cfg(not(target_os = "windows"))]
-    let botoes_taskbar = Rc::new(RefCell::new(None::<()>));
 
     let config = AppConfig::carregar();
 
@@ -1494,15 +1476,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let estado = estado.clone();
         let ui_fraca = ui.as_weak();
         ui.on_abrir_pasta(move || {
-            if let Some(caminho) = rfd::FileDialog::new().pick_folder() {
-                if let Some(ui) = ui_fraca.upgrade() {
-                    let mut e = estado.borrow_mut();
-                    // Pasta nova: limpa a busca
-                    e.filtro.clear();
-                    ui.set_texto_busca("".into());
-                    abrir_pasta(&mut e, &ui, caminho);
-                    salvar_configuracao(&e);
-                }
+            if let Some(caminho) = rfd::FileDialog::new().pick_folder()
+                && let Some(ui) = ui_fraca.upgrade()
+            {
+                let mut e = estado.borrow_mut();
+                // Pasta nova: limpa a busca
+                e.filtro.clear();
+                ui.set_texto_busca("".into());
+                abrir_pasta(&mut e, &ui, caminho);
+                salvar_configuracao(&e);
             }
         });
     }
@@ -1626,6 +1608,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     {
         let estado = estado.clone();
+        #[cfg(target_os = "windows")]
         let ui_fraca = ui.as_weak();
         ui.on_trocar_tema(move |escuro| {
             // O visual já mudou sozinho pelo binding da UI com `Tema.escuro`;
@@ -1637,10 +1620,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             // Troca de fundo é o gatilho mais documentado do bug de redraw
             // parcial do renderer de software (ver `forcar_repaint_completo`).
             #[cfg(target_os = "windows")]
-            if let Some(ui) = ui_fraca.upgrade() {
-                if let Some(hwnd) = obter_hwnd(&ui).map(HWND) {
-                    forcar_repaint_completo(hwnd);
-                }
+            if let Some(ui) = ui_fraca.upgrade()
+                && let Some(hwnd) = obter_hwnd(&ui).map(HWND)
+            {
+                forcar_repaint_completo(hwnd);
             }
         });
     }
@@ -1763,7 +1746,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     {
         let estado = estado.clone();
         let ui_fraca = ui.as_weak();
+        #[cfg(feature = "mpris")]
         let controles = controles.clone();
+        #[cfg(target_os = "windows")]
         let botoes_taskbar = botoes_taskbar.clone();
         #[cfg(target_os = "windows")]
         let mut tentativas_taskbar = 0u32;
@@ -1781,10 +1766,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 // Configura os controles multimídia na primeira oportunidade:
                 // a janela winit só existe depois que o event loop inicia
                 #[cfg(feature = "mpris")]
-                if controles.borrow().is_none() {
-                    if let Some(c) = configurar_controles_multimidia(&ui, tx.clone()) {
-                        *controles.borrow_mut() = Some(c);
-                    }
+                if controles.borrow().is_none()
+                    && let Some(c) = configurar_controles_multimidia(&ui, tx.clone())
+                {
+                    *controles.borrow_mut() = Some(c);
                 }
 
                 // Idem para os botões da taskbar: só quando a janela já existe,
@@ -1862,12 +1847,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let update_result = update_result.clone();
         update_timer.start(TimerMode::Repeated, Duration::from_millis(250), move || {
             let mut guard = update_result.lock().unwrap();
-            if let Some(info) = guard.take() {
-                if let Some(ui) = ui_weak.upgrade() {
-                    ui.set_update_versao(info.version.into());
-                    ui.set_update_descricao(info.body.into());
-                    ui.set_update_disponivel(true);
-                }
+            if let Some(info) = guard.take()
+                && let Some(ui) = ui_weak.upgrade()
+            {
+                ui.set_update_versao(info.version.into());
+                ui.set_update_descricao(info.body.into());
+                ui.set_update_disponivel(true);
             }
         });
     }

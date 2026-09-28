@@ -92,19 +92,19 @@ fn embutir_icone(quadrado: image::RgbaImage) {
 
     let destino =
         Path::new(&std::env::var("OUT_DIR").expect("OUT_DIR ausente")).join("furinar.ico");
+    // Sem o .ico pronto não há o que embutir; só Windows tem recurso de ícone.
     if let Err(erro) = gerar_ico(&quadrado, &destino) {
         println!("cargo:warning=falha ao gerar o .ico: {erro}");
-        return;
-    }
-
-    #[cfg(target_os = "windows")]
-    {
-        let caminho = destino.to_string_lossy().to_string();
-        if let Err(erro) = tauri_winres::WindowsResource::new()
-            .set_icon(&caminho)
-            .compile()
+    } else {
+        #[cfg(target_os = "windows")]
         {
-            println!("cargo:warning=falha ao embutir o ícone no executável: {erro}");
+            let caminho = destino.to_string_lossy().to_string();
+            if let Err(erro) = tauri_winres::WindowsResource::new()
+                .set_icon(&caminho)
+                .compile()
+            {
+                println!("cargo:warning=falha ao embutir o ícone no executável: {erro}");
+            }
         }
     }
 }

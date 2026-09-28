@@ -129,11 +129,11 @@ impl AppConfig {
     /// `pastas`, e essa pasta era necessariamente a que estava tocando. O
     /// campo `shuffle` (bool) vira `modo_shuffle` (0/1/2).
     pub fn migrar(&mut self) {
-        if self.pastas.is_empty() {
-            if let Some(antiga) = self.pasta.take() {
-                self.pastas.push(antiga);
-                self.pasta_reproducao_salva = Some(0);
-            }
+        if self.pastas.is_empty()
+            && let Some(antiga) = self.pasta.take()
+        {
+            self.pastas.push(antiga);
+            self.pasta_reproducao_salva = Some(0);
         }
         if self.modo_shuffle == 0 && self.shuffle {
             self.modo_shuffle = 1;

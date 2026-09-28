@@ -42,17 +42,17 @@ pub fn ler_tags(caminho: &std::path::Path) -> (String, Option<String>) {
     let mut titulo = None;
     let mut artista = None;
 
-    if let Ok(tagged) = Probe::open(caminho).and_then(|p| p.options(opcoes).read()) {
-        if let Some(tag) = tagged.primary_tag().or_else(|| tagged.first_tag()) {
-            titulo = tag
-                .title()
-                .map(|s| s.trim().to_string())
-                .filter(|s| !s.is_empty());
-            artista = tag
-                .artist()
-                .map(|s| s.trim().to_string())
-                .filter(|s| !s.is_empty());
-        }
+    if let Ok(tagged) = Probe::open(caminho).and_then(|p| p.options(opcoes).read())
+        && let Some(tag) = tagged.primary_tag().or_else(|| tagged.first_tag())
+    {
+        titulo = tag
+            .title()
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty());
+        artista = tag
+            .artist()
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty());
     }
 
     // Fallback: nome do arquivo sem extensão
@@ -120,15 +120,15 @@ fn coletar_recursivo(
         for entrada in entradas.flatten() {
             let path = entrada.path();
             if path.is_file() && e_arquivo_audio(&path) {
-                if let Ok(rel) = path.strip_prefix(raiz) {
-                    if let Some(nome) = rel.to_str() {
-                        let (titulo, artista) = ler_tags(&path);
-                        saida.push(TrackInfo {
-                            path: nome.replace('\\', "/"),
-                            titulo,
-                            artista,
-                        });
-                    }
+                if let Ok(rel) = path.strip_prefix(raiz)
+                    && let Some(nome) = rel.to_str()
+                {
+                    let (titulo, artista) = ler_tags(&path);
+                    saida.push(TrackInfo {
+                        path: nome.replace('\\', "/"),
+                        titulo,
+                        artista,
+                    });
                 }
             } else if recursivo && path.is_dir() {
                 coletar_recursivo(&path, raiz, recursivo, saida, visitados);
