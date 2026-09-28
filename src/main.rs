@@ -33,7 +33,10 @@ use souvlaki::{
     MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, MediaPosition, PlatformConfig,
     SeekDirection,
 };
-use track::{TrackInfo, coletar_arquivos_audio, nome_da_pasta, ordem_filtrada, texto_exibicao};
+use track::{
+    TrackInfo, coletar_arquivos_audio, filtro_efetivo, nome_da_pasta, ordem_filtrada,
+    texto_exibicao,
+};
 #[cfg(target_os = "windows")]
 use windows::Win32::Foundation::{HINSTANCE, HWND};
 #[cfg(target_os = "windows")]
@@ -611,6 +614,25 @@ fn tocar_faixa(estado: &mut EstadoAudio, ui: &MainWindow, pasta_idx: usize, trac
     iniciar_faixa(estado, ui, pasta_idx, track_idx, 0);
 }
 
+/// O que um seek vindo da UI deve fazer com a faixa atual.
+#[derive(Debug, PartialEq, Eq)]
+enum EfeitoSeek {
+    /// Player vivo: recria o player preservando tocar/pausado.
+    ManterEstado,
+    /// Parado com faixa selecionada (Stop): recarrega e toca do ponto pedido.
+    Recarregar,
+    /// Nada carregado: não há o que reposicionar.
+    Nada,
+}
+
+fn efeito_seek(tem_player: bool, tem_faixa: bool) -> EfeitoSeek {
+    match (tem_player, tem_faixa) {
+        (true, _) => EfeitoSeek::ManterEstado,
+        (false, true) => EfeitoSeek::Recarregar,
+        (false, false) => EfeitoSeek::Nada,
+    }
+}
+
 /// Reposiciona a faixa mantendo o estado de pausa. `executar_seek` recria o
 /// player já tocando, então re-pausamos quando for o caso.
 fn seek_mantendo_pausa(estado: &mut EstadoAudio, ui: &MainWindow, alvo_secs: u64) {
@@ -646,7 +668,8 @@ fn tocar_anterior(estado: &mut EstadoAudio, ui: &MainWindow) {
             return;
         };
 
-        let ordem = ordem_filtrada(&pasta.tracks, &estado.filtro);
+        let filtro = filtro_efetivo(estado.aba_visivel, estado.pasta_reproducao, &estado.filtro);
+        let ordem = ordem_filtrada(&pasta.tracks, filtro);
         if ordem.is_empty() {
             return;
         }
@@ -729,7 +752,8 @@ fn tocar_proxima_manual(estado: &mut EstadoAudio, ui: &MainWindow) {
             return;
         };
 
-        let ordem = ordem_filtrada(&pasta.tracks, &estado.filtro);
+        let filtro = filtro_efetivo(estado.aba_visivel, estado.pasta_reproducao, &estado.filtro);
+        let ordem = ordem_filtrada(&pasta.tracks, filtro);
         if ordem.is_empty() {
             return;
         }
@@ -1659,7 +1683,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             if let Some(ui) = ui_fraca.upgrade() {
                 let mut e = estado.borrow_mut();
                 let alvo = (v as f64 * e.duracao_total_secs as f64) as u64;
-                executar_seek(&mut e, &ui, alvo);
+                match efeito_seek(e.audio_player.is_some(), e.arquivo_atual.is_some()) {
+                    // Arrastar a barra com a faixa pausada não pode dar play:
+                    // executar_seek recria o Sink já tocando.
+                    EfeitoSeek::ManterEstado => seek_mantendo_pausa(&mut e, &ui, alvo),
+                    EfeitoSeek::Recarregar => executar_seek(&mut e, &ui, alvo),
+                    EfeitoSeek::Nada => {}
+                }
             }
         });
     }
@@ -1953,5 +1983,17 @@ mod tests {
     fn mp3_decodifica_com_hint_de_extensao() {
         let decodificador = decodificar("tone.mp3", "mp3");
         amostras_nao_silenciosas(decodificador);
+    }
+
+    #[test]
+    fn seek_com_player_preserva_tocando_ou_pausado() {
+        assert_eq!(efeito_seek(true, true), EfeitoSeek::ManterEstado);
+        assert_eq!(efeito_seek(true, false), EfeitoSeek::ManterEstado);
+    }
+
+    #[test]
+    fn seek_sem_player_só_recarrega_com_faixa_selecionada() {
+        assert_eq!(efeito_seek(false, true), EfeitoSeek::Recarregar);
+        assert_eq!(efeito_seek(false, false), EfeitoSeek::Nada);
     }
 }
