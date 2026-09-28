@@ -254,11 +254,11 @@ choose_mode_interactive() {
     local choice
 
     while true; do
-        echo ""
-        echo "Choose an option:"
-        echo "1) Install"
-        echo "2) Uninstall"
-        echo ""
+        echo "" >&2
+        echo "Choose an option:" >&2
+        echo "1) Install" >&2
+        echo "2) Uninstall" >&2
+        echo "" >&2
 
         if ! IFS= read -r -p "> " choice < /dev/tty; then
             err "Could not read input from terminal."
@@ -280,6 +280,7 @@ choose_mode_interactive() {
         esac
     done
 }
+
 
 
 main() {
