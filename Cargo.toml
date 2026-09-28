@@ -53,7 +53,14 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 souvlaki = { version = "0.8", optional = true }
 raw-window-handle = "0.6"
-self_update = { version = "0.41", features = ["archive-tar", "compression-flate2"] }
+# default-features = false: pula o "reqwest/default-tls" (native-tls/openssl),
+# que linkaria o binário em libssl do sistema. Com "rustls" a HTTPS sai toda
+# em Rust, com as CAs embutidas (webpki-roots), sem dependência do OpenSSL.
+self_update = { version = "0.41", default-features = false, features = [
+    "archive-tar",
+    "compression-flate2",
+    "rustls",
+] }
 semver = "1"
 
 [target.'cfg(target_os = "windows")'.dependencies]

@@ -36,6 +36,8 @@ jobs:
 
       # Os avisos mudam por alvo: os blocos cfg(windows)/cfg(mpris) só existem
       # em um ou outro. Ambas as combinações precisam ficar limpas.
+      # (Localmente o alvo Windows é checado com x86_64-pc-windows-gnu; o msvc
+      # de verdade precisa das ferramentas do Visual Studio, só existem aqui.)
       - name: clippy (todas as features)
         run: cargo clippy --all-targets --all-features -- -D warnings
 

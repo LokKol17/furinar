@@ -161,4 +161,31 @@ mod tests {
             "{versao} não é semver; check_for_update falharia"
         );
     }
+
+    /// Smoke de rede: a HTTPS precisa funcionar com rustls (troca do
+    /// native-tls/openssl). Ignorada por padrão por depender de internet:
+    /// `cargo test -- --ignored --nocapture`.
+    ///
+    /// Usa `ReleaseList::fetch` direto porque `check_for_update` engole o
+    /// erro com `.ok()?` e um TLS quebrado viraria só "sem atualização".
+    #[test]
+    #[ignore = "requer rede"]
+    fn smoke_rede_busca_releases_via_rustls() {
+        let releases = self_update::backends::github::ReleaseList::configure()
+            .repo_owner("LokKol17")
+            .repo_name("furinar")
+            .build()
+            .expect("ReleaseList build falhou")
+            .fetch()
+            .expect("HTTPS com rustls falhou");
+
+        println!("{} releases encontrados", releases.len());
+        let alvo = get_target();
+        assert!(
+            releases
+                .iter()
+                .any(|r| r.assets.iter().any(|a| a.name == alvo)),
+            "nenhuma release tem o asset {alvo}; conferir release.yml"
+        );
+    }
 }
