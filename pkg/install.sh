@@ -60,25 +60,58 @@ install_deps() {
     case "$DISTRO_FAMILY" in
         debian)
             sudo apt-get update -qq
-            sudo apt-get install -y -qq libasound2 libgtk-3-0 2>/dev/null || \
-            sudo apt-get install -y -qq libasound2 libgtk-3-0t64 2>/dev/null || true
+
+            if ! sudo apt-get install -y -qq libasound2 libgtk-3-0; then
+                sudo apt-get install -y -qq libasound2 libgtk-3-0t64
+            fi
+
+            # Optional compatibility runtime for older Furinar Linux releases.
+            # New releases build OpenSSL vendored/static and should not require this.
+            if sudo apt-get install -y -qq libssl3; then
+                info "Installed OpenSSL runtime compatibility package: libssl3"
+            elif sudo apt-get install -y -qq libssl1.1; then
+                info "Installed OpenSSL runtime compatibility package: libssl1.1"
+            else
+                warn "Could not install libssl3/libssl1.1 compatibility runtime."
+                warn "Continuing because newer Furinar builds vendor OpenSSL."
+            fi
             ;;
         arch)
-            sudo pacman -S --noconfirm --needed alsa-lib gtk3 2>/dev/null || true
+            sudo pacman -S --noconfirm --needed alsa-lib gtk3
+
+            if ! sudo pacman -S --noconfirm --needed openssl; then
+                warn "Could not install OpenSSL runtime compatibility package (openssl)."
+                warn "Continuing because newer Furinar builds vendor OpenSSL."
+            fi
             ;;
         fedora)
-            sudo dnf install -y alsa-lib gtk3 2>/dev/null || true
+            sudo dnf install -y alsa-lib gtk3
+
+            if ! sudo dnf install -y openssl-libs; then
+                warn "Could not install OpenSSL runtime compatibility package (openssl-libs)."
+                warn "Continuing because newer Furinar builds vendor OpenSSL."
+            fi
             ;;
         suse)
-            sudo zypper install -y libasound2 gtk3 2>/dev/null || true
+            sudo zypper install -y libasound2 gtk3
+
+            if sudo zypper install -y libopenssl3; then
+                info "Installed OpenSSL runtime compatibility package: libopenssl3"
+            elif sudo zypper install -y libopenssl1_1; then
+                info "Installed OpenSSL runtime compatibility package: libopenssl1_1"
+            else
+                warn "Could not install libopenssl3/libopenssl1_1 compatibility runtime."
+                warn "Continuing because newer Furinar builds vendor OpenSSL."
+            fi
             ;;
         *)
             warn "Unrecognized distribution. Install manually:"
             warn "  - libasound2 (ALSA)"
             warn "  - libgtk-3 (file dialogs)"
+            warn "  - OpenSSL runtime libraries (compatibility with older Furinar releases)"
             ;;
     esac
-    ok "Dependencies verified."
+    ok "Required dependencies installed."
 }
 
 # ---------------------------------------------------------------------------

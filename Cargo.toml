@@ -29,6 +29,7 @@ slint = { version = "1", default-features = false, features = [
     "raw-window-handle-06",
     "unstable-winit-030",
 ] }
+openssl = { version = "0.10", features = ["vendored"] }
 rfd = "0.15"
 rodio = { version = "0.19", features = ["mp3", "wav", "flac", "vorbis"] }
 lofty = "0.25"
