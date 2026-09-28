@@ -252,23 +252,27 @@ usage() {
 
 choose_mode_interactive() {
     local choice
+
     while true; do
-        echo "Choose an option:" >&2
-        echo "1) Install (default)" >&2
-        echo "2) Uninstall" >&2
-        if ! IFS= read -r -p "> " choice; then
-            choice=""
-            echo "" >&2
+        echo ""
+        echo "Choose an option:"
+        echo "1) Install"
+        echo "2) Uninstall"
+        echo ""
+
+        if ! IFS= read -r -p "> " choice < /dev/tty; then
+            err "Could not read input from terminal."
+            exit 1
         fi
 
         case "$choice" in
-            ""|1)
+            1)
                 echo "install"
-                return
+                return 0
                 ;;
             2)
                 echo "uninstall"
-                return
+                return 0
                 ;;
             *)
                 err "Invalid option. Please choose 1 or 2."
@@ -276,6 +280,7 @@ choose_mode_interactive() {
         esac
     done
 }
+
 
 main() {
     local mode=""
@@ -307,36 +312,34 @@ main() {
         done
     fi
 
-    # Garante que o menu retornou uma opção válida
-    case "$mode" in
-        deps|source|uninstall|install)
-            ;;
-        *)
-            err "Invalid mode: $mode"
-            exit 1
-            ;;
-    esac
-
     detect_distro
 
     case "$mode" in
         deps)
             install_deps
             ;;
+
         source)
             install_deps
             generate_desktop_files
             install_from_source
             install_files
             ;;
+
         uninstall)
             uninstall
             ;;
+
         install)
             install_deps
             download_binary
             generate_desktop_files
             install_files
+            ;;
+
+        *)
+            err "Invalid mode: $mode"
+            exit 1
             ;;
     esac
 
