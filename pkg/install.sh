@@ -345,7 +345,6 @@ main() {
     esac
 
     echo ""
-    ok "Done! Run 'furinar' to start."
 }
 
 main "$@"
