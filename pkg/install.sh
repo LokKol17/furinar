@@ -238,25 +238,60 @@ install_from_source() {
 usage() {
     echo "Usage: $0 [OPTIONS]"
     echo ""
+    echo "Without arguments, an interactive menu is shown:"
+    echo "  1) Install (default)"
+    echo "  2) Uninstall"
+    echo ""
     echo "Options:"
-    echo "  (no args)      Install furinar (downloads from GitHub Releases)"
+    echo "  (no args)      Show interactive menu (Install/Uninstall)"
     echo "  --deps         Only install dependencies"
     echo "  --from-source  Install from the local binary (target/release/furinar)"
     echo "  --uninstall    Uninstall furinar"
     echo "  --help         Show this message"
 }
 
-main() {
-    local mode="install"
-    for arg in "$@"; do
-        case "$arg" in
-            --help|-h)    usage; exit 0 ;;
-            --deps)       mode="deps" ;;
-            --from-source) mode="source" ;;
-            --uninstall)  mode="uninstall" ;;
-            *)            err "Unknown option: $arg"; usage; exit 1 ;;
+choose_mode_interactive() {
+    local choice
+    while true; do
+        echo "Choose an option:" >&2
+        echo "1) Install (default)" >&2
+        echo "2) Uninstall" >&2
+        if ! IFS= read -r -p "> " choice; then
+            choice=""
+            echo "" >&2
+        fi
+
+        case "$choice" in
+            ""|1)
+                echo "install"
+                return
+                ;;
+            2)
+                echo "uninstall"
+                return
+                ;;
+            *)
+                err "Invalid option. Please choose 1 or 2."
+                ;;
         esac
     done
+}
+
+main() {
+    local mode="install"
+    if [ "$#" -eq 0 ]; then
+        mode="$(choose_mode_interactive)"
+    else
+        for arg in "$@"; do
+            case "$arg" in
+                --help|-h)    usage; exit 0 ;;
+                --deps)       mode="deps" ;;
+                --from-source) mode="source" ;;
+                --uninstall)  mode="uninstall" ;;
+                *)            err "Unknown option: $arg"; usage; exit 1 ;;
+            esac
+        done
+    fi
 
     detect_distro
 
