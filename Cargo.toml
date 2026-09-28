@@ -34,7 +34,17 @@ slint = { version = "1", default-features = false, features = [
     "unstable-winit-030",
 ] }
 rfd = "0.15"
-rodio = { version = "0.19", features = ["mp3", "wav", "flac", "vorbis"] }
+# default-features = false: pula "recording" (microfone), que não usamos.
+rodio = { version = "0.22", default-features = false, features = [
+    "playback",
+    "mp3",
+    "wav",
+    "flac",
+    "vorbis",
+    # mp4 = symphonia-isomp4 + symphonia-aac: sem isto o symphonia não tem
+    # container isomp4 nem codec AAC, e a faixa aparece na lista mas não toca.
+    "mp4",
+] }
 lofty = "0.25"
 unicode-normalization = "0.1"
 mp3-duration = "0.1"

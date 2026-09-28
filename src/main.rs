@@ -23,7 +23,8 @@ use std::time::Duration;
 use config::AppConfig;
 use lrc::{caminho_lrc, indice_letra, janela_letra, parse_lrc};
 use rand::seq::SliceRandom;
-use rodio::{Decoder, OutputStream, Sink, Source};
+use rodio::decoder::DecoderError;
+use rodio::{Decoder, DeviceSinkBuilder, MixerDeviceSink, Player, Source};
 #[cfg(target_os = "windows")]
 use slint::winit_030::winit::platform::windows::EventLoopBuilderExtWindows;
 use slint::{ModelRc, SharedString, Timer, TimerMode, VecModel};
@@ -155,7 +156,7 @@ struct PastaMusical {
 // ---------------------------------------------------------------------
 
 struct EstadoAudio {
-    audio_player: Option<(OutputStream, Sink)>,
+    audio_player: Option<(MixerDeviceSink, Player)>,
     tempo_decorrido: f64,
     /// Pastas abertas (abas), na ordem de exibição.
     pastas: Vec<PastaMusical>,
@@ -461,6 +462,28 @@ fn publicar_letra(estado: &mut EstadoAudio, ui: &MainWindow) {
     ui.set_letra_destaque(destaque);
 }
 
+/// Abre o decodificador certo para a extensão do arquivo.
+///
+/// `byte_len` (tamanho do arquivo) é obrigatório: sem ele o symphonia trata a
+/// fonte como não-seekable e o reader isomp4 do M4A falha logo em `try_new` —
+/// no rodio 0.19 esse erro virava `unreachable!()` e derrubava o app. O hint de
+/// extensão escolhe o reader do container direto, sem depender do probe.
+fn criar_decodificador<R>(
+    leitor: R,
+    extensao: &str,
+    byte_len: u64,
+) -> Result<Decoder<R>, DecoderError>
+where
+    R: std::io::Read + std::io::Seek + Send + Sync + 'static,
+{
+    Decoder::builder()
+        .with_data(leitor)
+        .with_byte_len(byte_len)
+        .with_seekable(true)
+        .with_hint(extensao)
+        .build()
+}
+
 fn executar_seek(estado: &mut EstadoAudio, ui: &MainWindow, alvo_secs: u64) {
     // Sempre a pasta de onde vem a faixa atual, nunca a aba visível.
     let pasta = match estado.pasta_reproducao.and_then(|i| estado.pastas.get(i)) {
@@ -479,26 +502,30 @@ fn executar_seek(estado: &mut EstadoAudio, ui: &MainWindow, alvo_secs: u64) {
         Ok(a) => a,
         Err(_) => return,
     };
-    let (stream, stream_handle) = match OutputStream::try_default() {
+    let byte_len = match arquivo.metadata() {
+        Ok(m) => m.len(),
+        Err(_) => return,
+    };
+    let stream = match DeviceSinkBuilder::open_default_sink() {
         Ok(s) => s,
         Err(_) => return,
     };
-    let sink = match Sink::try_new(&stream_handle) {
-        Ok(s) => s,
-        Err(_) => return,
-    };
+    let sink = Player::connect_new(stream.mixer());
     sink.set_volume(estado.volume_atual);
 
+    let extensao = caminho_completo
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+
     let leitor = BufReader::new(arquivo);
-    let decodificador = match Decoder::new(leitor) {
+    let decodificador = match criar_decodificador(leitor, &extensao, byte_len) {
         Ok(d) => d,
         Err(_) => return,
     };
 
-    let total_secs = if caminho_completo
-        .extension()
-        .map_or(false, |e| e.eq_ignore_ascii_case("mp3"))
-    {
+    let total_secs = if extensao == "mp3" {
         mp3_duration::from_path(&caminho_completo)
             .map(|d| d.as_secs())
             .unwrap_or_else(|_| {
@@ -1850,4 +1877,81 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     salvar_configuracao(&estado.borrow());
 
     Ok(())
+}
+
+// ---------------------------------------------------------------------
+// Testes
+// ---------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rodio::Sample;
+
+    fn fixture(nome: &str) -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures")
+            .join(nome)
+    }
+
+    /// Abre a fixture do mesmo jeito que `executar_seek` abre a faixa real:
+    /// lendo o tamanho do arquivo antes de construir o decodificador.
+    fn decodificar(nome: &str, extensao: &str) -> Decoder<BufReader<File>> {
+        let arquivo = File::open(fixture(nome)).unwrap_or_else(|e| panic!("fixture {nome}: {e}"));
+        let byte_len = arquivo
+            .metadata()
+            .unwrap_or_else(|e| panic!("metadata de {nome}: {e}"))
+            .len();
+        criar_decodificador(BufReader::new(arquivo), extensao, byte_len)
+            .unwrap_or_else(|e| panic!("{nome} deve decodificar: {e:?}"))
+    }
+
+    fn amostras_nao_silenciosas(mut decodificador: Decoder<BufReader<File>>) {
+        let duracao = decodificador
+            .total_duration()
+            .expect("duração deve ser conhecida");
+        let amostras: Vec<Sample> = decodificador.take(4096).collect();
+        assert!(!amostras.is_empty(), "{:?} não devolveu amostras", duracao);
+        assert!(
+            amostras.iter().any(|s| *s != 0.0),
+            "{:?} devolveu só silêncio",
+            duracao
+        );
+    }
+
+    #[test]
+    fn m4a_decodifica_com_hint_de_extensao() {
+        let decodificador = decodificar("tone.m4a", "m4a");
+        let duracao = decodificador
+            .total_duration()
+            .expect("duração do m4a deve ser conhecida");
+        assert!(duracao.as_millis() >= 150, "durou {duracao:?}");
+
+        amostras_nao_silenciosas(decodificador);
+    }
+
+    #[test]
+    fn m4a_com_moov_no_inicio_tambem_decodifica() {
+        let decodificador = decodificar("tone_faststart.m4a", "m4a");
+        let duracao = decodificador
+            .total_duration()
+            .expect("duração do m4a deve ser conhecida");
+        assert!(duracao.as_secs() >= 1, "durou {duracao:?}");
+
+        amostras_nao_silenciosas(decodificador);
+    }
+
+    #[test]
+    fn m4a_permite_seek() {
+        let mut decodificador = decodificar("tone.m4a", "m4a");
+        decodificador
+            .try_seek(Duration::from_millis(100))
+            .expect("seek em m4a deve funcionar");
+    }
+
+    #[test]
+    fn mp3_decodifica_com_hint_de_extensao() {
+        let decodificador = decodificar("tone.mp3", "mp3");
+        amostras_nao_silenciosas(decodificador);
+    }
 }
