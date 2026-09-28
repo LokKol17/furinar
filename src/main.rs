@@ -3,6 +3,9 @@
 
 slint::include_modules!();
 
+mod config;
+mod lrc;
+mod track;
 mod translations;
 mod updates;
 
@@ -17,12 +20,10 @@ use std::sync::{
 };
 use std::time::Duration;
 
-use lofty::config::ParseOptions;
-use lofty::prelude::*;
-use lofty::probe::Probe;
+use config::AppConfig;
+use lrc::{caminho_lrc, indice_letra, janela_letra, parse_lrc};
 use rand::seq::SliceRandom;
 use rodio::{Decoder, OutputStream, Sink, Source};
-use serde::{Deserialize, Serialize};
 #[cfg(target_os = "windows")]
 use slint::winit_030::winit::platform::windows::EventLoopBuilderExtWindows;
 use slint::{ModelRc, SharedString, Timer, TimerMode, VecModel};
@@ -31,8 +32,7 @@ use souvlaki::{
     MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, MediaPosition, PlatformConfig,
     SeekDirection,
 };
-use unicode_normalization::UnicodeNormalization;
-use unicode_normalization::char::is_combining_mark;
+use track::{TrackInfo, coletar_arquivos_audio, nome_da_pasta, ordem_filtrada, texto_exibicao};
 #[cfg(target_os = "windows")]
 use windows::Win32::Foundation::{HINSTANCE, HWND};
 #[cfg(target_os = "windows")]
@@ -63,115 +63,6 @@ use windows::Win32::UI::WindowsAndMessaging::{
     WM_DISPLAYCHANGE, WM_DWMCOMPOSITIONCHANGED, WM_EXITSIZEMOVE,
 };
 
-// ---------------------------------------------------------------------
-// Config
-// ---------------------------------------------------------------------
-
-#[derive(Serialize, Deserialize, Default)]
-struct AppConfig {
-    /// Campo antigo (uma pasta só). Existe apenas para migrar configs antigas.
-    #[serde(default, skip_serializing)]
-    pasta: Option<String>,
-    /// Pastas abertas, na ordem das abas.
-    #[serde(default)]
-    pastas: Vec<String>,
-    /// Aba que estava sendo exibida.
-    #[serde(default)]
-    aba_visivel_salva: usize,
-    /// Pasta de onde vinha a faixa que estava tocando.
-    #[serde(default)]
-    pasta_reproducao_salva: Option<usize>,
-    volume: f32,
-    modo_loop: u8,
-    /// Campo antigo (só ligado/desligado). Existe apenas para migrar configs antigas.
-    #[serde(default, skip_serializing)]
-    shuffle: bool,
-    /// 0 = desligado, 1 = shuffle, 2 = shuffle inteligente.
-    #[serde(default)]
-    modo_shuffle: u8,
-    indice_atual: Option<usize>,
-    tempo_atual: Option<u64>,
-    #[serde(default)]
-    escanear_subpastas: bool,
-    /// Tema claro ligado. `false` = escuro (padrão, mantém quem já usa o app).
-    #[serde(default)]
-    tema_claro: bool,
-    #[serde(default = "default_idioma")]
-    idioma: String,
-}
-
-fn default_idioma() -> String {
-    "pt-br".to_string()
-}
-
-fn config_path() -> PathBuf {
-    #[cfg(target_os = "linux")]
-    {
-        if let Ok(xdg) = std::env::var("XDG_CONFIG_HOME") {
-            PathBuf::from(xdg)
-                .join("furinar")
-                .join("furinar_config.json")
-        } else {
-            if let Ok(home) = std::env::var("HOME") {
-                PathBuf::from(home)
-                    .join(".config")
-                    .join("furinar")
-                    .join("furinar_config.json")
-            } else {
-                PathBuf::from("furinar_config.json")
-            }
-        }
-    }
-    #[cfg(not(target_os = "linux"))]
-    {
-        PathBuf::from("furinar_config.json")
-    }
-}
-
-impl AppConfig {
-    fn carregar() -> Self {
-        let config_path = config_path();
-        if let Some(parent) = config_path.parent() {
-            let _ = fs::create_dir_all(parent);
-        }
-        let mut config = if let Ok(conteudo) = fs::read_to_string(&config_path) {
-            serde_json::from_str(&conteudo).unwrap_or_default()
-        } else {
-            Self {
-                volume: 0.8,
-                ..Default::default()
-            }
-        };
-        config.migrar();
-        config
-    }
-
-    /// Migra configs antigas: o campo `pasta` (singular) vira uma entrada em
-    /// `pastas`, e essa pasta era necessariamente a que estava tocando. O
-    /// campo `shuffle` (bool) vira `modo_shuffle` (0/1/2).
-    fn migrar(&mut self) {
-        if self.pastas.is_empty() {
-            if let Some(antiga) = self.pasta.take() {
-                self.pastas.push(antiga);
-                self.pasta_reproducao_salva = Some(0);
-            }
-        }
-        if self.modo_shuffle == 0 && self.shuffle {
-            self.modo_shuffle = 1;
-        }
-    }
-
-    fn salvar(&self) {
-        let config_path = config_path();
-        if let Some(parent) = config_path.parent() {
-            let _ = fs::create_dir_all(parent);
-        }
-        if let Ok(json) = serde_json::to_string_pretty(self) {
-            let _ = fs::write(&config_path, json);
-        }
-    }
-}
-
 fn formatar_tempo(segundos: u64, com_horas: bool) -> String {
     let horas = segundos / 3600;
     let mins = (segundos % 3600) / 60;
@@ -180,17 +71,6 @@ fn formatar_tempo(segundos: u64, com_horas: bool) -> String {
         format!("{:02}:{:02}:{:02}", horas, mins, segs)
     } else {
         format!("{:02}:{:02}", mins, segs)
-    }
-}
-
-fn e_arquivo_audio(caminho: &std::path::Path) -> bool {
-    if let Some(ext) = caminho.extension().and_then(|e| e.to_str()) {
-        matches!(
-            ext.to_lowercase().as_str(),
-            "mp3" | "wav" | "flac" | "ogg" | "m4a"
-        )
-    } else {
-        false
     }
 }
 
@@ -256,63 +136,6 @@ fn aplicar_idioma(idioma: &str, ui: &MainWindow) {
 }
 
 // ---------------------------------------------------------------------
-// Informações de faixa (tags ID3/Vorbis)
-// ---------------------------------------------------------------------
-
-#[derive(Clone)]
-struct TrackInfo {
-    path: String,            // relativo à pasta raiz
-    titulo: String,          // tag title ou fallback do nome do arquivo
-    artista: Option<String>, // tag artist (se houver)
-}
-
-/// Normaliza texto para busca: remove acentos e passa para minúsculas, de modo
-/// que "cancao" encontre "canção".
-fn normalizar_busca(texto: &str) -> String {
-    texto
-        .nfd()
-        .filter(|c| !is_combining_mark(*c))
-        .collect::<String>()
-        .to_lowercase()
-}
-
-/// Lê título e artista das tags. O título cai para o nome do arquivo quando
-/// não há tag.
-fn ler_tags(caminho: &std::path::Path) -> (String, Option<String>) {
-    // Lê apenas as tags (sem propriedades nem capa) para manter o scan rápido
-    let opcoes = ParseOptions::new()
-        .read_properties(false)
-        .read_cover_art(false);
-
-    let mut titulo = None;
-    let mut artista = None;
-
-    if let Ok(tagged) = Probe::open(caminho).and_then(|p| p.options(opcoes).read()) {
-        if let Some(tag) = tagged.primary_tag().or_else(|| tagged.first_tag()) {
-            titulo = tag
-                .title()
-                .map(|s| s.trim().to_string())
-                .filter(|s| !s.is_empty());
-            artista = tag
-                .artist()
-                .map(|s| s.trim().to_string())
-                .filter(|s| !s.is_empty());
-        }
-    }
-
-    // Fallback: nome do arquivo sem extensão
-    let titulo = titulo.unwrap_or_else(|| {
-        caminho
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .unwrap_or("")
-            .replace('_', " ")
-    });
-
-    (titulo, artista)
-}
-
-// ---------------------------------------------------------------------
 // Pastas (abas)
 // ---------------------------------------------------------------------
 
@@ -325,15 +148,6 @@ struct PastaMusical {
     /// Se as faixas já foram escaneadas. O scan é preguiçoso: pastas abertas
     /// mas nunca visitadas ficam sem `tracks` até serem necessárias.
     carregada: bool,
-}
-
-/// Nome de exibição de uma pasta.
-fn nome_da_pasta(caminho: &std::path::Path) -> String {
-    caminho
-        .file_name()
-        .and_then(|n| n.to_str())
-        .map(|n| n.to_string())
-        .unwrap_or_else(|| caminho.to_string_lossy().to_string())
 }
 
 // ---------------------------------------------------------------------
@@ -439,69 +253,6 @@ fn salvar_configuracao(estado: &EstadoAudio) {
         },
     };
     config.salvar();
-}
-
-fn coletar_arquivos_audio(
-    diretorio: &std::path::Path,
-    raiz: &std::path::Path,
-    recursivo: bool,
-    saida: &mut Vec<TrackInfo>,
-) {
-    if let Ok(entradas) = fs::read_dir(diretorio) {
-        for entrada in entradas.flatten() {
-            let path = entrada.path();
-            if path.is_file() && e_arquivo_audio(&path) {
-                if let Ok(rel) = path.strip_prefix(raiz) {
-                    if let Some(nome) = rel.to_str() {
-                        let (titulo, artista) = ler_tags(&path);
-                        saida.push(TrackInfo {
-                            path: nome.replace('\\', "/"),
-                            titulo,
-                            artista,
-                        });
-                    }
-                }
-            } else if recursivo && path.is_dir() {
-                coletar_arquivos_audio(&path, raiz, recursivo, saida);
-            }
-        }
-    }
-}
-
-/// Texto exibido na lista: "Artista - Título" quando há artista.
-fn texto_exibicao(track: &TrackInfo) -> String {
-    match &track.artista {
-        Some(artista) => format!("{} - {}", artista, track.titulo),
-        None => track.titulo.clone(),
-    }
-}
-
-/// Ordem de navegação de uma pasta, aplicando o filtro atual.
-/// Chave de busca de uma faixa: título + artista normalizados (sem acento,
-/// minúsculo). É calculada sob demanda, só durante o filtro, para não manter
-/// uma cópia do texto por faixa na memória.
-fn chave_busca(track: &TrackInfo) -> String {
-    let mut chave = track.titulo.clone();
-    if let Some(artista) = &track.artista {
-        chave.push(' ');
-        chave.push_str(artista);
-    }
-    normalizar_busca(&chave)
-}
-
-fn ordem_filtrada(tracks: &[TrackInfo], filtro: &str) -> Vec<usize> {
-    let filtro = normalizar_busca(filtro);
-    if filtro.is_empty() {
-        // Sem filtro não há por que normalizar faixa nenhuma
-        return (0..tracks.len()).collect();
-    }
-
-    tracks
-        .iter()
-        .enumerate()
-        .filter(|(_, t)| chave_busca(t).contains(filtro.as_str()))
-        .map(|(i, _)| i)
-        .collect()
 }
 
 /// Marca na UI a posição da faixa atual na lista visível.
@@ -676,124 +427,6 @@ fn reescaneiar_pastas(estado: &mut EstadoAudio, ui: &MainWindow) {
 // ---------------------------------------------------------------------
 // Letras sincronizadas (.lrc)
 // ---------------------------------------------------------------------
-
-/// Quantas linhas mandamos pra UI ao redor da linha atual. Ímpar, para a
-/// linha atual poder ficar centralizada.
-const LETRA_JANELA: usize = 9;
-
-/// Caminho do .lrc irmão da faixa: mesmo nome, extensão trocada.
-fn caminho_lrc(caminho_faixa: &std::path::Path) -> PathBuf {
-    caminho_faixa.with_extension("lrc")
-}
-
-/// Converte "mm:ss", "mm:ss.xx" ou "mm:ss.xxx" em segundos.
-fn parse_tempo(dentro: &str) -> Option<f64> {
-    let (minutos, resto) = dentro.split_once(':')?;
-    let minutos: u64 = minutos.trim().parse().ok()?;
-
-    let (segundos, fracao) = match resto.split_once('.') {
-        Some((s, f)) => (s, Some(f)),
-        None => (resto, None),
-    };
-    let segundos: u64 = segundos.trim().parse().ok()?;
-
-    let fracao = match fracao {
-        None => 0.0,
-        Some(f) => {
-            let f = f.trim();
-            // 1 a 3 dígitos: ".5", ".50" e ".500" valem 500 ms
-            if f.is_empty() || f.len() > 3 || !f.bytes().all(|b| b.is_ascii_digit()) {
-                return None;
-            }
-            let valor: u64 = f.parse().ok()?;
-            match f.len() {
-                1 => valor as f64 / 10.0,
-                2 => valor as f64 / 100.0,
-                _ => valor as f64 / 1000.0,
-            }
-        }
-    };
-
-    Some(minutos as f64 * 60.0 + segundos as f64 + fracao)
-}
-
-/// Parseia um .lrc. Linhas fora do padrão `[tempo]texto` são ignoradas em
-/// silêncio, e uma linha com vários timestamps gera uma entrada por timestamp.
-fn parse_lrc(conteudo: &str) -> Vec<(f64, String)> {
-    let mut linhas: Vec<(f64, String)> = Vec::new();
-
-    for linha in conteudo.lines() {
-        let mut resto = linha;
-        let mut tempos: Vec<f64> = Vec::new();
-
-        // Consome todos os `[tempo]` no começo da linha
-        while let Some(fim) = resto.find(']') {
-            if !resto.starts_with('[') {
-                break;
-            }
-            match parse_tempo(&resto[1..fim]) {
-                Some(t) => tempos.push(t),
-                // Metadado ([ar:...], [ti:...]) ou lixo: a linha não serve
-                None => break,
-            }
-            resto = &resto[fim + 1..];
-        }
-
-        if tempos.is_empty() {
-            continue;
-        }
-
-        let texto = resto.trim().to_string();
-        for t in tempos {
-            linhas.push((t, texto.clone()));
-        }
-    }
-
-    linhas.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
-    linhas
-}
-
-/// Índice da última linha cujo tempo é ≤ `tempo` (-1 se ainda não chegou).
-fn indice_letra(letra: &[(f64, String)], tempo: f64) -> i32 {
-    let n = letra.partition_point(|(t, _)| *t <= tempo);
-    if n == 0 { -1 } else { (n - 1) as i32 }
-}
-
-/// Recorte de linhas ao redor da linha atual. Devolve (início, linhas, destaque).
-/// A janela fica centrada na linha atual, exceto perto das pontas — é isso
-/// que dá a sensação de rolagem em vez de um texto trocando no lugar.
-fn janela_letra(letra: &[(f64, String)], indice: i32) -> (usize, Vec<SharedString>, i32) {
-    if letra.is_empty() {
-        return (0, Vec::new(), -1);
-    }
-
-    let inicio = if indice < 0 {
-        0
-    } else {
-        let atual = indice as usize;
-        let metade = LETRA_JANELA / 2;
-        if atual < metade {
-            0
-        } else if atual + metade + 1 > letra.len() {
-            letra.len().saturating_sub(LETRA_JANELA)
-        } else {
-            atual - metade
-        }
-    };
-
-    let fim = (inicio + LETRA_JANELA).min(letra.len());
-    let linhas = letra[inicio..fim]
-        .iter()
-        .map(|(_, t)| t.as_str().into())
-        .collect();
-    let destaque = if indice < 0 {
-        -1
-    } else {
-        indice - inicio as i32
-    };
-
-    (inicio, linhas, destaque)
-}
 
 /// Carrega a letra da faixa e já publica o primeiro recorte. Não existir .lrc
 /// é o caso normal ("sem letra disponível"), não uma falha.
