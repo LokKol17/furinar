@@ -1921,7 +1921,7 @@ mod tests {
             .unwrap_or_else(|e| panic!("{nome} deve decodificar: {e:?}"))
     }
 
-    fn amostras_nao_silenciosas(mut decodificador: Decoder<BufReader<File>>) {
+    fn amostras_nao_silenciosas(decodificador: Decoder<BufReader<File>>) {
         let duracao = decodificador
             .total_duration()
             .expect("duração deve ser conhecida");

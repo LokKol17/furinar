@@ -17,6 +17,9 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Test
+        run: cargo test --all-features
+
       - name: Build
         run: cargo build --release
 
@@ -42,6 +45,9 @@ jobs:
 
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y libasound2-dev libgtk-3-dev pkg-config
+
+      - name: Test
+        run: cargo test --all-features
 
       - name: Build
         run: cargo build --release

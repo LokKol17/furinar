@@ -190,13 +190,20 @@ pub fn filtro_efetivo(aba_visivel: usize, pasta_reproducao: Option<usize>, filtr
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::{Path, PathBuf};
+    use std::path::Path;
+    #[cfg(unix)]
+    use std::path::PathBuf;
+    #[cfg(unix)]
     use std::sync::atomic::{AtomicUsize, Ordering};
 
+    #[cfg(unix)]
     static SEQUENCIA: AtomicUsize = AtomicUsize::new(0);
 
+    /// Só nos testes unix: os testes de symlink não existem em Windows.
+    #[cfg(unix)]
     struct PastaTemporaria(PathBuf);
 
+    #[cfg(unix)]
     impl PastaTemporaria {
         fn nova(nome: &str) -> Self {
             let caminho = std::env::temp_dir().join(format!(
@@ -210,6 +217,7 @@ mod tests {
         }
     }
 
+    #[cfg(unix)]
     impl Drop for PastaTemporaria {
         fn drop(&mut self) {
             let _ = fs::remove_dir_all(&self.0);
