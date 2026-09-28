@@ -5,7 +5,7 @@
 # ============================================================================
 set -euo pipefail
 
-VERSION="${FURINAR_VERSION:-1.5.4}"
+FURINAR_VERSION="${FURINAR_VERSION:-1.5.4}"
 INSTALL_DIR="/usr/local/bin"
 ICON_DIR="/usr/share/icons/hicolor/256x256/apps"
 DESKTOP_DIR="/usr/share/applications"
@@ -86,10 +86,10 @@ install_deps() {
 # ---------------------------------------------------------------------------
 download_binary() {
     local tarball="furinar-linux-x86_64.tar.gz"
-    local url="https://github.com/LokKol17/furinar/releases/download/v${VERSION}/${tarball}"
+    local url="https://github.com/LokKol17/furinar/releases/download/v${FURINAR_VERSION}/${tarball}"
     local dest="/tmp/furinar"
 
-    info "Downloading furinar v${VERSION}..."
+    info "Downloading furinar v${FURINAR_VERSION}..."
     if command -v curl &>/dev/null; then
         curl -fSL "$url" -o "/tmp/${tarball}"
     elif command -v wget &>/dev/null; then
