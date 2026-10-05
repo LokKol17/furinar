@@ -7,7 +7,7 @@ description = "A light, fast, and beautiful audio player — inspired by the Hyd
 repository = "https://github.com/LokKol17/furinar"
 
 [package.metadata.deb]
-maintainer = "Furinar Dev <dev@furinar.dev>"
+maintainer = "Lokkie <dev@furinar.dev>"
 copyright = "2026, Furinar Dev"
 license-file = ["LICENSE", "0"]
 assets = [
@@ -41,6 +41,7 @@ souvlaki = "0.8"
 raw-window-handle = "0.6"
 self_update = { version = "0.41", features = ["archive-tar", "compression-flate2"] }
 semver = "1"
+reqwest = { version = "0.12", features = ["blocking", "json"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows = { version = "0.62", features = [

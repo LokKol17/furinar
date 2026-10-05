@@ -70,6 +70,11 @@ export component MainWindow inherits Window {
     in-out property <bool> atualizando: false;
     callback baixar_atualizacao();
 
+    // Fetch de letras
+    in-out property <bool> fetch_em_progresso: false;
+    in-out property <string> fetch_status: "";
+    callback buscar_letra_lrclib();
+
     // Altura de cada linha da playlist
     private property <length> altura_linha: 30px;
     private property <length> largura_aba: 150px;
@@ -528,6 +533,40 @@ export component MainWindow inherits Window {
                         text: I18n.no_lyrics;
                         color: Tema.texto_suave;
                         font-size: 13px;
+                        horizontal-alignment: center;
+                        wrap: word-wrap;
+                    }
+
+                    if !fetch_em_progresso : Rectangle {
+                        width: 140px;
+                        height: 32px;
+                        border-radius: 8px;
+                        background: Tema.oceano;
+
+                        TouchArea {
+                            clicked => { buscar_letra_lrclib(); }
+                        }
+
+                        Text {
+                            text: "Buscar letra online";
+                            color: #ffffff;
+                            font-size: 12px;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                    }
+
+                    if fetch_em_progresso : Text {
+                        text: "Buscando...";
+                        color: Tema.oceano;
+                        font-size: 12px;
+                        horizontal-alignment: center;
+                    }
+
+                    if fetch_status != "" : Text {
+                        text: fetch_status;
+                        color: Tema.dourado;
+                        font-size: 11px;
                         horizontal-alignment: center;
                         wrap: word-wrap;
                     }

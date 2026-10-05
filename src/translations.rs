@@ -35,6 +35,11 @@ pub fn pt_br() -> Translations {
     t.insert("shuffle_off", "Shuffle: Desl");
     t.insert("shuffle_on", "Shuffle: On");
     t.insert("shuffle_smart", "Shuffle: Inteligente");
+    t.insert("fetch_lyrics", "Buscar letra online");
+    t.insert("fetch_searching", "Buscando...");
+    t.insert("fetch_found", "Letra encontrada e salva!");
+    t.insert("fetch_not_found", "Letra não encontrada no LRCLIB.");
+    t.insert("fetch_instrumental", "Faixa instrumental detectada.");
     t
 }
 
@@ -71,6 +76,11 @@ pub fn en() -> Translations {
     t.insert("shuffle_off", "Shuffle: Off");
     t.insert("shuffle_on", "Shuffle: On");
     t.insert("shuffle_smart", "Shuffle: Smart");
+    t.insert("fetch_lyrics", "Fetch lyrics online");
+    t.insert("fetch_searching", "Searching...");
+    t.insert("fetch_found", "Lyrics found and saved!");
+    t.insert("fetch_not_found", "Lyrics not found on LRCLIB.");
+    t.insert("fetch_instrumental", "Instrumental track detected.");
     t
 }
 

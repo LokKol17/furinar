@@ -3,6 +3,7 @@
 
 slint::include_modules!();
 
+mod api_lrclib;
 mod translations;
 mod updates;
 
@@ -377,6 +378,8 @@ struct EstadoAudio {
     letra_janela_inicio: usize,
     faixa_controles: Option<String>,
     status_controles: Option<MediaPlayback>,
+    fetch_em_progresso: bool,
+    fetch_resultado: Option<String>,
 }
 
 impl Default for EstadoAudio {
@@ -405,6 +408,8 @@ impl Default for EstadoAudio {
             letra_janela_inicio: 0,
             faixa_controles: None,
             status_controles: None,
+            fetch_em_progresso: false,
+            fetch_resultado: None,
         }
     }
 }
@@ -2152,6 +2157,110 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         });
     }
+
+    // Busca de letra via LRCLIB
+    let fetch_resultado: Arc<Mutex<Option<(String, Option<PathBuf>, Option<f64>)>>> =
+        Arc::new(Mutex::new(None));
+    {
+        let estado = estado.clone();
+        let ui_fraca = ui.as_weak();
+        let fetch_resultado_cb = fetch_resultado.clone();
+        ui.on_buscar_letra_lrclib(move || {
+            let _ui = match ui_fraca.upgrade() {
+                Some(u) => u,
+                None => return,
+            };
+
+            // Extrair dados antes do spawn — Rc<RefCell<>> não é Send
+            let (titulo, artista, caminho, duracao) = {
+                let e = estado.borrow();
+                match e
+                    .pasta_reproducao
+                    .and_then(|pi| e.pastas.get(pi))
+                    .zip(e.indice_atual)
+                    .and_then(|(pasta, ti)| pasta.tracks.get(ti).map(|t| (pasta, t)))
+                {
+                    Some((pasta, track)) => {
+                        let caminho = pasta.caminho.join(&track.path);
+                        let duracao = {
+                            let opcoes = ParseOptions::new()
+                                .read_properties(true)
+                                .read_cover_art(false);
+                            Probe::open(&caminho)
+                                .ok()
+                                .and_then(|p| p.options(opcoes).read().ok())
+                                .map(|tagged| tagged.properties().duration().as_secs_f64())
+                                .unwrap_or(0.0)
+                        };
+                        (
+                            track.titulo.clone(),
+                            track.artista.clone().unwrap_or_default(),
+                            caminho,
+                            duracao,
+                        )
+                    }
+                    None => return,
+                }
+            };
+
+            {
+                let mut e = estado.borrow_mut();
+                e.fetch_em_progresso = true;
+            }
+
+            let fetch_resultado = fetch_resultado_cb.clone();
+            std::thread::spawn(move || {
+                let resultado = api_lrclib::get_lyrics(&titulo, &artista, None, duracao);
+
+                let msg = match resultado {
+                    Ok(Some(lrc)) => {
+                        if let Some(synced) = lrc.synced_lyrics {
+                            let lrc_path = caminho.with_extension("lrc");
+                            let _ = std::fs::write(&lrc_path, &synced);
+                            Some((
+                                "Letra encontrada e salva!".to_string(),
+                                Some(caminho),
+                                Some(duracao),
+                            ))
+                        } else if lrc.instrumental {
+                            Some(("Faixa instrumental detectada.".to_string(), None, None))
+                        } else {
+                            Some(("Letra não sincronizada encontrada.".to_string(), None, None))
+                        }
+                    }
+                    Ok(None) => Some(("Letra não encontrada no LRCLIB.".to_string(), None, None)),
+                    Err(_) => Some(("Erro ao buscar letra (rede).".to_string(), None, None)),
+                };
+                *fetch_resultado.lock().unwrap() = msg;
+            });
+        });
+    }
+
+    // Timer para processar resultados do fetch
+    let fetch_timer = Timer::default();
+    {
+        let estado = estado.clone();
+        let ui_weak = ui.as_weak();
+        let fetch_resultado = fetch_resultado.clone();
+        fetch_timer.start(TimerMode::Repeated, Duration::from_millis(250), move || {
+            let mut guard = fetch_resultado.lock().unwrap();
+            if let Some((msg, caminho, duracao)) = guard.take() {
+                if let Some(ui) = ui_weak.upgrade() {
+                    let mut e = estado.borrow_mut();
+                    e.fetch_em_progresso = false;
+                    e.fetch_resultado = Some(msg);
+                    if let (Some(c), Some(d)) = (caminho, duracao) {
+                        carregar_letra(&mut e, &ui, &c, d);
+                    }
+                    if let Some(ref m) = e.fetch_resultado {
+                        ui.set_fetch_status(m.clone().into());
+                    }
+                    ui.set_fetch_em_progresso(false);
+                }
+            }
+        });
+    }
+
     let update_timer = Timer::default();
     {
         let ui_weak = ui.as_weak();
