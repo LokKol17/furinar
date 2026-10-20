@@ -1970,6 +1970,32 @@ mod tests {
         amostras_nao_silenciosas(decodificador);
     }
 
+    /// O fallback de `aplicar_idioma` é a própria chave: uma chave que não
+    /// existe nas traduções aparece crua na UI. Lê o próprio fonte para pegar
+    /// toda chave pedida via `g("...")`.
+    #[test]
+    fn aplicar_idioma_so_usa_chaves_existentes() {
+        let fonte = include_str!("main.rs");
+        let inicio = fonte
+            .find("fn aplicar_idioma(")
+            .expect("aplicar_idioma deve existir");
+        let corpo = &fonte[inicio..];
+        let corpo = &corpo[..corpo.find("\n}\n").expect("fim de aplicar_idioma")];
+
+        let chaves: Vec<&str> = corpo
+            .split("g(\"")
+            .skip(1)
+            .filter_map(|resto| resto.split('"').next())
+            .collect();
+        assert!(!chaves.is_empty(), "nenhuma chave encontrada");
+
+        for (idioma, t) in [("pt-br", translations::pt_br()), ("en", translations::en())] {
+            for chave in &chaves {
+                assert!(t.contains_key(chave), "{idioma}: chave {chave} ausente");
+            }
+        }
+    }
+
     #[test]
     fn seek_com_player_preserva_tocando_ou_pausado() {
         assert_eq!(efeito_seek(true, true), EfeitoSeek::ManterEstado);

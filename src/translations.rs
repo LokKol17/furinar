@@ -16,8 +16,8 @@ pub fn pt_br() -> Translations {
     t.insert("search_placeholder", "Buscar por título ou artista...");
     t.insert("no_lyrics", "Sem letra disponível para esta faixa.");
     t.insert("config_title", "Configurações");
-    t.insert("theme_label_dark", "Tema: Escuro");
-    t.insert("theme_label_light", "Tema: Claro");
+    t.insert("theme_dark", "Tema: Escuro");
+    t.insert("theme_light", "Tema: Claro");
     t.insert("scan_subfolders", "Escaneia subpastas");
     t.insert(
         "scan_subfolders_desc",
@@ -52,8 +52,8 @@ pub fn en() -> Translations {
     t.insert("search_placeholder", "Search by title or artist...");
     t.insert("no_lyrics", "No lyrics available for this track.");
     t.insert("config_title", "Settings");
-    t.insert("theme_label_dark", "Theme: Dark");
-    t.insert("theme_label_light", "Theme: Light");
+    t.insert("theme_dark", "Theme: Dark");
+    t.insert("theme_light", "Theme: Light");
     t.insert("scan_subfolders", "Scan subfolders");
     t.insert(
         "scan_subfolders_desc",
