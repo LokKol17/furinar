@@ -18,7 +18,6 @@ use std::rc::Rc;
 use std::sync::mpsc::Sender;
 #[cfg(any(feature = "mpris", target_os = "windows"))]
 use std::sync::mpsc::{self, Receiver};
-use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use config::AppConfig;
@@ -160,7 +159,14 @@ struct PastaMusical {
 // ---------------------------------------------------------------------
 
 struct EstadoAudio {
-    audio_player: Option<(MixerDeviceSink, Player)>,
+    /// Saída de áudio do sistema. Aberta uma vez e reaproveitada entre seeks
+    /// e trocas de faixa: reabrir o dispositivo a cada vez recria o stream,
+    /// a thread e os buffers do backend. Só é fechada no stop.
+    saida: Option<MixerDeviceSink>,
+    audio_player: Option<Player>,
+    /// Faixa (caminho completo) cuja duração está em `duracao_total_secs`.
+    /// Evita varrer o MP3 inteiro de novo a cada seek.
+    duracao_de: Option<PathBuf>,
     tempo_decorrido: f64,
     /// Pastas abertas (abas), na ordem de exibição.
     pastas: Vec<PastaMusical>,
@@ -204,7 +210,9 @@ struct EstadoAudio {
 impl Default for EstadoAudio {
     fn default() -> Self {
         Self {
+            saida: None,
             audio_player: None,
+            duracao_de: None,
             tempo_decorrido: 0.0,
             pastas: Vec::new(),
             aba_visivel: 0,
@@ -500,7 +508,9 @@ fn executar_seek(estado: &mut EstadoAudio, ui: &MainWindow, alvo_secs: u64) {
     };
     let caminho_completo = pasta.join(&nome_arquivo);
 
-    estado.audio_player = None;
+    if let Some(antigo) = estado.audio_player.take() {
+        antigo.stop();
+    }
 
     let arquivo = match File::open(&caminho_completo) {
         Ok(a) => a,
@@ -510,11 +520,16 @@ fn executar_seek(estado: &mut EstadoAudio, ui: &MainWindow, alvo_secs: u64) {
         Ok(m) => m.len(),
         Err(_) => return,
     };
-    let stream = match DeviceSinkBuilder::open_default_sink() {
-        Ok(s) => s,
-        Err(_) => return,
+    if estado.saida.is_none() {
+        match DeviceSinkBuilder::open_default_sink() {
+            Ok(s) => estado.saida = Some(s),
+            Err(_) => return,
+        }
+    }
+    let Some(saida) = estado.saida.as_ref() else {
+        return;
     };
-    let sink = Player::connect_new(stream.mixer());
+    let sink = Player::connect_new(saida.mixer());
     sink.set_volume(estado.volume_atual);
 
     let extensao = caminho_completo
@@ -529,7 +544,10 @@ fn executar_seek(estado: &mut EstadoAudio, ui: &MainWindow, alvo_secs: u64) {
         Err(_) => return,
     };
 
-    let total_secs = if extensao == "mp3" {
+    // Seek na mesma faixa: a duração já é conhecida
+    let total_secs = if estado.duracao_de.as_ref() == Some(&caminho_completo) {
+        estado.duracao_total_secs
+    } else if extensao == "mp3" {
         mp3_duration::from_path(&caminho_completo)
             .map(|d| d.as_secs())
             .unwrap_or_else(|_| {
@@ -545,6 +563,7 @@ fn executar_seek(estado: &mut EstadoAudio, ui: &MainWindow, alvo_secs: u64) {
             .unwrap_or(0)
     };
     estado.duracao_total_secs = total_secs;
+    estado.duracao_de = Some(caminho_completo);
 
     sink.append(decodificador);
     if alvo_secs > 0 {
@@ -553,7 +572,7 @@ fn executar_seek(estado: &mut EstadoAudio, ui: &MainWindow, alvo_secs: u64) {
 
     estado.tempo_decorrido = alvo_secs as f64;
     estado.ultimo_segundo = alvo_secs;
-    estado.audio_player = Some((stream, sink));
+    estado.audio_player = Some(sink);
 
     ui.set_progresso(if total_secs > 0 {
         alvo_secs as f32 / total_secs as f32
@@ -637,18 +656,14 @@ fn efeito_seek(tem_player: bool, tem_faixa: bool) -> EfeitoSeek {
 /// Reposiciona a faixa mantendo o estado de pausa. `executar_seek` recria o
 /// player já tocando, então re-pausamos quando for o caso.
 fn seek_mantendo_pausa(estado: &mut EstadoAudio, ui: &MainWindow, alvo_secs: u64) {
-    let Some(estava_pausado) = estado
-        .audio_player
-        .as_ref()
-        .map(|(_, sink)| sink.is_paused())
-    else {
+    let Some(estava_pausado) = estado.audio_player.as_ref().map(|sink| sink.is_paused()) else {
         // Sem faixa carregada não há o que reposicionar
         return;
     };
 
     executar_seek(estado, ui, alvo_secs);
 
-    if estava_pausado && let Some((_, ref sink)) = estado.audio_player {
+    if estava_pausado && let Some(ref sink) = estado.audio_player {
         sink.pause();
         ui.set_texto_play_pause(texto_play(&translations::get_translations(&estado.idioma)).into());
         ui.set_tocando(false);
@@ -686,7 +701,7 @@ fn tocar_anterior(estado: &mut EstadoAudio, ui: &MainWindow) {
 }
 
 fn alternar_play_pause(estado: &EstadoAudio, ui: &MainWindow) {
-    if let Some((_, ref sink)) = estado.audio_player {
+    if let Some(ref sink) = estado.audio_player {
         let t = translations::get_translations(&estado.idioma);
         if sink.is_paused() {
             sink.play();
@@ -702,7 +717,7 @@ fn alternar_play_pause(estado: &EstadoAudio, ui: &MainWindow) {
 
 #[cfg(feature = "mpris")]
 fn pausar(estado: &EstadoAudio, ui: &MainWindow) {
-    if let Some((_, ref sink)) = estado.audio_player
+    if let Some(ref sink) = estado.audio_player
         && !sink.is_paused()
     {
         sink.pause();
@@ -713,7 +728,7 @@ fn pausar(estado: &EstadoAudio, ui: &MainWindow) {
 
 #[cfg(feature = "mpris")]
 fn reproduzir(estado: &EstadoAudio, ui: &MainWindow) {
-    if let Some((_, ref sink)) = estado.audio_player
+    if let Some(ref sink) = estado.audio_player
         && sink.is_paused()
     {
         sink.play();
@@ -726,6 +741,8 @@ fn reproduzir(estado: &EstadoAudio, ui: &MainWindow) {
 
 fn stop_music(estado: &mut EstadoAudio, ui: &MainWindow) {
     estado.audio_player = None;
+    // Parado não segura o dispositivo: sem stream aberto, sem thread de áudio
+    estado.saida = None;
     estado.tempo_decorrido = 0.0;
     estado.ultimo_segundo = 0;
     ui.set_progresso(0.0);
@@ -838,7 +855,7 @@ fn atualizar_progresso(estado: &mut EstadoAudio, ui: &MainWindow) {
     let total_secs = estado.duracao_total_secs;
 
     let terminou = match estado.audio_player {
-        Some((_, ref sink)) => sink.empty() && total_secs > 0,
+        Some(ref sink) => sink.empty() && total_secs > 0,
         None => false,
     };
     if terminou {
@@ -850,7 +867,7 @@ fn atualizar_progresso(estado: &mut EstadoAudio, ui: &MainWindow) {
     sincronizar_letra(estado, ui);
 
     let pausado = match estado.audio_player {
-        Some((_, ref sink)) => sink.is_paused(),
+        Some(ref sink) => sink.is_paused(),
         None => return,
     };
 
@@ -972,10 +989,9 @@ fn processar_eventos_multimidia(
                 let vol = v.clamp(0.0, 1.0) as f32;
                 estado.volume_atual = vol;
                 ui.set_volume(vol);
-                if let Some((_, ref sink)) = estado.audio_player {
+                if let Some(ref sink) = estado.audio_player {
                     sink.set_volume(vol);
                 }
-                salvar_configuracao(estado);
             }
             _ => {}
         }
@@ -1014,10 +1030,10 @@ fn sincronizar_controles(controles: &Rc<RefCell<Option<MediaControls>>>, estado:
     // Status: atualiza quando muda (a cada segundo ou em play/pause/stop)
     let progresso = MediaPosition(Duration::from_secs(estado.ultimo_segundo));
     let playback = match &estado.audio_player {
-        Some((_, sink)) if !sink.is_paused() => MediaPlayback::Playing {
+        Some(sink) if !sink.is_paused() => MediaPlayback::Playing {
             progress: Some(progresso),
         },
-        Some((_, _)) => MediaPlayback::Paused {
+        Some(_) => MediaPlayback::Paused {
             progress: Some(progresso),
         },
         None => MediaPlayback::Stopped,
@@ -1302,7 +1318,7 @@ fn processar_eventos_taskbar(rx: &Receiver<u32>, estado: &mut EstadoAudio, ui: &
 #[cfg(target_os = "windows")]
 fn atualizar_icone_taskbar(botoes: &Rc<RefCell<Option<BotoesTaskbar>>>, estado: &EstadoAudio) {
     let pausado = match &estado.audio_player {
-        Some((_, sink)) => sink.is_paused(),
+        Some(sink) => sink.is_paused(),
         // Parado: o botão oferece "tocar"
         None => true,
     };
@@ -1342,6 +1358,14 @@ fn arredondar_cantos(_ui: &MainWindow) {}
 // ---------------------------------------------------------------------
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // A glibc cria uma arena de malloc por thread (áudio, D-Bus, update...), e
+    // a memória livre de cada uma não volta para o SO. Duas bastam aqui.
+    #[cfg(all(target_os = "linux", target_env = "gnu"))]
+    // SAFETY: só ajusta um parâmetro do alocador, antes de qualquer thread
+    unsafe {
+        libc::mallopt(libc::M_ARENA_MAX, 2);
+    }
+
     // Canal dos cliques nos botões da miniatura da taskbar
     #[cfg(target_os = "windows")]
     let (tx_taskbar, rx_taskbar) = mpsc::channel::<u32>();
@@ -1652,10 +1676,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ui.on_volume_mudou(move |v| {
             let mut e = estado.borrow_mut();
             e.volume_atual = v;
-            if let Some((_, ref sink)) = e.audio_player {
+            if let Some(ref sink) = e.audio_player {
                 sink.set_volume(v);
             }
-            salvar_configuracao(&e);
+            // Sem salvar aqui: o slider dispara a cada pixel arrastado, e o
+            // save ao fechar a janela já persiste o volume.
         });
     }
 
@@ -1830,57 +1855,50 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
     }
 
-    // Check for updates on startup — spawn a background thread, then use
-    // a polling timer on the main thread to push data into the UI.
-    let update_result: Arc<Mutex<Option<updates::UpdateInfo>>> = Arc::new(Mutex::new(None));
+    // Checagem de update em segundo plano. A thread entrega o resultado
+    // direto no event loop (`upgrade_in_event_loop`), sem timer de polling.
     {
-        let update_result = update_result.clone();
+        let ui_fraca = ui.as_weak();
         std::thread::spawn(move || {
-            if let Some(info) = updates::check_for_update() {
-                *update_result.lock().unwrap() = Some(info);
+            let atualizacao = updates::check_for_update();
+            // A checagem desserializa a lista inteira de releases e sobe um
+            // runtime HTTP; devolve ao SO o heap que sobrou livre disso.
+            #[cfg(all(target_os = "linux", target_env = "gnu"))]
+            // SAFETY: malloc_trim só libera páginas livres do alocador
+            unsafe {
+                libc::malloc_trim(0);
             }
-        });
-    }
-    let update_timer = Timer::default();
-    {
-        let ui_weak = ui.as_weak();
-        let update_result = update_result.clone();
-        update_timer.start(TimerMode::Repeated, Duration::from_millis(250), move || {
-            let mut guard = update_result.lock().unwrap();
-            if let Some(info) = guard.take()
-                && let Some(ui) = ui_weak.upgrade()
-            {
-                ui.set_update_versao(info.version.into());
-                ui.set_update_descricao(info.body.into());
-                ui.set_update_disponivel(true);
+            if let Some(info) = atualizacao {
+                let _ = ui_fraca.upgrade_in_event_loop(move |ui| {
+                    ui.set_update_versao(info.version.into());
+                    ui.set_update_descricao(info.body.into());
+                    ui.set_update_disponivel(true);
+                });
             }
         });
     }
 
-    // Wire up the update download callback
     {
-        let ui_weak = ui.as_weak();
-        let update_result = update_result.clone();
+        let ui_fraca = ui.as_weak();
         ui.on_baixar_atualizacao(move || {
-            if let Some(ui) = ui_weak.upgrade() {
+            if let Some(ui) = ui_fraca.upgrade() {
                 ui.set_atualizando(true);
-                let ui_weak2 = ui.as_weak();
-                let update_result2 = update_result.clone();
+                let ui_fraca = ui.as_weak();
                 std::thread::spawn(move || {
-                    let result = updates::perform_update();
-                    if let Some(ui) = ui_weak2.upgrade() {
+                    // O erro vira texto: `Box<dyn Error>` não é `Send`
+                    let resultado = updates::perform_update().map_err(|e| e.to_string());
+                    // `upgrade()` só funciona na thread da UI: fora dela
+                    // devolve sempre `None` e o "baixando" nunca sumia.
+                    let _ = ui_fraca.upgrade_in_event_loop(move |ui| {
                         ui.set_atualizando(false);
-                        match result {
+                        match resultado {
                             Ok(()) => {
                                 ui.set_update_disponivel(false);
                                 println!("Update complete! Please restart Furinar.");
                             }
-                            Err(e) => {
-                                eprintln!("Update failed: {e}");
-                            }
+                            Err(e) => eprintln!("Update failed: {e}"),
                         }
-                    }
-                    drop(update_result2);
+                    });
                 });
             }
         });

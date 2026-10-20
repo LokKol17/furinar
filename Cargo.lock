@@ -1541,6 +1541,7 @@ name = "furinar"
 version = "1.5.3"
 dependencies = [
  "image",
+ "libc",
  "lofty",
  "mp3-duration",
  "rand 0.8.8",

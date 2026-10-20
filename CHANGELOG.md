@@ -7,6 +7,17 @@ e o projeto adere ao [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Alterado
+- Perfil de release com LTO, `codegen-units = 1` e `strip`: ~2 MB a menos de RSS
+- A saída de áudio é aberta uma vez e reaproveitada entre seeks e trocas de faixa (antes era reaberta a cada seek)
+- A duração do MP3 é calculada uma vez por faixa, não a cada seek (o cálculo varre o arquivo inteiro)
+- O resultado da checagem de update chega direto no event loop; sai o timer que acordava a cada 250 ms durante toda a execução
+- O volume não é mais gravado no config a cada evento do slider; é salvo ao fechar
+- Linux (glibc): no máximo 2 arenas de malloc e `malloc_trim` depois da checagem de update
+
+### Corrigido
+- O estado "baixando" da atualização nunca era limpo: a thread de download chamava `upgrade()` fora da thread da UI
+
 ## [1.5.3] — 2026-09-23
 
 ### Adicionado

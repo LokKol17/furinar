@@ -51,6 +51,8 @@ mp3-duration = "0.1"
 rand = "0.8"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+# Fica no use_dbus padrão: o backend use_zbus abre conexão própria (+2 threads)
+# e mantém uma thread acordando mesmo com o player pausado.
 souvlaki = { version = "0.8", optional = true }
 raw-window-handle = "0.6"
 # default-features = false: pula o "reqwest/default-tls" (native-tls/openssl),
@@ -74,6 +76,10 @@ windows = { version = "0.62", features = [
     "Win32_UI_Shell",
     "Win32_UI_WindowsAndMessaging",
 ] }
+
+[target.'cfg(all(target_os = "linux", target_env = "gnu"))'.dependencies]
+# mallopt/malloc_trim: segura o número de arenas e devolve heap livre ao SO
+libc = "0.2"
 
 [build-dependencies]
 slint-build = "1"
