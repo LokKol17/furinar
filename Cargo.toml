@@ -82,3 +82,12 @@ image = { version = "0.25", default-features = false, features = ["png", "ico"] 
 
 [target.'cfg(target_os = "windows")'.build-dependencies]
 tauri-winres = "0.3"
+
+# LTO + codegen-units=1 encolhem o .text, e com ele as páginas do binário que
+# entram no RSS. panic fica como unwind: um panic numa thread de áudio não
+# pode derrubar o player inteiro.
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+strip = true
