@@ -1,10 +1,11 @@
-//! Painel da biblioteca no modo imersivo: lista da aba visível e a fila
-//! "a seguir", com miniaturas de capa.
+//! Painel da biblioteca no modo imersivo: lista da aba visível, a fila
+//! "a seguir" e a grade de álbuns, com miniaturas de capa.
 //!
 //! A lista é virtualizada à mão: a UI recebe só uma janela de linhas ao redor
-//! do trecho visível e avisa quando rola (`rolou`). Miniaturas existem só para
-//! as linhas da janela e da fila; o resto fica no cache em disco. O painel
-//! inteiro só existe enquanto está aberto.
+//! do trecho visível e avisa quando rola (`rolou`). A grade recebe todos os
+//! cartões (são poucos), mas só os à vista ganham imagem. Miniaturas existem
+//! só para o que está na janela, na fila e na grade à vista; o resto fica no
+//! cache em disco. O painel inteiro só existe enquanto está aberto.
 
 use std::collections::{HashMap, HashSet};
 use std::ops::Range;
@@ -14,10 +15,14 @@ use std::rc::Rc;
 use slint::{Image, Model, ModelRc, VecModel};
 
 use crate::miniaturas::Carregador;
-use crate::{LinhaPainel, MainWindow};
+use crate::track::GrupoAlbum;
+use crate::translations::Translations;
+use crate::{CartaoAlbum, LinhaPainel, MainWindow};
 
 /// Linhas carregadas além das visíveis, acima e abaixo.
 const MARGEM: usize = 15;
+/// Guia da grade de álbuns (0 = biblioteca, 1 = a seguir).
+pub const GUIA_ALBUNS: i32 = 2;
 
 /// O que o painel precisa saber de uma faixa da lista.
 pub struct Item {
@@ -26,12 +31,15 @@ pub struct Item {
     pub indice: usize,
     pub titulo: String,
     pub artista: Option<String>,
+    pub album: Option<String>,
+    /// Segundos (0 = desconhecida).
+    pub duracao: u32,
     pub tocando: bool,
+    pub favorita: bool,
 }
 
+/// Miniatura de uma faixa.
 struct Info {
-    album: Option<String>,
-    duracao: Option<u64>,
     capa: Option<Image>,
     /// Tem capa (no cache); a imagem pode ter sido solta por estar longe.
     tem_capa: bool,
@@ -49,14 +57,24 @@ pub struct Painel {
     linhas: Rc<VecModel<LinhaPainel>>,
     fila: Vec<Item>,
     linhas_fila: Rc<VecModel<LinhaPainel>>,
+    /// Grade de álbuns à vista (guia aberta).
+    mostrando_albuns: bool,
+    albuns: Vec<GrupoAlbum>,
+    /// De onde vem a capa de cada álbum (a primeira faixa).
+    capas_albuns: Vec<Option<PathBuf>>,
+    /// Cartões à vista, como a UI informou.
+    albuns_visiveis: Range<usize>,
+    cartoes: Rc<VecModel<CartaoAlbum>>,
 }
 
 impl Painel {
     pub fn novo(ui: &MainWindow) -> Self {
         let linhas = Rc::new(VecModel::default());
         let linhas_fila = Rc::new(VecModel::default());
+        let cartoes = Rc::new(VecModel::default());
         ui.set_imv_painel_linhas(ModelRc::from(linhas.clone()));
         ui.set_imv_fila(ModelRc::from(linhas_fila.clone()));
+        ui.set_imv_albuns(ModelRc::from(cartoes.clone()));
         Self {
             carregador: Carregador::novo(),
             infos: HashMap::new(),
@@ -67,6 +85,11 @@ impl Painel {
             linhas,
             fila: Vec::new(),
             linhas_fila,
+            mostrando_albuns: false,
+            albuns: Vec::new(),
+            capas_albuns: Vec::new(),
+            albuns_visiveis: 0..12,
+            cartoes,
         }
     }
 
@@ -110,57 +133,174 @@ impl Painel {
         self.pedir_faltantes();
     }
 
+    pub fn mostrando_albuns(&self) -> bool {
+        self.mostrando_albuns
+    }
+
+    /// Abre ou fecha a grade. Fechada, solta os cartões.
+    pub fn mostrar_albuns(&mut self, mostrar: bool) {
+        self.mostrando_albuns = mostrar;
+        if !mostrar {
+            self.albuns.clear();
+            self.capas_albuns.clear();
+            self.cartoes.set_vec(Vec::new());
+            self.pedir_faltantes();
+        }
+    }
+
+    /// Troca os álbuns da grade. `capa_de(i)` dá o arquivo da faixa `i`.
+    pub fn publicar_albuns(
+        &mut self,
+        grupos: Vec<GrupoAlbum>,
+        lang: &Translations,
+        capa_de: impl Fn(usize) -> Option<PathBuf>,
+    ) {
+        if grupos == self.albuns {
+            return;
+        }
+        self.capas_albuns = grupos
+            .iter()
+            .map(|g| g.faixas.first().and_then(|&i| capa_de(i)))
+            .collect();
+        let cartoes: Vec<CartaoAlbum> = grupos
+            .iter()
+            .enumerate()
+            .map(|(i, g)| self.cartao(i, g, lang))
+            .collect();
+        self.albuns = grupos;
+        self.cartoes.set_vec(cartoes);
+        self.pedir_faltantes();
+    }
+
+    /// A grade rolou: `quantos` cartões à vista a partir de `primeiro`.
+    pub fn albuns_rolou(&mut self, primeiro: usize, quantos: usize) {
+        let novo = primeiro..primeiro + quantos;
+        if novo == self.albuns_visiveis {
+            return;
+        }
+        self.albuns_visiveis = novo;
+        self.pedir_faltantes();
+        self.atualizar_cartoes();
+    }
+
+    pub fn album(&self, posicao: usize) -> Option<&GrupoAlbum> {
+        self.albuns.get(posicao)
+    }
+
     /// Chamado pelo timer do modo: aplica as miniaturas que chegaram.
     pub fn tick(&mut self) {
         let chegadas: Vec<_> = self.carregador.recebidos().collect();
         if chegadas.is_empty() {
             return;
         }
-        for (caminho, meta) in chegadas {
-            let tem_capa = meta.capa.is_some();
+        for (caminho, capa) in chegadas {
             self.infos.insert(
                 caminho,
                 Info {
-                    album: meta.album,
-                    duracao: meta.duracao,
-                    capa: meta.capa.map(Image::from_rgba8),
-                    tem_capa,
+                    tem_capa: capa.is_some(),
+                    capa: capa.map(Image::from_rgba8),
                 },
             );
         }
         atualizar_linhas(&self.linhas, &self.janela, &self.infos);
         atualizar_linhas(&self.linhas_fila, &self.fila, &self.infos);
+        self.atualizar_cartoes();
     }
 
     fn linha(&self, item: &Item) -> LinhaPainel {
         linha(item, self.infos.get(&item.caminho))
     }
 
-    /// Pede ao carregador o que falta na janela e na fila (visíveis primeiro)
-    /// e solta as miniaturas de quem saiu delas.
+    fn cartao(&self, i: usize, g: &GrupoAlbum, lang: &Translations) -> CartaoAlbum {
+        let t = |k: &str| lang.get(k).copied().unwrap_or("").to_string();
+        let artista = if g.varios {
+            Some(t("various_artists"))
+        } else {
+            g.artista.clone()
+        };
+        let n = g.faixas.len();
+        let faixas = format!(
+            "{n} {}",
+            t(if n == 1 {
+                "album_track"
+            } else {
+                "album_tracks"
+            })
+        );
+        let detalhe = match artista {
+            Some(a) => format!("{a} • {faixas}"),
+            None => faixas,
+        };
+        let nome = if g.nome.is_empty() {
+            t("no_album")
+        } else {
+            g.nome.clone()
+        };
+        let capa = self.capa_do_album(i);
+        CartaoAlbum {
+            nome: nome.into(),
+            detalhe: detalhe.into(),
+            tem_capa: capa.is_some(),
+            capa: capa.unwrap_or_default(),
+        }
+    }
+
+    /// Imagem do cartão `i`, só se ele está à vista.
+    fn capa_do_album(&self, i: usize) -> Option<Image> {
+        if !self.albuns_visiveis.contains(&i) {
+            return None;
+        }
+        let caminho = self.capas_albuns.get(i)?.as_ref()?;
+        self.infos.get(caminho)?.capa.clone()
+    }
+
+    fn atualizar_cartoes(&self) {
+        for i in 0..self.cartoes.row_count() {
+            let Some(mut c) = self.cartoes.row_data(i) else {
+                continue;
+            };
+            let capa = self.capa_do_album(i);
+            if c.tem_capa != capa.is_some() || capa.as_ref().is_some_and(|img| *img != c.capa) {
+                c.tem_capa = capa.is_some();
+                c.capa = capa.unwrap_or_default();
+                self.cartoes.set_row_data(i, c);
+            }
+        }
+    }
+
+    /// Pede ao carregador o que falta (visíveis primeiro, depois a fila, a
+    /// grade e a margem) e solta as miniaturas de quem saiu de vista.
     fn pedir_faltantes(&mut self) {
         let visiveis = intervalo(self.visivel, self.total, 0);
         let (perto, longe): (Vec<_>, Vec<_>) = (self.primeira..)
             .zip(&self.janela)
             .partition(|(pos, _)| visiveis.contains(pos));
+        let albuns = self
+            .capas_albuns
+            .get(self.albuns_visiveis.start.min(self.capas_albuns.len())..)
+            .unwrap_or_default()
+            .iter()
+            .take(self.albuns_visiveis.len())
+            .flatten();
         let ordem = perto
             .into_iter()
-            .map(|(_, i)| i)
-            .chain(&self.fila)
-            .chain(longe.into_iter().map(|(_, i)| i));
+            .map(|(_, i)| &i.caminho)
+            .chain(self.fila.iter().map(|i| &i.caminho))
+            .chain(albuns)
+            .chain(longe.into_iter().map(|(_, i)| &i.caminho));
 
         let mut vistos = HashSet::new();
         let mut pedidos = Vec::new();
-        for item in ordem {
-            if !vistos.insert(&item.caminho) {
+        for caminho in ordem {
+            if !vistos.insert(caminho) {
                 continue;
             }
-            let falta = match self.infos.get(&item.caminho) {
+            let falta = match self.infos.get(caminho) {
                 None => true,
                 Some(info) => info.tem_capa && info.capa.is_none(),
             };
             if falta {
-                pedidos.push(item.caminho.clone());
+                pedidos.push(caminho.clone());
             }
         }
         self.carregador.pedir(pedidos);
@@ -181,16 +321,15 @@ fn intervalo((primeira, quantas): (usize, usize), total: usize, margem: usize) -
 }
 
 fn linha(item: &Item, info: Option<&Info>) -> LinhaPainel {
-    let album = info.and_then(|i| i.album.as_deref());
-    let detalhe = [item.artista.as_deref(), album]
+    let detalhe = [item.artista.as_deref(), item.album.as_deref()]
         .into_iter()
         .flatten()
         .collect::<Vec<_>>()
         .join(" • ");
-    let duracao = info
-        .and_then(|i| i.duracao)
-        .map(|s| crate::formatar_tempo(s, s >= 3600))
-        .unwrap_or_default();
+    let duracao = match item.duracao as u64 {
+        0 => String::new(),
+        s => crate::formatar_tempo(s, s >= 3600),
+    };
     let capa = info.and_then(|i| i.capa.clone());
     LinhaPainel {
         titulo: item.titulo.as_str().into(),
@@ -199,6 +338,7 @@ fn linha(item: &Item, info: Option<&Info>) -> LinhaPainel {
         tem_capa: capa.is_some(),
         capa: capa.unwrap_or_default(),
         tocando: item.tocando,
+        favorita: item.favorita,
     }
 }
 
@@ -219,8 +359,10 @@ fn atualizar_linhas(
 pub fn limpar_ui(ui: &MainWindow) {
     ui.set_imv_painel_linhas(ModelRc::default());
     ui.set_imv_fila(ModelRc::default());
+    ui.set_imv_albuns(ModelRc::default());
     ui.set_imv_painel_total(0);
     ui.set_imv_painel_primeira(0);
+    ui.set_imv_guia(0);
 }
 
 #[cfg(test)]
@@ -238,24 +380,23 @@ mod tests {
 
     #[test]
     fn linha_junta_artista_e_album() {
-        let item = Item {
+        let mut item = Item {
             caminho: "a.mp3".into(),
             indice: 0,
             titulo: "Faixa".into(),
             artista: Some("Banda".into()),
-            tocando: true,
-        };
-        let info = Info {
             album: Some("Disco".into()),
-            duracao: Some(201),
-            capa: None,
-            tem_capa: false,
+            duracao: 201,
+            tocando: true,
+            favorita: true,
         };
-        let l = linha(&item, Some(&info));
+        let l = linha(&item, None);
         assert_eq!(l.detalhe, "Banda • Disco");
         assert_eq!(l.duracao, "03:21");
-        assert!(l.tocando && !l.tem_capa);
-        // Antes dos metadados chegarem: só o artista, sem duração
+        assert!(l.tocando && l.favorita && !l.tem_capa);
+        // Sem álbum nem duração: só o artista
+        item.album = None;
+        item.duracao = 0;
         let l = linha(&item, None);
         assert_eq!((l.detalhe.as_str(), l.duracao.as_str()), ("Banda", ""));
     }

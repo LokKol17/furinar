@@ -3,6 +3,7 @@
 
 slint::include_modules!();
 
+mod biblioteca;
 mod capa;
 mod config;
 mod fundo;
@@ -13,14 +14,16 @@ mod miniaturas;
 mod painel;
 mod sono;
 mod track;
+mod transicao;
 mod translations;
 mod updates;
 mod visualizador;
 
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::BufReader;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
 #[cfg(feature = "mpris")]
 use std::sync::mpsc::Sender;
@@ -28,6 +31,7 @@ use std::sync::mpsc::Sender;
 use std::sync::mpsc::{self, Receiver};
 use std::time::{Duration, Instant};
 
+use biblioteca::{Biblioteca, chave_faixa};
 use config::AppConfig;
 use lrc::{caminho_lrc, indice_letra, janela_letra, parse_lrc};
 use rand::seq::SliceRandom;
@@ -42,7 +46,7 @@ use souvlaki::{
     SeekDirection,
 };
 use track::{
-    TrackInfo, coletar_arquivos_audio, filtro_efetivo, nome_da_pasta, ordem_filtrada,
+    Ordem, TrackInfo, coletar_arquivos_audio, filtro_efetivo, nome_da_pasta, ordem_filtrada,
     texto_exibicao,
 };
 #[cfg(target_os = "windows")]
@@ -135,6 +139,23 @@ fn aplicar_idioma(idioma: &str, ui: &MainWindow) {
     i18n.set_up_next_empty(g("up_next_empty"));
     i18n.set_tip_lyrics_only(g("tip_lyrics_only"));
     i18n.set_tip_sleep(g("tip_sleep"));
+    i18n.set_tip_sort(g("tip_sort"));
+    i18n.set_tip_favorite(g("tip_favorite"));
+    i18n.set_sort_default(g("sort_default"));
+    i18n.set_sort_title(g("sort_title"));
+    i18n.set_sort_artist(g("sort_artist"));
+    i18n.set_sort_album(g("sort_album"));
+    i18n.set_sort_duration(g("sort_duration"));
+    i18n.set_sort_added(g("sort_added"));
+    i18n.set_sort_plays(g("sort_plays"));
+    i18n.set_albums(g("albums"));
+    i18n.set_albums_empty(g("albums_empty"));
+    i18n.set_up_next_preview(g("up_next_preview"));
+    i18n.set_replaygain(g("replaygain"));
+    i18n.set_replaygain_desc(g("replaygain_desc"));
+    i18n.set_reactive_bg(g("reactive_bg"));
+    i18n.set_favorites_empty(g("favorites_empty"));
+    i18n.set_most_played_empty(g("most_played_empty"));
     i18n.set_bg_label(g("bg_label"));
     i18n.set_bg_choose(g("bg_choose"));
     i18n.set_bg_clear(g("bg_clear"));
@@ -164,15 +185,102 @@ fn aplicar_idioma(idioma: &str, ui: &MainWindow) {
 // Pastas (abas)
 // ---------------------------------------------------------------------
 
-/// Uma pasta de música aberta pelo usuário, com as faixas já escaneadas.
+/// Chaves das listas especiais na config (caminho de pasta nunca começa
+/// com `:`).
+const CHAVE_FAVORITAS: &str = ":favoritas";
+const CHAVE_MAIS_TOCADAS: &str = ":mais_tocadas";
+/// As listas especiais ocupam as primeiras posições de `pastas`, nesta ordem.
+const POS_FAVORITAS: usize = 0;
+const POS_MAIS_TOCADAS: usize = 1;
+const ESPECIAIS: usize = 2;
+
+#[derive(Clone, PartialEq)]
+enum Tipo {
+    Pasta,
+    Favoritas,
+    MaisTocadas,
+    /// Aba temporária com um álbum, aberta pela grade do modo imersivo. Não
+    /// é salva; `origem` é a lista de onde ele saiu.
+    Album {
+        origem: String,
+    },
+}
+
+/// Uma aba: pasta de música aberta pelo usuário ou lista especial. Nas
+/// especiais `caminho` é vazio e cada faixa guarda o caminho absoluto.
 struct PastaMusical {
     caminho: PathBuf,
     /// Nome de exibição na aba (último componente do caminho).
     nome: String,
     tracks: Vec<TrackInfo>,
     /// Se as faixas já foram escaneadas. O scan é preguiçoso: pastas abertas
-    /// mas nunca visitadas ficam sem `tracks` até serem necessárias.
+    /// mas nunca visitadas ficam sem `tracks` até serem necessárias. Nas
+    /// especiais, `false` pede para remontar a lista.
     carregada: bool,
+    tipo: Tipo,
+    ordem: Ordem,
+}
+
+impl PastaMusical {
+    fn pasta(caminho: PathBuf) -> Self {
+        Self {
+            nome: nome_da_pasta(&caminho),
+            caminho,
+            tracks: Vec::new(),
+            carregada: false,
+            tipo: Tipo::Pasta,
+            ordem: Ordem::Padrao,
+        }
+    }
+
+    fn especial(tipo: Tipo, ordem: Ordem) -> Self {
+        Self {
+            caminho: PathBuf::new(),
+            nome: String::new(),
+            tracks: Vec::new(),
+            carregada: false,
+            tipo,
+            ordem,
+        }
+    }
+
+    /// Identidade da lista na config.
+    fn chave(&self) -> String {
+        match &self.tipo {
+            Tipo::Pasta => self.caminho.to_string_lossy().to_string(),
+            Tipo::Favoritas => CHAVE_FAVORITAS.to_string(),
+            Tipo::MaisTocadas => CHAVE_MAIS_TOCADAS.to_string(),
+            Tipo::Album { origem } => origem.clone(),
+        }
+    }
+
+    fn caminho_faixa(&self, indice: usize) -> Option<PathBuf> {
+        Some(self.caminho.join(&self.tracks.get(indice)?.path))
+    }
+
+    fn chave_faixa(&self, indice: usize) -> Option<String> {
+        Some(chave_faixa(&self.caminho, &self.tracks.get(indice)?.path))
+    }
+
+    /// Pasta onde procurar fundo do modo imersivo: a da aba, ou a da própria
+    /// faixa nas listas especiais.
+    fn raiz_da_faixa(&self, indice: usize) -> PathBuf {
+        if self.tipo == Tipo::Pasta {
+            return self.caminho.clone();
+        }
+        self.caminho_faixa(indice)
+            .and_then(|c| c.parent().map(PathBuf::from))
+            .unwrap_or_default()
+    }
+}
+
+/// Faixa da próxima música já carregada no player (gapless): começa sozinha
+/// quando a atual acabar.
+struct Engatilhada {
+    pasta: usize,
+    indice: usize,
+    duracao: u64,
+    controle: transicao::Controle,
 }
 
 // ---------------------------------------------------------------------
@@ -215,6 +323,22 @@ struct EstadoAudio {
     sorteio: Vec<usize>,
     /// Temporizador de sono ligado.
     sono: Option<sono::Sono>,
+    /// Favoritas e contagem de reproduções.
+    biblioteca: Biblioteca,
+    /// A faixa atual já contou uma reprodução.
+    contada: bool,
+    /// Próxima faixa já na fila do player (gapless).
+    engatilhada: Option<Engatilhada>,
+    /// A transição para a próxima já foi preparada (ou tentada) nesta faixa.
+    transicao_feita: bool,
+    /// Faixa anterior sumindo no crossfade, até acabar.
+    saindo: Option<Player>,
+    /// Pede o fade-out da faixa atual.
+    controle: transicao::Controle,
+    /// Segundos de crossfade (0 = só gapless).
+    crossfade: u8,
+    replaygain: bool,
+    fundo_reativo: bool,
     escanear_subpastas: bool,
     tema_claro: bool,
     idioma: String,
@@ -224,6 +348,8 @@ struct EstadoAudio {
     filtro: String,
     /// Letra sincronizada da faixa atual (tempo em segundos, texto), ordenada.
     letra_atual: Vec<(f64, String)>,
+    /// A letra atual não tem tempos (veio da tag sem sincronia).
+    letra_livre: bool,
     /// Índice da linha da letra exibida (-1 = antes da primeira).
     letra_indice: i32,
     /// Índice absoluto da primeira linha do recorte que está na UI. Serve para
@@ -260,12 +386,22 @@ impl Default for EstadoAudio {
             sacola_shuffle: Vec::new(),
             sorteio: Vec::new(),
             sono: None,
+            biblioteca: Biblioteca::default(),
+            contada: false,
+            engatilhada: None,
+            transicao_feita: false,
+            saindo: None,
+            controle: transicao::Controle::default(),
+            crossfade: 0,
+            replaygain: true,
+            fundo_reativo: true,
             escanear_subpastas: false,
             tema_claro: false,
             idioma: "pt-br".to_string(),
             indices_visiveis: Vec::new(),
             filtro: String::new(),
             letra_atual: Vec::new(),
+            letra_livre: false,
             letra_indice: -1,
             letra_janela_inicio: 0,
             imersivo: None,
@@ -278,16 +414,53 @@ impl Default for EstadoAudio {
     }
 }
 
+/// Quantas próximas do shuffle vão para a config (a sacola inteira do
+/// inteligente pode ter milhares).
+const FILA_SALVA: usize = 50;
+
 fn salvar_configuracao(estado: &EstadoAudio) {
+    let lista = |i: usize| estado.pastas.get(i).map(PastaMusical::chave);
+    let reproducao = estado.pasta_reproducao.and_then(|i| estado.pastas.get(i));
+    let faixa_salva =
+        reproducao.and_then(|p| Some(chave_faixa(&p.caminho, estado.arquivo_atual.as_deref()?)));
+    let proximas: Vec<usize> = match estado.modo_shuffle {
+        2 => estado
+            .sacola_shuffle
+            .iter()
+            .rev()
+            .take(FILA_SALVA)
+            .copied()
+            .collect(),
+        1 => estado.sorteio.clone(),
+        _ => Vec::new(),
+    };
+    let fila_shuffle = reproducao
+        .map(|p| proximas.iter().filter_map(|&i| p.chave_faixa(i)).collect())
+        .unwrap_or_default();
     let config = AppConfig {
         pasta: None,
         pastas: estado
             .pastas
             .iter()
+            .filter(|p| p.tipo == Tipo::Pasta)
             .map(|p| p.caminho.to_string_lossy().to_string())
             .collect(),
-        aba_visivel_salva: estado.aba_visivel,
-        pasta_reproducao_salva: estado.pasta_reproducao,
+        aba_visivel_salva: 0,
+        pasta_reproducao_salva: None,
+        indice_atual: None,
+        aba_salva: lista(estado.aba_visivel),
+        lista_salva: estado.pasta_reproducao.and_then(lista),
+        faixa_salva,
+        fila_shuffle,
+        ordens: estado
+            .pastas
+            .iter()
+            .filter(|p| p.ordem != Ordem::Padrao && !matches!(p.tipo, Tipo::Album { .. }))
+            .map(|p| (p.chave(), p.ordem.indice() as u8))
+            .collect(),
+        crossfade: estado.crossfade,
+        replaygain: estado.replaygain,
+        fundo_reativo: estado.fundo_reativo,
         volume: estado.volume_atual,
         modo_loop: estado.modo_loop,
         shuffle: false,
@@ -299,7 +472,6 @@ fn salvar_configuracao(estado: &EstadoAudio) {
             .fundo_global
             .as_ref()
             .map(|p| p.to_string_lossy().to_string()),
-        indice_atual: estado.indice_atual,
         tempo_atual: if estado.tempo_decorrido > 0.0 {
             Some(estado.tempo_decorrido as u64)
         } else {
@@ -326,20 +498,29 @@ fn atualizar_selecao_visivel(estado: &EstadoAudio, ui: &MainWindow) {
 
 /// Reconstrói a lista da aba visível aplicando o filtro e atualiza a seleção.
 fn atualizar_lista(estado: &mut EstadoAudio, ui: &MainWindow) {
-    let (indices, modelo) = match estado.pastas.get(estado.aba_visivel) {
-        Some(pasta) => {
-            let indices = ordem_filtrada(&pasta.tracks, &estado.filtro);
-            let modelo: Vec<SharedString> = indices
-                .iter()
-                .map(|&i| texto_exibicao(&pasta.tracks[i]).into())
-                .collect();
-            (indices, modelo)
-        }
-        None => (Vec::new(), Vec::new()),
+    let indices = ordem_lista(estado, estado.aba_visivel, &estado.filtro);
+    let modelo: Vec<LinhaLista> = match estado.pastas.get(estado.aba_visivel) {
+        Some(pasta) => indices
+            .iter()
+            .map(|&i| LinhaLista {
+                texto: texto_exibicao(&pasta.tracks[i]).into(),
+                favorita: pasta
+                    .chave_faixa(i)
+                    .is_some_and(|k| estado.biblioteca.e_favorita(&k)),
+            })
+            .collect(),
+        None => Vec::new(),
     };
 
     estado.indices_visiveis = indices;
     ui.set_musicas(ModelRc::new(VecModel::from(modelo)));
+    ui.set_ordem_atual(
+        estado
+            .pastas
+            .get(estado.aba_visivel)
+            .map_or(0, |p| p.ordem.indice() as i32),
+    );
+    atualizar_favorita_atual(estado, ui);
 
     atualizar_selecao_visivel(estado, ui);
     atualizar_painel(estado, ui);
@@ -349,10 +530,15 @@ fn atualizar_lista(estado: &mut EstadoAudio, ui: &MainWindow) {
 
 /// Espelha a lista de pastas e os índices das abas na UI.
 fn atualizar_abas(estado: &EstadoAudio, ui: &MainWindow) {
+    let lang = translations::get_translations(&estado.idioma);
     let nomes: Vec<SharedString> = estado
         .pastas
         .iter()
-        .map(|p| p.nome.as_str().into())
+        .map(|p| match p.tipo {
+            Tipo::Favoritas => lang.get("tab_favorites").copied().unwrap_or("").into(),
+            Tipo::MaisTocadas => lang.get("tab_most_played").copied().unwrap_or("").into(),
+            _ => p.nome.as_str().into(),
+        })
         .collect();
     ui.set_abas(ModelRc::new(VecModel::from(nomes)));
     ui.set_aba_ativa(estado.aba_visivel as i32);
@@ -362,12 +548,33 @@ fn atualizar_abas(estado: &EstadoAudio, ui: &MainWindow) {
 /// Escaneia a pasta na primeira vez que ela é necessária. Idempotente.
 fn garantir_pasta_carregada(estado: &mut EstadoAudio, indice: usize) {
     let escanear = estado.escanear_subpastas;
-    let Some(pasta) = estado.pastas.get_mut(indice) else {
+    let Some(pasta) = estado.pastas.get(indice) else {
         return;
     };
     if pasta.carregada {
         return;
     }
+    let chaves: Vec<String> = match pasta.tipo {
+        Tipo::Favoritas => estado.biblioteca.favoritas().to_vec(),
+        Tipo::MaisTocadas => estado
+            .biblioteca
+            .mais_tocadas(biblioteca::TAMANHO_MAIS_TOCADAS)
+            .into_iter()
+            .map(String::from)
+            .collect(),
+        Tipo::Pasta => Vec::new(),
+        // A aba do álbum já nasce com as faixas
+        Tipo::Album { .. } => return,
+    };
+    if pasta.tipo != Tipo::Pasta {
+        let tracks = faixas_por_chave(&estado.pastas, &chaves);
+        let pasta = &mut estado.pastas[indice];
+        pasta.tracks = tracks;
+        pasta.carregada = true;
+        return;
+    }
+
+    let pasta = &mut estado.pastas[indice];
 
     let mut tracks = Vec::new();
     coletar_arquivos_audio(&pasta.caminho, &pasta.caminho, escanear, &mut tracks);
@@ -376,10 +583,111 @@ fn garantir_pasta_carregada(estado: &mut EstadoAudio, indice: usize) {
     pasta.carregada = true;
 }
 
+/// Faixas das listas especiais, a partir dos caminhos. Quem já está numa pasta
+/// carregada vem de lá (sem ler o arquivo de novo); o resto é lido agora.
+/// Arquivo que sumiu fica de fora.
+fn faixas_por_chave(pastas: &[PastaMusical], chaves: &[String]) -> Vec<TrackInfo> {
+    let mut conhecidas: HashMap<String, &TrackInfo> = HashMap::new();
+    for pasta in pastas
+        .iter()
+        .filter(|p| p.tipo == Tipo::Pasta && p.carregada)
+    {
+        for t in &pasta.tracks {
+            conhecidas.insert(chave_faixa(&pasta.caminho, &t.path), t);
+        }
+    }
+    chaves
+        .iter()
+        .filter_map(|chave| {
+            let mut t = match conhecidas.get(chave) {
+                Some(t) => (*t).clone(),
+                None => {
+                    let caminho = Path::new(chave);
+                    if !caminho.is_file() {
+                        return None;
+                    }
+                    track::ler_faixa(caminho, chave.clone())
+                }
+            };
+            t.path = chave.clone();
+            Some(t)
+        })
+        .collect()
+}
+
+/// Ordem de exibição e navegação de uma lista: filtro da busca e depois a
+/// ordem escolhida para a aba.
+fn ordem_lista(estado: &EstadoAudio, indice: usize, filtro: &str) -> Vec<usize> {
+    let Some(pasta) = estado.pastas.get(indice) else {
+        return Vec::new();
+    };
+    let mut ordem = ordem_filtrada(&pasta.tracks, filtro);
+    track::ordenar(&mut ordem, &pasta.tracks, pasta.ordem, |i| {
+        pasta
+            .chave_faixa(i)
+            .map_or(0, |k| estado.biblioteca.reproducoes(&k))
+    });
+    ordem
+}
+
+/// Acha de novo a faixa atual na lista que toca, pelo nome: depois de um
+/// reescaneio ou de uma lista especial remontada, as posições mudam.
+/// `false` quando ela não está mais lá.
+fn reposicionar_atual(estado: &mut EstadoAudio) -> bool {
+    let (Some(p), Some(nome)) = (estado.pasta_reproducao, estado.arquivo_atual.as_deref()) else {
+        return true;
+    };
+    let novo = estado
+        .pastas
+        .get(p)
+        .and_then(|pasta| pasta.tracks.iter().position(|t| t.path == nome));
+    estado.indice_atual = novo;
+    novo.is_some()
+}
+
+/// Remonta uma lista especial depois que as favoritas ou as contagens
+/// mudaram. Se ela está tocando e a faixa atual sairia dela, espera: a lista
+/// seria puxada debaixo do que toca. Volta a ser montada na próxima visita.
+fn renovar_especial(estado: &mut EstadoAudio, ui: &MainWindow, indice: usize) {
+    let Some(pasta) = estado.pastas.get_mut(indice) else {
+        return;
+    };
+    pasta.carregada = false;
+    let visivel = estado.aba_visivel == indice;
+    let tocando = estado.pasta_reproducao == Some(indice);
+    if !visivel && !tocando {
+        return;
+    }
+    let antes = std::mem::take(&mut estado.pastas[indice].tracks);
+    garantir_pasta_carregada(estado, indice);
+    if tocando {
+        if !reposicionar_atual(estado) {
+            // Fica como estava até a faixa acabar
+            let pasta = &mut estado.pastas[indice];
+            pasta.tracks = antes;
+            pasta.carregada = false;
+            reposicionar_atual(estado);
+            if visivel {
+                atualizar_lista(estado, ui);
+            }
+            return;
+        }
+        estado.sacola_shuffle.clear();
+        estado.sorteio.clear();
+    }
+    if visivel {
+        atualizar_lista(estado, ui);
+    }
+}
+
 /// Abre uma pasta: entra como nova aba, ou só troca para a aba já existente.
 /// Não interfere na reprodução em andamento.
 fn abrir_pasta(estado: &mut EstadoAudio, ui: &MainWindow, caminho: PathBuf) {
-    if let Some(idx) = estado.pastas.iter().position(|p| p.caminho == caminho) {
+    if let Some(idx) = estado
+        .pastas
+        .iter()
+        .position(|p| p.tipo == Tipo::Pasta && p.caminho == caminho)
+    {
         estado.aba_visivel = idx;
         // Pode ser uma pasta que ainda não foi visitada nesta sessão
         garantir_pasta_carregada(estado, idx);
@@ -392,15 +700,23 @@ fn abrir_pasta(estado: &mut EstadoAudio, ui: &MainWindow, caminho: PathBuf) {
     coletar_arquivos_audio(&caminho, &caminho, estado.escanear_subpastas, &mut tracks);
     tracks.sort_by(|a, b| a.path.cmp(&b.path));
 
-    let nome = nome_da_pasta(&caminho);
-    estado.pastas.push(PastaMusical {
-        caminho,
-        nome,
-        tracks,
-        // Já escaneada acima: não passa pelo caminho preguiçoso
-        carregada: true,
-    });
-    estado.aba_visivel = estado.pastas.len() - 1;
+    let mut pasta = PastaMusical::pasta(caminho);
+    pasta.tracks = tracks;
+    // Já escaneada acima: não passa pelo caminho preguiçoso
+    pasta.carregada = true;
+    // Antes da aba do álbum, que fica sempre por último
+    let pos = estado
+        .pastas
+        .iter()
+        .position(|p| matches!(p.tipo, Tipo::Album { .. }))
+        .unwrap_or(estado.pastas.len());
+    estado.pastas.insert(pos, pasta);
+    if let Some(p) = estado.pasta_reproducao.as_mut()
+        && *p >= pos
+    {
+        *p += 1;
+    }
+    estado.aba_visivel = pos;
 
     atualizar_abas(estado, ui);
     atualizar_lista(estado, ui);
@@ -408,7 +724,8 @@ fn abrir_pasta(estado: &mut EstadoAudio, ui: &MainWindow, caminho: PathBuf) {
 
 /// Fecha uma aba. Se era a pasta que estava tocando, a reprodução para.
 fn fechar_pasta(estado: &mut EstadoAudio, ui: &MainWindow, idx: usize) {
-    if idx >= estado.pastas.len() {
+    // As listas especiais não fecham
+    if idx < ESPECIAIS || idx >= estado.pastas.len() {
         return;
     }
 
@@ -440,6 +757,88 @@ fn fechar_pasta(estado: &mut EstadoAudio, ui: &MainWindow, idx: usize) {
     atualizar_imersivo(estado, ui);
 }
 
+/// Abre (ou troca) a aba do álbum com as faixas do grupo, na ordem do disco,
+/// e toca a primeira.
+fn abrir_album(estado: &mut EstadoAudio, ui: &MainWindow, grupo: &track::GrupoAlbum) {
+    let Some(origem) = estado.pastas.get(estado.aba_visivel) else {
+        return;
+    };
+    let mut tracks: Vec<TrackInfo> = grupo
+        .faixas
+        .iter()
+        .filter_map(|&i| {
+            let mut t = origem.tracks.get(i)?.clone();
+            t.path = chave_faixa(&origem.caminho, &t.path);
+            Some(t)
+        })
+        .collect();
+    tracks.sort_by(|a, b| a.numero.cmp(&b.numero).then_with(|| a.path.cmp(&b.path)));
+    let chave_origem = match &origem.tipo {
+        Tipo::Album { origem } => origem.clone(),
+        _ => origem.chave(),
+    };
+    let mut pasta = PastaMusical::especial(
+        Tipo::Album {
+            origem: chave_origem,
+        },
+        Ordem::Padrao,
+    );
+    pasta.nome = grupo.nome.clone();
+    pasta.tracks = tracks;
+    pasta.carregada = true;
+
+    // Uma aba de álbum só, sempre a última
+    let pos = match estado
+        .pastas
+        .iter()
+        .position(|p| matches!(p.tipo, Tipo::Album { .. }))
+    {
+        Some(pos) => {
+            estado.pastas[pos] = pasta;
+            if estado.pasta_reproducao == Some(pos) {
+                // Mesma aba, faixas novas: a sacola era do álbum anterior
+                estado.sacola_shuffle.clear();
+                estado.sorteio.clear();
+            }
+            pos
+        }
+        None => {
+            estado.pastas.push(pasta);
+            estado.pastas.len() - 1
+        }
+    };
+    estado.aba_visivel = pos;
+    // A busca da aba anterior esconderia faixas do álbum
+    estado.filtro.clear();
+    ui.set_texto_busca(SharedString::new());
+    atualizar_abas(estado, ui);
+    atualizar_lista(estado, ui);
+    tocar_faixa(estado, ui, pos, 0);
+    ui.set_imv_guia(0);
+}
+
+/// Opções do crossfade, em segundos.
+const OPCOES_CROSSFADE: [u8; 4] = [0, 3, 6, 10];
+
+fn proximo_crossfade(atual: u8) -> u8 {
+    let pos = OPCOES_CROSSFADE
+        .iter()
+        .position(|&o| o == atual)
+        .unwrap_or(0);
+    OPCOES_CROSSFADE[(pos + 1) % OPCOES_CROSSFADE.len()]
+}
+
+fn publicar_crossfade(estado: &EstadoAudio, ui: &MainWindow) {
+    let lang = translations::get_translations(&estado.idioma);
+    let rotulo = lang.get("crossfade").copied().unwrap_or("crossfade");
+    let valor = if estado.crossfade == 0 {
+        lang.get("crossfade_off").copied().unwrap_or("").to_string()
+    } else {
+        format!("{} s", estado.crossfade)
+    };
+    ui.set_crossfade_texto(format!("{rotulo}: {valor}").into());
+}
+
 /// Reescaneia todas as pastas (a opção de subpastas é global) e reposiciona a
 /// faixa atual pelo caminho, já que os índices podem ter mudado.
 fn reescaneiar_pastas(estado: &mut EstadoAudio, ui: &MainWindow) {
@@ -447,7 +846,7 @@ fn reescaneiar_pastas(estado: &mut EstadoAudio, ui: &MainWindow) {
     for pasta in &mut estado.pastas {
         // Pastas ainda não carregadas serão escaneadas com a nova opção quando
         // forem abertas; carregá-las agora só gastaria memória à toa.
-        if !pasta.carregada {
+        if !pasta.carregada || pasta.tipo != Tipo::Pasta {
             continue;
         }
 
@@ -462,21 +861,12 @@ fn reescaneiar_pastas(estado: &mut EstadoAudio, ui: &MainWindow) {
     estado.sacola_shuffle.clear();
     estado.sorteio.clear();
 
-    if let (Some(p), Some(nome)) = (estado.pasta_reproducao, estado.arquivo_atual.clone()) {
-        let novo = estado
-            .pastas
-            .get(p)
-            .and_then(|pasta| pasta.tracks.iter().position(|t| t.path == nome));
-        match novo {
-            Some(pos) => estado.indice_atual = Some(pos),
-            None => {
-                // A faixa atual já não está na pasta
-                estado.pasta_reproducao = None;
-                estado.indice_atual = None;
-                estado.arquivo_atual = None;
-                stop_music(estado, ui);
-            }
-        }
+    if !reposicionar_atual(estado) {
+        // A faixa atual já não está na pasta
+        estado.pasta_reproducao = None;
+        estado.indice_atual = None;
+        estado.arquivo_atual = None;
+        stop_music(estado, ui);
     }
 
     atualizar_abas(estado, ui);
@@ -488,7 +878,8 @@ fn reescaneiar_pastas(estado: &mut EstadoAudio, ui: &MainWindow) {
 // Letras sincronizadas (.lrc)
 // ---------------------------------------------------------------------
 
-/// Carrega a letra da faixa e já publica o primeiro recorte. Não existir .lrc
+/// Carrega a letra da faixa e já publica o primeiro recorte: o `.lrc` ao
+/// lado da faixa ou, na falta dele, a letra embutida nas tags. Não ter letra
 /// é o caso normal ("sem letra disponível"), não uma falha.
 fn carregar_letra(
     estado: &mut EstadoAudio,
@@ -496,10 +887,18 @@ fn carregar_letra(
     caminho_faixa: &std::path::Path,
     tempo: f64,
 ) {
-    estado.letra_atual = fs::read_to_string(caminho_lrc(caminho_faixa))
-        .map(|conteudo| parse_lrc(&conteudo))
-        .unwrap_or_default();
-    estado.letra_indice = indice_letra(&estado.letra_atual, tempo);
+    let letra = match fs::read_to_string(caminho_lrc(caminho_faixa)) {
+        Ok(conteudo) => lrc::Letra::Sincronizada(parse_lrc(&conteudo)),
+        Err(_) => lrc::letra_embutida(caminho_faixa),
+    };
+    estado.letra_livre = matches!(&letra, lrc::Letra::Livre(l) if !l.is_empty());
+    estado.letra_atual = letra.linhas();
+    ui.set_letra_livre(estado.letra_livre);
+    estado.letra_indice = if estado.letra_livre {
+        -1
+    } else {
+        indice_letra(&estado.letra_atual, tempo)
+    };
     // O modo imersivo rola a letra inteira; o painel normal usa só o recorte
     let completa: Vec<SharedString> = estado
         .letra_atual
@@ -512,6 +911,9 @@ fn carregar_letra(
 
 /// Recalcula a linha atual e só mexe na UI quando ela muda.
 fn sincronizar_letra(estado: &mut EstadoAudio, ui: &MainWindow) {
+    if estado.letra_livre {
+        return;
+    }
     let indice = indice_letra(&estado.letra_atual, estado.tempo_decorrido);
     if indice == estado.letra_indice {
         return;
@@ -544,10 +946,11 @@ fn nome_fundo(caminho: Option<&std::path::Path>) -> String {
 /// Faixa atual no formato que o modo imersivo usa.
 fn faixa_imersiva(estado: &EstadoAudio) -> Option<imersivo::Faixa> {
     let pasta = estado.pastas.get(estado.pasta_reproducao?)?;
-    let track = pasta.tracks.get(estado.indice_atual?)?;
+    let indice = estado.indice_atual?;
+    let track = pasta.tracks.get(indice)?;
     Some(imersivo::Faixa {
         caminho: pasta.caminho.join(&track.path),
-        pasta_raiz: pasta.caminho.clone(),
+        pasta_raiz: pasta.raiz_da_faixa(indice),
         titulo: track.titulo.clone(),
         artista: track.artista.clone(),
         fundo_global: estado.fundo_global.clone(),
@@ -579,15 +982,25 @@ fn atualizar_painel(estado: &mut EstadoAudio, ui: &MainWindow) {
         None
     };
     let indices = &estado.indices_visiveis;
+    let bib = &estado.biblioteca;
     painel.publicar(ui, indices.len(), |pos| {
-        item_painel(pasta?, *indices.get(pos)?, tocando)
+        item_painel(pasta?, *indices.get(pos)?, tocando, bib)
     });
+    if painel.mostrando_albuns()
+        && let Some(pasta) = pasta
+    {
+        let lang = translations::get_translations(&estado.idioma);
+        painel.publicar_albuns(track::agrupar_albuns(&pasta.tracks, indices), &lang, |i| {
+            pasta.caminho_faixa(i)
+        });
+    }
 }
 
 fn item_painel(
     pasta: &PastaMusical,
     indice: usize,
     tocando: Option<usize>,
+    bib: &Biblioteca,
 ) -> Option<painel::Item> {
     let t = pasta.tracks.get(indice)?;
     Some(painel::Item {
@@ -595,7 +1008,12 @@ fn item_painel(
         indice,
         titulo: t.titulo.clone(),
         artista: t.artista.clone(),
+        album: t.album.clone(),
+        duracao: t.duracao,
         tocando: tocando == Some(indice),
+        favorita: pasta
+            .chave_faixa(indice)
+            .is_some_and(|k| bib.e_favorita(&k)),
     })
 }
 
@@ -608,16 +1026,27 @@ fn atualizar_fila(estado: &mut EstadoAudio) {
     if !aberto {
         return;
     }
-    let proximas = proximas(estado, TAMANHO_FILA);
-    let itens = match estado.pasta_reproducao.and_then(|p| estado.pastas.get(p)) {
-        Some(pasta) => proximas
-            .iter()
-            .filter_map(|&i| item_painel(pasta, i, None))
-            .collect(),
-        None => Vec::new(),
-    };
+    let itens = fila_a_seguir(estado, TAMANHO_FILA);
     if let Some(painel) = estado.imersivo.as_mut().and_then(|i| i.painel.as_mut()) {
         painel.publicar_fila(itens);
+    }
+}
+
+/// As próximas `n` como itens do painel. A engatilhada (gapless) já saiu da
+/// fila do shuffle, mas é a primeira a tocar.
+fn fila_a_seguir(estado: &mut EstadoAudio, n: usize) -> Vec<painel::Item> {
+    // Em ordem nada é consumido: a engatilhada já é a primeira de `proximas`
+    let engatilhada = estado.engatilhada.as_ref().map(|e| e.indice);
+    let consumida = estado.modo_shuffle != 0 || engatilhada == estado.indice_atual;
+    let mut indices: Vec<usize> = engatilhada.filter(|_| consumida).into_iter().collect();
+    let resto = proximas(estado, n.saturating_sub(indices.len()));
+    indices.extend(resto);
+    match estado.pasta_reproducao.and_then(|p| estado.pastas.get(p)) {
+        Some(pasta) => indices
+            .iter()
+            .filter_map(|&i| item_painel(pasta, i, None, &estado.biblioteca))
+            .collect(),
+        None => Vec::new(),
     }
 }
 
@@ -643,59 +1072,49 @@ where
         .build()
 }
 
-fn executar_seek(estado: &mut EstadoAudio, ui: &MainWindow, alvo_secs: u64) {
-    // Sempre a pasta de onde vem a faixa atual, nunca a aba visível.
-    let pasta = match estado.pasta_reproducao.and_then(|i| estado.pastas.get(i)) {
-        Some(p) => p.caminho.clone(),
-        None => return,
-    };
-    let nome_arquivo = match estado.arquivo_atual.clone() {
-        Some(n) => n,
-        None => return,
-    };
-    let caminho_completo = pasta.join(&nome_arquivo);
+/// Fonte pronta para o player: decodificador com ganho/transição e espião
+/// do visualizador.
+type Fonte = visualizador::Espiao<transicao::Transicao<Decoder<BufReader<File>>>>;
 
-    if let Some(antigo) = estado.audio_player.take() {
-        antigo.stop();
+/// Caminho completo da faixa atual, sempre na pasta de onde ela vem (nunca
+/// na aba visível).
+fn caminho_atual(estado: &EstadoAudio) -> Option<PathBuf> {
+    let pasta = estado.pastas.get(estado.pasta_reproducao?)?;
+    Some(pasta.caminho.join(estado.arquivo_atual.as_deref()?))
+}
+
+/// Fator do ReplayGain de uma faixa (1 com a opção desligada ou sem tag).
+fn ganho_de(estado: &EstadoAudio, pasta: usize, indice: Option<usize>) -> f32 {
+    if !estado.replaygain {
+        return 1.0;
     }
+    indice
+        .and_then(|i| estado.pastas.get(pasta)?.tracks.get(i)?.ganho)
+        .unwrap_or(1.0)
+}
 
-    let arquivo = match File::open(&caminho_completo) {
-        Ok(a) => a,
-        Err(_) => return,
-    };
-    let byte_len = match arquivo.metadata() {
-        Ok(m) => m.len(),
-        Err(_) => return,
-    };
-    if estado.saida.is_none() {
-        match DeviceSinkBuilder::open_default_sink() {
-            Ok(s) => estado.saida = Some(s),
-            Err(_) => return,
-        }
-    }
-    let Some(saida) = estado.saida.as_ref() else {
-        return;
-    };
-    let sink = Player::connect_new(saida.mixer());
-    sink.set_volume(estado.volume_atual);
-
-    let extensao = caminho_completo
+/// Abre a faixa e devolve a fonte, a duração (s) e o controle do fade-out.
+/// `entrada` é o fade-in (crossfade); zero entra direto.
+fn abrir_fonte(
+    estado: &EstadoAudio,
+    caminho: &Path,
+    ganho: f32,
+    entrada: Duration,
+) -> Option<(Fonte, u64, transicao::Controle)> {
+    let arquivo = File::open(caminho).ok()?;
+    let byte_len = arquivo.metadata().ok()?.len();
+    let extensao = caminho
         .extension()
         .and_then(|e| e.to_str())
         .unwrap_or("")
         .to_lowercase();
-
-    let leitor = BufReader::new(arquivo);
-    let decodificador = match criar_decodificador(leitor, &extensao, byte_len) {
-        Ok(d) => d,
-        Err(_) => return,
-    };
+    let decodificador = criar_decodificador(BufReader::new(arquivo), &extensao, byte_len).ok()?;
 
     // Seek na mesma faixa: a duração já é conhecida
-    let total_secs = if estado.duracao_de.as_ref() == Some(&caminho_completo) {
+    let total_secs = if estado.duracao_de.as_deref() == Some(caminho) {
         estado.duracao_total_secs
     } else if extensao == "mp3" {
-        mp3_duration::from_path(&caminho_completo)
+        mp3_duration::from_path(caminho)
             .map(|d| d.as_secs())
             .unwrap_or_else(|_| {
                 decodificador
@@ -709,37 +1128,145 @@ fn executar_seek(estado: &mut EstadoAudio, ui: &MainWindow, alvo_secs: u64) {
             .map(|d| d.as_secs())
             .unwrap_or(0)
     };
-    estado.duracao_total_secs = total_secs;
-    estado.duracao_de = Some(caminho_completo);
 
-    sink.append(visualizador::Espiao::new(
-        decodificador,
+    let controle = transicao::Controle::default();
+    let fonte = visualizador::Espiao::new(
+        transicao::Transicao::new(decodificador, ganho, entrada, controle.clone()),
         estado.captura.clone(),
-    ));
+    );
+    Some((fonte, total_secs, controle))
+}
+
+/// Mixer da saída de áudio, abrindo o dispositivo se preciso.
+fn mixer(estado: &mut EstadoAudio) -> Option<&rodio::mixer::Mixer> {
+    if estado.saida.is_none() {
+        estado.saida = DeviceSinkBuilder::open_default_sink().ok();
+    }
+    estado.saida.as_ref().map(|s| s.mixer())
+}
+
+/// Recria o player da faixa atual a partir de `alvo_secs`, tocando ou já
+/// pausado (pausa antes do primeiro som: sem estalo no seek pausado).
+fn executar_seek(estado: &mut EstadoAudio, ui: &MainWindow, alvo_secs: u64, pausado: bool) {
+    let Some(caminho_completo) = caminho_atual(estado) else {
+        return;
+    };
+
+    if let Some(antigo) = estado.audio_player.take() {
+        antigo.stop();
+    }
+    if let Some(saindo) = estado.saindo.take() {
+        saindo.stop();
+    }
+    // A próxima que estava na fila do player volta para a fila do shuffle
+    if let Some(e) = estado.engatilhada.take() {
+        devolver_a_fila(estado, e.indice);
+    }
+    estado.transicao_feita = false;
+
+    let ganho = ganho_de(
+        estado,
+        estado.pasta_reproducao.unwrap_or(0),
+        estado.indice_atual,
+    );
+    let Some((fonte, total_secs, controle)) =
+        abrir_fonte(estado, &caminho_completo, ganho, Duration::ZERO)
+    else {
+        return;
+    };
+    let volume = estado.volume_atual;
+    let Some(mixer) = mixer(estado) else {
+        return;
+    };
+    let sink = Player::connect_new(mixer);
+    sink.set_volume(volume);
+    if pausado {
+        sink.pause();
+    }
+    sink.append(fonte);
     if alvo_secs > 0 {
         let _ = sink.try_seek(Duration::from_secs(alvo_secs));
     }
 
+    estado.duracao_total_secs = total_secs;
+    estado.duracao_de = Some(caminho_completo);
+    estado.controle = controle;
     estado.tempo_decorrido = alvo_secs as f64;
     estado.ultimo_segundo = alvo_secs;
     estado.audio_player = Some(sink);
 
-    ui.set_progresso(if total_secs > 0 {
-        alvo_secs as f32 / total_secs as f32
+    publicar_tempo(estado, ui);
+    publicar_play_pause(estado, ui, !pausado);
+}
+
+/// Barra e texto de tempo da faixa atual.
+fn publicar_tempo(estado: &EstadoAudio, ui: &MainWindow) {
+    let total = estado.duracao_total_secs;
+    let atual = estado.tempo_decorrido as u64;
+    ui.set_progresso(if total > 0 {
+        atual as f32 / total as f32
     } else {
         0.0
     });
-    ui.set_texto_play_pause(texto_pause(&translations::get_translations(&estado.idioma)).into());
-    ui.set_tocando(true);
-    let com_horas = total_secs >= 3600;
+    let com_horas = total >= 3600;
     ui.set_texto_tempo(
         format!(
             "{} / {}",
-            formatar_tempo(alvo_secs, com_horas),
-            formatar_tempo(total_secs, com_horas)
+            formatar_tempo(atual, com_horas),
+            formatar_tempo(total, com_horas)
         )
         .into(),
     );
+}
+
+fn publicar_play_pause(estado: &EstadoAudio, ui: &MainWindow, tocando: bool) {
+    let t = translations::get_translations(&estado.idioma);
+    let texto = if tocando {
+        texto_pause(&t)
+    } else {
+        texto_play(&t)
+    };
+    ui.set_texto_play_pause(texto.into());
+    ui.set_tocando(tocando);
+}
+
+/// Passa o estado do app para a faixa `track_idx` da pasta `pasta_idx`: letra,
+/// seleção, origem do som. Não mexe no player.
+fn marcar_faixa(
+    estado: &mut EstadoAudio,
+    ui: &MainWindow,
+    pasta_idx: usize,
+    track_idx: usize,
+    alvo_secs: u64,
+) -> bool {
+    garantir_pasta_carregada(estado, pasta_idx);
+
+    let Some(pasta) = estado.pastas.get(pasta_idx) else {
+        return false;
+    };
+    let Some(caminho) = pasta.tracks.get(track_idx).map(|t| t.path.clone()) else {
+        return false;
+    };
+
+    // Troca de faixa: descarta a letra anterior e tenta carregar a nova
+    let completo = pasta.caminho.join(&caminho);
+    carregar_letra(estado, ui, &completo, alvo_secs as f64);
+
+    if estado.pasta_reproducao != Some(pasta_idx) {
+        // Pasta de reprodução mudou: a sacola do shuffle inteligente era
+        // da pasta antiga, não serve mais aqui.
+        estado.sacola_shuffle.clear();
+        estado.sorteio.clear();
+    }
+
+    estado.pasta_reproducao = Some(pasta_idx);
+    estado.indice_atual = Some(track_idx);
+    estado.arquivo_atual = Some(caminho);
+    estado.contada = false;
+
+    atualizar_selecao_visivel(estado, ui);
+    atualizar_favorita_atual(estado, ui);
+    true
 }
 
 /// Toca uma faixa de uma pasta específica, começando em `alvo_secs`.
@@ -753,37 +1280,37 @@ fn iniciar_faixa(
     track_idx: usize,
     alvo_secs: u64,
 ) {
-    garantir_pasta_carregada(estado, pasta_idx);
-
-    let (caminho, pasta_raiz) = match estado.pastas.get(pasta_idx) {
-        Some(pasta) => match pasta.tracks.get(track_idx) {
-            Some(t) => (t.path.clone(), pasta.caminho.clone()),
-            None => return,
-        },
-        None => return,
-    };
-
-    // Troca de faixa: descarta a letra anterior e tenta carregar a nova
-    carregar_letra(estado, ui, &pasta_raiz.join(&caminho), alvo_secs as f64);
-
-    if estado.pasta_reproducao != Some(pasta_idx) {
-        // Pasta de reprodução mudou: a sacola do shuffle inteligente era
-        // da pasta antiga, não serve mais aqui.
-        estado.sacola_shuffle.clear();
-        estado.sorteio.clear();
+    if !marcar_faixa(estado, ui, pasta_idx, track_idx, alvo_secs) {
+        return;
     }
-
-    estado.pasta_reproducao = Some(pasta_idx);
-    estado.indice_atual = Some(track_idx);
-    estado.arquivo_atual = Some(caminho);
-
-    atualizar_selecao_visivel(estado, ui);
-    executar_seek(estado, ui, alvo_secs);
+    executar_seek(estado, ui, alvo_secs, false);
     atualizar_imersivo(estado, ui);
 }
 
 fn tocar_faixa(estado: &mut EstadoAudio, ui: &MainWindow, pasta_idx: usize, track_idx: usize) {
     iniciar_faixa(estado, ui, pasta_idx, track_idx, 0);
+}
+
+/// A próxima faixa já começou no player (gapless, ou o crossfade entrou): o
+/// estado passa a ser dela sem recriar nada.
+fn assumir_faixa(
+    estado: &mut EstadoAudio,
+    ui: &MainWindow,
+    pasta_idx: usize,
+    track_idx: usize,
+    duracao: u64,
+) {
+    if !marcar_faixa(estado, ui, pasta_idx, track_idx, 0) {
+        return;
+    }
+    estado.duracao_total_secs = duracao;
+    estado.duracao_de = caminho_atual(estado);
+    estado.tempo_decorrido = 0.0;
+    estado.ultimo_segundo = 0;
+    estado.transicao_feita = false;
+    publicar_tempo(estado, ui);
+    atualizar_imersivo(estado, ui);
+    atualizar_fila(estado);
 }
 
 /// O que um seek vindo da UI deve fazer com a faixa atual.
@@ -805,104 +1332,130 @@ fn efeito_seek(tem_player: bool, tem_faixa: bool) -> EfeitoSeek {
     }
 }
 
-/// Reposiciona a faixa mantendo o estado de pausa. `executar_seek` recria o
-/// player já tocando, então re-pausamos quando for o caso.
+/// Reposiciona a faixa mantendo o estado de pausa.
 fn seek_mantendo_pausa(estado: &mut EstadoAudio, ui: &MainWindow, alvo_secs: u64) {
     let Some(estava_pausado) = estado.audio_player.as_ref().map(|sink| sink.is_paused()) else {
         // Sem faixa carregada não há o que reposicionar
         return;
     };
+    executar_seek(estado, ui, alvo_secs, estava_pausado);
+}
 
-    executar_seek(estado, ui, alvo_secs);
+/// Seek vindo de fora (barra, MPRIS): com player, preserva a pausa; parado
+/// com faixa (Stop ou recém-aberto), carrega e toca dali.
+fn seek_pedido(estado: &mut EstadoAudio, ui: &MainWindow, alvo_secs: u64) {
+    match efeito_seek(
+        estado.audio_player.is_some(),
+        estado.arquivo_atual.is_some(),
+    ) {
+        EfeitoSeek::ManterEstado => seek_mantendo_pausa(estado, ui, alvo_secs),
+        EfeitoSeek::Recarregar => executar_seek(estado, ui, alvo_secs, false),
+        EfeitoSeek::Nada => {}
+    }
+}
 
-    if estava_pausado && let Some(ref sink) = estado.audio_player {
-        sink.pause();
-        ui.set_texto_play_pause(texto_play(&translations::get_translations(&estado.idioma)).into());
-        ui.set_tocando(false);
+/// A próxima já estava na fila do player e a fila mudou (loop, shuffle,
+/// sono): tira ela de lá recriando o player no mesmo ponto.
+fn desengatilhar(estado: &mut EstadoAudio, ui: &MainWindow) {
+    if estado.engatilhada.is_none() {
+        return;
+    }
+    let pos = estado
+        .audio_player
+        .as_ref()
+        .map_or(0, |p| p.get_pos().as_secs());
+    seek_mantendo_pausa(estado, ui, pos);
+    atualizar_fila(estado);
+}
+
+/// Faixa tirada da fila do shuffle que acabou não tocando volta para a frente.
+fn devolver_a_fila(estado: &mut EstadoAudio, indice: usize) {
+    if estado.indice_atual == Some(indice) {
+        return;
+    }
+    match estado.modo_shuffle {
+        2 => estado.sacola_shuffle.push(indice),
+        1 => estado.sorteio.insert(0, indice),
+        _ => {}
     }
 }
 
 fn tocar_anterior(estado: &mut EstadoAudio, ui: &MainWindow) {
     // Navega na pasta de onde vem a faixa atual, nunca na aba visível.
-    let alvo = {
-        let Some(pasta_idx) = estado.pasta_reproducao else {
-            return;
-        };
-        let Some(pasta) = estado.pastas.get(pasta_idx) else {
-            return;
-        };
-
-        let filtro = filtro_efetivo(estado.aba_visivel, estado.pasta_reproducao, &estado.filtro);
-        let ordem = ordem_filtrada(&pasta.tracks, filtro);
-        if ordem.is_empty() {
-            return;
-        }
-
-        let pos = estado
-            .indice_atual
-            .and_then(|idx| ordem.iter().position(|&i| i == idx));
-        let track_idx = match pos {
-            Some(0) => ordem[ordem.len() - 1],
-            Some(p) => ordem[p - 1],
-            // Faixa atual fora do filtro: começa pela última
-            None => ordem[ordem.len() - 1],
-        };
-        (pasta_idx, track_idx)
+    let Some((pasta_idx, ordem)) = ordem_reproducao(estado) else {
+        return;
     };
-    tocar_faixa(estado, ui, alvo.0, alvo.1);
+    let pos = estado
+        .indice_atual
+        .and_then(|idx| ordem.iter().position(|&i| i == idx));
+    let track_idx = match pos {
+        Some(p) if p > 0 => ordem[p - 1],
+        // Na primeira, ou fora do filtro: vai para a última
+        _ => ordem[ordem.len() - 1],
+    };
+    tocar_faixa(estado, ui, pasta_idx, track_idx);
 }
 
-fn alternar_play_pause(estado: &EstadoAudio, ui: &MainWindow) {
-    if let Some(ref sink) = estado.audio_player {
-        let t = translations::get_translations(&estado.idioma);
-        if sink.is_paused() {
+fn alternar_play_pause(estado: &mut EstadoAudio, ui: &MainWindow) {
+    match &estado.audio_player {
+        Some(sink) if sink.is_paused() => {
             sink.play();
-            ui.set_texto_play_pause(texto_pause(&t).into());
-            ui.set_tocando(true);
-        } else {
-            sink.pause();
-            ui.set_texto_play_pause(texto_play(&t).into());
-            ui.set_tocando(false);
+            publicar_play_pause(estado, ui, true);
         }
+        Some(_) => pausar(estado, ui),
+        None => retomar(estado, ui),
     }
 }
 
-fn pausar(estado: &EstadoAudio, ui: &MainWindow) {
+fn pausar(estado: &mut EstadoAudio, ui: &MainWindow) {
     if let Some(ref sink) = estado.audio_player
         && !sink.is_paused()
     {
         sink.pause();
-        ui.set_texto_play_pause(texto_play(&translations::get_translations(&estado.idioma)).into());
-        ui.set_tocando(false);
+        publicar_play_pause(estado, ui, false);
+    }
+    // A anterior do crossfade não fica tocando sozinha
+    if let Some(saindo) = estado.saindo.take() {
+        saindo.stop();
     }
 }
 
-#[cfg(feature = "mpris")]
-fn reproduzir(estado: &EstadoAudio, ui: &MainWindow) {
-    if let Some(ref sink) = estado.audio_player
-        && sink.is_paused()
-    {
-        sink.play();
-        ui.set_texto_play_pause(
-            texto_pause(&translations::get_translations(&estado.idioma)).into(),
-        );
-        ui.set_tocando(true);
+/// Play: continua o player pausado, ou carrega a faixa que ficou selecionada
+/// (Stop, ou o app recém-aberto) a partir de onde ela estava.
+fn retomar(estado: &mut EstadoAudio, ui: &MainWindow) {
+    match &estado.audio_player {
+        Some(sink) if sink.is_paused() => {
+            sink.play();
+            publicar_play_pause(estado, ui, true);
+        }
+        Some(_) => {}
+        None if estado.arquivo_atual.is_some() => {
+            let alvo = estado.tempo_decorrido as u64;
+            executar_seek(estado, ui, alvo, false);
+            atualizar_imersivo(estado, ui);
+        }
+        None => {}
     }
 }
 
 fn stop_music(estado: &mut EstadoAudio, ui: &MainWindow) {
     estado.audio_player = None;
+    estado.saindo = None;
+    if let Some(e) = estado.engatilhada.take() {
+        devolver_a_fila(estado, e.indice);
+    }
     // Parado não segura o dispositivo: sem stream aberto, sem thread de áudio
     estado.saida = None;
     estado.tempo_decorrido = 0.0;
     estado.ultimo_segundo = 0;
     ui.set_progresso(0.0);
-    ui.set_texto_play_pause(texto_play(&translations::get_translations(&estado.idioma)).into());
-    ui.set_tocando(false);
+    publicar_play_pause(estado, ui, false);
     ui.set_texto_tempo("00:00 / 00:00".into());
 
     // Nada tocando: some com a letra da faixa anterior
     estado.letra_atual.clear();
+    estado.letra_livre = false;
+    ui.set_letra_livre(false);
     estado.letra_indice = -1;
     publicar_letra(estado, ui);
 }
@@ -912,9 +1465,8 @@ fn stop_music(estado: &mut EstadoAudio, ui: &MainWindow) {
 /// visível.
 fn ordem_reproducao(estado: &EstadoAudio) -> Option<(usize, Vec<usize>)> {
     let pasta_idx = estado.pasta_reproducao?;
-    let pasta = estado.pastas.get(pasta_idx)?;
     let filtro = filtro_efetivo(estado.aba_visivel, estado.pasta_reproducao, &estado.filtro);
-    let ordem = ordem_filtrada(&pasta.tracks, filtro);
+    let ordem = ordem_lista(estado, pasta_idx, filtro);
     (!ordem.is_empty()).then_some((pasta_idx, ordem))
 }
 
@@ -938,8 +1490,8 @@ fn encher_sacola(estado: &mut EstadoAudio, ordem: &[usize]) {
 }
 
 /// As próximas `n` faixas (índices na pasta que toca), sem tocar nenhuma. O
-/// sorteio do shuffle acontece aqui, adiantado, e `tocar_proxima_manual`
-/// consome a mesma fila: o que aparece em "a seguir" é o que toca.
+/// sorteio do shuffle acontece aqui, adiantado, e `escolher_proxima` consome
+/// a mesma fila: o que aparece em "a seguir" é o que toca.
 fn proximas(estado: &mut EstadoAudio, n: usize) -> Vec<usize> {
     let Some((_, ordem)) = ordem_reproducao(estado) else {
         return Vec::new();
@@ -987,11 +1539,10 @@ fn proximas(estado: &mut EstadoAudio, n: usize) -> Vec<usize> {
     }
 }
 
-fn tocar_proxima_manual(estado: &mut EstadoAudio, ui: &MainWindow) {
-    let Some((pasta_idx, ordem)) = ordem_reproducao(estado) else {
-        return;
-    };
-
+/// Tira da fila a próxima a tocar: (pasta, faixa). `None` no fim da pasta
+/// (em ordem, sem loop) ou sem lista.
+fn escolher_proxima(estado: &mut EstadoAudio) -> Option<(usize, usize)> {
+    let (pasta_idx, ordem) = ordem_reproducao(estado)?;
     let alvo = match estado.modo_shuffle {
         2 => {
             if estado.sacola_shuffle.is_empty() {
@@ -1008,9 +1559,20 @@ fn tocar_proxima_manual(estado: &mut EstadoAudio, ui: &MainWindow) {
         // Em ordem: `proximas` já sabe parar no fim da pasta
         _ => proximas(estado, 1).first().copied(),
     };
+    alvo.map(|i| (pasta_idx, i))
+}
 
-    match alvo {
-        Some(track_idx) => tocar_faixa(estado, ui, pasta_idx, track_idx),
+fn tocar_proxima_manual(estado: &mut EstadoAudio, ui: &MainWindow) {
+    // Já na fila do player: é ela a próxima
+    if let Some(e) = estado.engatilhada.take() {
+        tocar_faixa(estado, ui, e.pasta, e.indice);
+        return;
+    }
+    if ordem_reproducao(estado).is_none() {
+        return;
+    }
+    match escolher_proxima(estado) {
+        Some((pasta_idx, track_idx)) => tocar_faixa(estado, ui, pasta_idx, track_idx),
         None => stop_music(estado, ui), // fim da pasta: para
     }
 }
@@ -1024,38 +1586,169 @@ fn proxima_musica_auto(estado: &mut EstadoAudio, ui: &MainWindow) {
         return;
     }
     if estado.modo_loop == 1 {
-        executar_seek(estado, ui, 0);
+        executar_seek(estado, ui, 0, false);
     } else {
         tocar_proxima_manual(estado, ui);
     }
 }
 
-/// Restaura a faixa e a posição salvas. A pasta de reprodução já foi
-/// resolvida (e migrada) no carregamento da config.
-fn restaurar_posicao(estado: &mut EstadoAudio, ui: &MainWindow, config: &AppConfig) {
-    let (Some(pasta_idx), Some(indice), Some(tempo)) = (
-        estado.pasta_reproducao,
-        config.indice_atual,
-        config.tempo_atual,
-    ) else {
+/// Antecedência com que a próxima entra na fila do player (gapless). Folga
+/// para o timer de 250 ms e para abrir o arquivo.
+const ANTECEDENCIA_GAPLESS: f64 = 2.0;
+
+/// Perto do fim da faixa: põe a próxima na fila do player (gapless) ou começa
+/// o crossfade. Faixas seguidas do mesmo álbum, em ordem, emendam sem
+/// crossfade: disco ao vivo e álbum conceitual não podem ter a emenda mexida.
+fn preparar_transicao(estado: &mut EstadoAudio, ui: &MainWindow) {
+    if estado.transicao_feita
+        || estado.engatilhada.is_some()
+        || estado.sono == Some(sono::Sono::FimDaFaixa)
+    {
+        return;
+    }
+    let Some(sink) = &estado.audio_player else {
+        return;
+    };
+    let total = estado.duracao_total_secs as f64;
+    if sink.is_paused() || total <= 0.0 {
+        return;
+    }
+    let restante = total - sink.get_pos().as_secs_f64();
+    let crossfade = estado.crossfade as f64;
+    if restante > crossfade.max(ANTECEDENCIA_GAPLESS) {
+        return;
+    }
+    estado.transicao_feita = true;
+
+    let proxima = if estado.modo_loop == 1 {
+        estado.pasta_reproducao.zip(estado.indice_atual)
+    } else {
+        escolher_proxima(estado)
+    };
+    let Some((pasta_idx, indice)) = proxima else {
+        return;
+    };
+    let Some(caminho) = estado
+        .pastas
+        .get(pasta_idx)
+        .and_then(|p| p.caminho_faixa(indice))
+    else {
         return;
     };
 
-    let existe = estado
-        .pastas
-        .get(pasta_idx)
-        .is_some_and(|p| indice < p.tracks.len());
-    if !existe {
-        estado.pasta_reproducao = None;
+    let mesmo_album = {
+        let album = |i: Option<usize>| {
+            let p = estado.pastas.get(pasta_idx)?;
+            p.tracks.get(i?)?.album.clone()
+        };
+        estado.modo_shuffle == 0
+            && album(estado.indice_atual).is_some()
+            && album(estado.indice_atual) == album(Some(indice))
+    };
+    let cruzar = crossfade > 0.0 && estado.modo_loop != 1 && !mesmo_album;
+    let entrada = if cruzar {
+        Duration::from_secs_f64(restante.max(0.5))
+    } else {
+        Duration::ZERO
+    };
+    let ganho = ganho_de(estado, pasta_idx, Some(indice));
+    let Some((fonte, duracao, controle)) = abrir_fonte(estado, &caminho, ganho, entrada) else {
+        devolver_a_fila(estado, indice);
+        return;
+    };
+
+    if !cruzar {
+        if let Some(sink) = &estado.audio_player {
+            sink.append(fonte);
+        }
+        estado.engatilhada = Some(Engatilhada {
+            pasta: pasta_idx,
+            indice,
+            duracao,
+            controle,
+        });
+        atualizar_fila(estado);
         return;
     }
 
-    iniciar_faixa(estado, ui, pasta_idx, indice, tempo);
+    // Crossfade: a atual some no que falta dela, a próxima entra num player
+    // novo no mesmo tempo
+    estado.controle.esmaecer(entrada);
+    let volume = estado.volume_atual;
+    let Some(mixer) = mixer(estado) else {
+        return;
+    };
+    let novo = Player::connect_new(mixer);
+    novo.set_volume(volume);
+    novo.append(fonte);
+    estado.saindo = estado.audio_player.replace(novo);
+    estado.controle = controle;
+    assumir_faixa(estado, ui, pasta_idx, indice, duracao);
+}
+
+/// Restaura a faixa e a posição salvas, pausada e sem abrir o dispositivo de
+/// áudio: o Play é que carrega (`retomar`).
+fn restaurar_posicao(estado: &mut EstadoAudio, ui: &MainWindow, config: &AppConfig) {
+    let Some(pasta_idx) = estado.pasta_reproducao else {
+        return;
+    };
+    let Some(pasta) = estado.pastas.get(pasta_idx) else {
+        return;
+    };
+    let indice = match &config.faixa_salva {
+        Some(chave) => {
+            (0..pasta.tracks.len()).find(|&i| pasta.chave_faixa(i).as_ref() == Some(chave))
+        }
+        // Config antiga: posição na lista
+        None => config.indice_atual.filter(|&i| i < pasta.tracks.len()),
+    };
+    let Some(indice) = indice else {
+        estado.pasta_reproducao = None;
+        return;
+    };
+    let tempo = config.tempo_atual.unwrap_or(0);
+    let duracao = pasta.tracks[indice].duracao as u64;
+
+    // A fila do shuffle que ia tocar
+    let posicoes: HashMap<String, usize> = (0..pasta.tracks.len())
+        .filter_map(|i| Some((pasta.chave_faixa(i)?, i)))
+        .collect();
+    let fila: Vec<usize> = config
+        .fila_shuffle
+        .iter()
+        .filter_map(|k| posicoes.get(k).copied())
+        .collect();
+
+    if !marcar_faixa(estado, ui, pasta_idx, indice, tempo) {
+        return;
+    }
+    match estado.modo_shuffle {
+        2 => estado.sacola_shuffle = fila.into_iter().rev().collect(),
+        1 => estado.sorteio = fila,
+        _ => {}
+    }
+    estado.tempo_decorrido = tempo as f64;
+    estado.duracao_total_secs = duracao;
+    publicar_tempo(estado, ui);
+    publicar_play_pause(estado, ui, false);
 }
 
 fn atualizar_progresso(estado: &mut EstadoAudio, ui: &MainWindow) {
-    let total_secs = estado.duracao_total_secs;
+    // A anterior do crossfade terminou de sumir
+    if estado.saindo.as_ref().is_some_and(|s| s.empty()) {
+        estado.saindo = None;
+    }
 
+    // Gapless: a engatilhada começou (a anterior saiu da fila do player)
+    if estado.engatilhada.is_some()
+        && estado.audio_player.as_ref().is_some_and(|s| s.len() <= 1)
+        && let Some(e) = estado.engatilhada.take()
+    {
+        estado.controle = e.controle;
+        assumir_faixa(estado, ui, e.pasta, e.indice, e.duracao);
+    }
+
+    let total_secs = estado.duracao_total_secs;
     let terminou = match estado.audio_player {
         Some(ref sink) => sink.empty() && total_secs > 0,
         None => false,
@@ -1065,35 +1758,75 @@ fn atualizar_progresso(estado: &mut EstadoAudio, ui: &MainWindow) {
         return;
     }
 
+    let Some(sink) = &estado.audio_player else {
+        return;
+    };
+    let pausado = sink.is_paused();
+    if !pausado {
+        estado.tempo_decorrido = sink.get_pos().as_secs_f64();
+    }
+
     // Letra: recalcula a linha atual (também quando pausado, após um seek)
     sincronizar_letra(estado, ui);
 
-    let pausado = match estado.audio_player {
-        Some(ref sink) => sink.is_paused(),
-        None => return,
-    };
-
-    if !pausado {
-        estado.tempo_decorrido += 0.25;
-        let atual_secs = estado.tempo_decorrido as u64;
-        if atual_secs != estado.ultimo_segundo {
-            estado.ultimo_segundo = atual_secs;
-            ui.set_progresso(if total_secs > 0 {
-                atual_secs as f32 / total_secs as f32
-            } else {
-                0.0
-            });
-            let com_horas = total_secs >= 3600;
-            ui.set_texto_tempo(
-                format!(
-                    "{} / {}",
-                    formatar_tempo(atual_secs, com_horas),
-                    formatar_tempo(total_secs, com_horas)
-                )
-                .into(),
-            );
-        }
+    if pausado {
+        return;
     }
+
+    if !estado.contada && biblioteca::conta_como_ouvida(estado.tempo_decorrido, total_secs) {
+        contar_reproducao(estado, ui);
+    }
+    preparar_transicao(estado, ui);
+
+    let atual_secs = estado.tempo_decorrido as u64;
+    if atual_secs != estado.ultimo_segundo {
+        estado.ultimo_segundo = atual_secs;
+        publicar_tempo(estado, ui);
+    }
+}
+
+/// Mais uma reprodução da faixa atual. A lista "Mais tocadas" é remontada
+/// quando estiver à vista.
+fn contar_reproducao(estado: &mut EstadoAudio, ui: &MainWindow) {
+    estado.contada = true;
+    let Some(chave) = estado
+        .pasta_reproducao
+        .and_then(|p| estado.pastas.get(p))
+        .zip(estado.arquivo_atual.as_deref())
+        .map(|(p, nome)| chave_faixa(&p.caminho, nome))
+    else {
+        return;
+    };
+    estado.biblioteca.contar(&chave);
+    estado.biblioteca.salvar();
+    renovar_especial(estado, ui, POS_MAIS_TOCADAS);
+}
+
+/// Marca ou desmarca uma faixa como favorita e atualiza o que mostra isso.
+fn alternar_favorita(estado: &mut EstadoAudio, ui: &MainWindow, chave: &str) {
+    estado.biblioteca.alternar_favorita(chave);
+    estado.biblioteca.salvar();
+    renovar_especial(estado, ui, POS_FAVORITAS);
+    // A estrela das linhas (a lista especial já remontou a sua)
+    if estado.aba_visivel != POS_FAVORITAS {
+        atualizar_lista(estado, ui);
+    }
+    atualizar_favorita_atual(estado, ui);
+    atualizar_fila(estado);
+}
+
+/// Estrela da faixa que toca (modo imersivo e atalho F).
+fn atualizar_favorita_atual(estado: &EstadoAudio, ui: &MainWindow) {
+    let favorita = chave_atual(estado).is_some_and(|k| estado.biblioteca.e_favorita(&k));
+    ui.set_favorita_atual(favorita);
+}
+
+fn chave_atual(estado: &EstadoAudio) -> Option<String> {
+    let pasta = estado.pastas.get(estado.pasta_reproducao?)?;
+    Some(chave_faixa(
+        &pasta.caminho,
+        estado.arquivo_atual.as_deref()?,
+    ))
 }
 
 /// Temporizador de sono: esmaece o volume no fim e pausa. Roda no timer de
@@ -1105,21 +1838,52 @@ fn verificar_sono(estado: &mut EstadoAudio, ui: &MainWindow) {
         if fator <= 0.0 {
             estado.sono = None;
             pausar(estado, ui);
-            if let Some(sink) = &estado.audio_player {
-                sink.set_volume(estado.volume_atual);
-            }
-        } else if fator < 1.0
-            && let Some(sink) = &estado.audio_player
-        {
-            sink.set_volume(estado.volume_atual * fator);
+            aplicar_volume(estado, estado.volume_atual);
+        } else if fator < 1.0 {
+            aplicar_volume(estado, estado.volume_atual * fator);
         }
     }
 
     let lang = translations::get_translations(&estado.idioma);
     let fim_da_faixa = lang.get("sleep_end").copied().unwrap_or("sleep_end");
     let texto = sono::texto(estado.sono, agora, fim_da_faixa);
-    if ui.get_imv_sono() != texto.as_str() {
-        ui.set_imv_sono(texto.into());
+    if ui.get_sono_texto() != texto.as_str() {
+        ui.set_sono_texto(texto.into());
+    }
+}
+
+/// Volume nos players (o do crossfade incluído). `volume_atual` é o do slider;
+/// o sono passa um valor menor no esmaecimento.
+fn aplicar_volume(estado: &EstadoAudio, volume: f32) {
+    for p in estado.audio_player.iter().chain(&estado.saindo) {
+        p.set_volume(volume);
+    }
+}
+
+/// Prévia "a seguir" do modo imersivo nos últimos segundos da faixa.
+const PREVIA_SEGUNDOS: f64 = 10.0;
+
+fn atualizar_previa(estado: &mut EstadoAudio, ui: &MainWindow) {
+    let restante = estado.duracao_total_secs as f64 - estado.tempo_decorrido;
+    let tocando = estado.audio_player.as_ref().is_some_and(|p| !p.is_paused());
+    let mostrar = tocando
+        && estado.duracao_total_secs > 0
+        && restante <= PREVIA_SEGUNDOS
+        && estado.modo_loop != 1
+        && estado.sono != Some(sono::Sono::FimDaFaixa);
+    let texto = if mostrar {
+        fila_a_seguir(estado, 1)
+            .first()
+            .map(|i| match &i.artista {
+                Some(a) => format!("{} — {a}", i.titulo),
+                None => i.titulo.clone(),
+            })
+            .unwrap_or_default()
+    } else {
+        String::new()
+    };
+    if ui.get_imv_proxima() != texto.as_str() {
+        ui.set_imv_proxima(texto.into());
     }
 }
 
@@ -1195,7 +1959,7 @@ fn processar_eventos_multimidia(
 ) {
     for evento in rx.try_iter() {
         match evento {
-            MediaControlEvent::Play => reproduzir(estado, ui),
+            MediaControlEvent::Play => retomar(estado, ui),
             MediaControlEvent::Pause => pausar(estado, ui),
             MediaControlEvent::Toggle => alternar_play_pause(estado, ui),
             MediaControlEvent::Next => tocar_proxima_manual(estado, ui),
@@ -1208,7 +1972,7 @@ fn processar_eventos_multimidia(
                 };
                 let alvo = (estado.tempo_decorrido as i64 + delta)
                     .clamp(0, estado.duracao_total_secs as i64) as u64;
-                executar_seek(estado, ui, alvo);
+                seek_pedido(estado, ui, alvo);
             }
             MediaControlEvent::SeekBy(direcao, duracao) => {
                 let delta = match direcao {
@@ -1217,18 +1981,16 @@ fn processar_eventos_multimidia(
                 };
                 let alvo = (estado.tempo_decorrido as i64 + delta)
                     .clamp(0, estado.duracao_total_secs as i64) as u64;
-                executar_seek(estado, ui, alvo);
+                seek_pedido(estado, ui, alvo);
             }
             MediaControlEvent::SetPosition(pos) => {
-                executar_seek(estado, ui, pos.0.as_secs());
+                seek_pedido(estado, ui, pos.0.as_secs());
             }
             MediaControlEvent::SetVolume(v) => {
                 let vol = v.clamp(0.0, 1.0) as f32;
                 estado.volume_atual = vol;
                 ui.set_volume(vol);
-                if let Some(ref sink) = estado.audio_player {
-                    sink.set_volume(vol);
-                }
+                aplicar_volume(estado, vol);
             }
             _ => {}
         }
@@ -1250,13 +2012,13 @@ fn sincronizar_controles(controles: &Rc<RefCell<Option<MediaControls>>>, estado:
                 let nome = estado.arquivo_atual.as_deref()?;
                 pasta.tracks.iter().find(|t| t.path == nome)
             })
-            .map(|t| (t.titulo.clone(), t.artista.clone()));
+            .map(|t| (t.titulo.clone(), t.artista.clone(), t.album.clone()));
 
-        if let Some((titulo, artista)) = info {
+        if let Some((titulo, artista, album)) = info {
             let _ = c.set_metadata(MediaMetadata {
                 title: Some(titulo.as_str()),
                 artist: artista.as_deref(),
-                album: None,
+                album: album.as_deref(),
                 cover_url: None,
                 duration: Some(Duration::from_secs(estado.duracao_total_secs)),
             });
@@ -1670,6 +2432,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         e.idioma = config.idioma.clone();
         e.fundo_global = config.fundo_tela_cheia.as_ref().map(PathBuf::from);
         ui.set_fundo_global_nome(nome_fundo(e.fundo_global.as_deref()).into());
+        e.biblioteca = Biblioteca::carregar();
+        e.crossfade = config.crossfade;
+        e.replaygain = config.replaygain;
+        e.fundo_reativo = config.fundo_reativo;
+        ui.set_replaygain(config.replaygain);
+        ui.set_fundo_reativo(config.fundo_reativo);
 
         ui.set_volume(config.volume);
         let lang = translations::get_translations(&config.idioma);
@@ -1685,9 +2453,27 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // Aplica todas as traduções antes da primeira renderização
         aplicar_idioma(&config.idioma, &ui);
+        publicar_crossfade(&e, &ui);
+
+        // Listas especiais primeiro (POS_FAVORITAS, POS_MAIS_TOCADAS)
+        let ordem_salva = |chave: &str, padrao| {
+            config
+                .ordens
+                .get(chave)
+                .map_or(padrao, |&o| Ordem::de_indice(o as usize))
+        };
+        e.pastas.push(PastaMusical::especial(
+            Tipo::Favoritas,
+            ordem_salva(CHAVE_FAVORITAS, Ordem::Padrao),
+        ));
+        e.pastas.push(PastaMusical::especial(
+            Tipo::MaisTocadas,
+            ordem_salva(CHAVE_MAIS_TOCADAS, Ordem::Padrao),
+        ));
 
         // Carrega as pastas salvas. Se alguma não existir mais, é pulada, e o
-        // mapeamento mantém os índices salvos coerentes com a nova lista.
+        // mapeamento mantém os índices salvos (de configs antigas) coerentes
+        // com a nova lista.
         let mut mapeamento: Vec<Option<usize>> = Vec::with_capacity(config.pastas.len());
         for caminho_salvo in &config.pastas {
             let caminho = PathBuf::from(caminho_salvo);
@@ -1695,28 +2481,30 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 mapeamento.push(None);
                 continue;
             }
-
-            let nome = nome_da_pasta(&caminho);
             // Sem escanear: as faixas entram sob demanda
-            e.pastas.push(PastaMusical {
-                caminho,
-                nome,
-                tracks: Vec::new(),
-                carregada: false,
-            });
+            let mut pasta = PastaMusical::pasta(caminho);
+            pasta.ordem = ordem_salva(caminho_salvo, Ordem::Padrao);
+            e.pastas.push(pasta);
             mapeamento.push(Some(e.pastas.len() - 1));
         }
 
-        if !e.pastas.is_empty() {
-            e.aba_visivel = mapeamento
-                .get(config.aba_visivel_salva)
-                .copied()
-                .flatten()
-                .unwrap_or(0);
-        }
-        e.pasta_reproducao = config
-            .pasta_reproducao_salva
-            .and_then(|i| mapeamento.get(i).copied().flatten());
+        let pela_chave = |chave: &Option<String>| {
+            let chave = chave.as_deref()?;
+            e.pastas.iter().position(|p| p.chave() == chave)
+        };
+        let legado = |i: Option<usize>| i.and_then(|i| mapeamento.get(i).copied().flatten());
+        let primeira_pasta = if e.pastas.len() > ESPECIAIS {
+            ESPECIAIS
+        } else {
+            0
+        };
+        let aba = pela_chave(&config.aba_salva)
+            .or_else(|| legado(Some(config.aba_visivel_salva)))
+            .unwrap_or(primeira_pasta);
+        let reproducao =
+            pela_chave(&config.lista_salva).or_else(|| legado(config.pasta_reproducao_salva));
+        e.aba_visivel = aba;
+        e.pasta_reproducao = reproducao;
 
         // Só a aba visível e a pasta que estava tocando precisam das faixas agora
         let aba = e.aba_visivel;
@@ -1799,7 +2587,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let ui_fraca = ui.as_weak();
         ui.on_play_pause(move || {
             if let Some(ui) = ui_fraca.upgrade() {
-                alternar_play_pause(&estado.borrow(), &ui);
+                alternar_play_pause(&mut estado.borrow_mut(), &ui);
             }
         });
     }
@@ -1834,6 +2622,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let lang = translations::get_translations(&e.idioma);
                 ui.set_texto_loop(texto_loop(e.modo_loop, &lang).into());
                 ui.set_loop_ativo(e.modo_loop != 0);
+                desengatilhar(&mut e, &ui);
                 atualizar_fila(&mut e);
                 salvar_configuracao(&e);
             }
@@ -1847,6 +2636,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             if let Some(ui) = ui_fraca.upgrade() {
                 let mut e = estado.borrow_mut();
                 e.modo_shuffle = (e.modo_shuffle + 1) % 3;
+                // A engatilhada foi escolhida no modo antigo
+                desengatilhar(&mut e, &ui);
                 // Sacola da pasta antiga não serve pro modo novo.
                 e.sacola_shuffle.clear();
                 e.sorteio.clear();
@@ -1904,6 +2695,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let lang = translations::get_translations(&e.idioma);
                 ui.set_texto_loop(texto_loop(e.modo_loop, &lang).into());
                 ui.set_texto_shuffle(texto_shuffle(e.modo_shuffle, &lang).into());
+                publicar_crossfade(&e, &ui);
+                atualizar_abas(&e, &ui);
                 let t = idioma.to_string();
                 drop(e);
                 aplicar_idioma(&t, &ui);
@@ -1918,9 +2711,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ui.on_volume_mudou(move |v| {
             let mut e = estado.borrow_mut();
             e.volume_atual = v;
-            if let Some(ref sink) = e.audio_player {
-                sink.set_volume(v);
-            }
+            aplicar_volume(&e, v);
             // Sem salvar aqui: o slider dispara a cada pixel arrastado, e o
             // save ao fechar a janela já persiste o volume.
         });
@@ -1933,13 +2724,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             if let Some(ui) = ui_fraca.upgrade() {
                 let mut e = estado.borrow_mut();
                 let alvo = (v as f64 * e.duracao_total_secs as f64) as u64;
-                match efeito_seek(e.audio_player.is_some(), e.arquivo_atual.is_some()) {
-                    // Arrastar a barra com a faixa pausada não pode dar play:
-                    // executar_seek recria o Sink já tocando.
-                    EfeitoSeek::ManterEstado => seek_mantendo_pausa(&mut e, &ui, alvo),
-                    EfeitoSeek::Recarregar => executar_seek(&mut e, &ui, alvo),
-                    EfeitoSeek::Nada => {}
-                }
+                // Arrastar a barra com a faixa pausada não pode dar play
+                seek_pedido(&mut e, &ui, alvo);
             }
         });
     }
@@ -1967,6 +2753,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let Some(absoluto) = e.letra_janela_inicio.checked_add(posicao as usize) else {
                     return;
                 };
+                if e.letra_livre {
+                    return;
+                }
                 let Some((tempo, _)) = e.letra_atual.get(absoluto) else {
                     return;
                 };
@@ -2049,7 +2838,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let e = &mut *e;
                 let tocando = e.audio_player.as_ref().is_some_and(|p| !p.is_paused());
                 if let Some(imv) = e.imersivo.as_mut() {
-                    imv.tick(&ui, &e.idioma, &e.captura, tocando);
+                    imv.tick(&ui, &e.idioma, &e.captura, tocando, e.fundo_reativo);
                 }
             });
         });
@@ -2094,6 +2883,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ui.on_letra_completa_clicada(move |indice| {
             if let Some(ui) = ui_fraca.upgrade() {
                 let mut e = estado.borrow_mut();
+                if e.letra_livre {
+                    return;
+                }
                 let Some((tempo, _)) = usize::try_from(indice)
                     .ok()
                     .and_then(|i| e.letra_atual.get(i))
@@ -2168,6 +2960,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let Some(pasta_idx) = e.pasta_reproducao else {
                 return;
             };
+            // Clicou em outra que não a engatilhada: ela volta para a fila
+            if let Some(eng) = e.engatilhada.take()
+                && eng.indice != indice
+            {
+                devolver_a_fila(&mut e, eng.indice);
+            }
             // Pular para uma faixa da fila consome a fila até ela
             match e.modo_shuffle {
                 2 => e.sacola_shuffle.retain(|&i| i != indice),
@@ -2192,10 +2990,156 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let mut e = estado.borrow_mut();
             e.sono = sono::proximo(e.sono, Instant::now());
             // Trocar ou desligar no meio do esmaecimento devolve o volume
-            if let Some(sink) = &e.audio_player {
-                sink.set_volume(e.volume_atual);
+            aplicar_volume(&e, e.volume_atual);
+            // "Fim da faixa" pausa na próxima: ela não pode já estar na fila
+            if e.sono == Some(sono::Sono::FimDaFaixa) {
+                desengatilhar(&mut e, &ui);
             }
             verificar_sono(&mut e, &ui);
+        });
+    }
+
+    {
+        let estado = estado.clone();
+        let ui_fraca = ui.as_weak();
+        ui.on_ordem_escolhida(move |indice| {
+            let Some(ui) = ui_fraca.upgrade() else {
+                return;
+            };
+            let mut e = estado.borrow_mut();
+            let aba = e.aba_visivel;
+            let Some(pasta) = e.pastas.get_mut(aba) else {
+                return;
+            };
+            pasta.ordem = Ordem::de_indice(indice.max(0) as usize);
+            // A ordem nova é a da navegação: a fila em ordem muda, a do
+            // shuffle não (sorteio não depende de ordem)
+            atualizar_lista(&mut e, &ui);
+            salvar_configuracao(&e);
+        });
+    }
+
+    {
+        let estado = estado.clone();
+        let ui_fraca = ui.as_weak();
+        ui.on_favorita_alternada(move |posicao| {
+            let Some(ui) = ui_fraca.upgrade() else {
+                return;
+            };
+            let mut e = estado.borrow_mut();
+            let Some(chave) = e
+                .indices_visiveis
+                .get(posicao.max(0) as usize)
+                .and_then(|&i| e.pastas.get(e.aba_visivel)?.chave_faixa(i))
+            else {
+                return;
+            };
+            alternar_favorita(&mut e, &ui, &chave);
+        });
+    }
+
+    {
+        let estado = estado.clone();
+        let ui_fraca = ui.as_weak();
+        ui.on_alternar_favorita_atual(move || {
+            let Some(ui) = ui_fraca.upgrade() else {
+                return;
+            };
+            let mut e = estado.borrow_mut();
+            if let Some(chave) = chave_atual(&e) {
+                alternar_favorita(&mut e, &ui, &chave);
+            }
+        });
+    }
+
+    {
+        let estado = estado.clone();
+        let ui_fraca = ui.as_weak();
+        ui.on_alternar_crossfade(move || {
+            let Some(ui) = ui_fraca.upgrade() else {
+                return;
+            };
+            let mut e = estado.borrow_mut();
+            e.crossfade = proximo_crossfade(e.crossfade);
+            publicar_crossfade(&e, &ui);
+            salvar_configuracao(&e);
+        });
+    }
+
+    {
+        let estado = estado.clone();
+        let ui_fraca = ui.as_weak();
+        ui.on_alternar_replaygain(move |ligado| {
+            let Some(ui) = ui_fraca.upgrade() else {
+                return;
+            };
+            let mut e = estado.borrow_mut();
+            e.replaygain = ligado;
+            // O ganho mora na fonte: refaz a faixa atual no mesmo ponto
+            let pos = e.audio_player.as_ref().map(|p| p.get_pos().as_secs());
+            if let Some(pos) = pos {
+                seek_mantendo_pausa(&mut e, &ui, pos);
+            }
+            salvar_configuracao(&e);
+        });
+    }
+
+    {
+        let estado = estado.clone();
+        ui.on_alternar_fundo_reativo(move |ligado| {
+            let mut e = estado.borrow_mut();
+            e.fundo_reativo = ligado;
+            salvar_configuracao(&e);
+        });
+    }
+
+    {
+        let estado = estado.clone();
+        let ui_fraca = ui.as_weak();
+        ui.on_imv_guia_mudou(move |guia| {
+            let Some(ui) = ui_fraca.upgrade() else {
+                return;
+            };
+            let mut e = estado.borrow_mut();
+            if let Some(p) = e.imersivo.as_mut().and_then(|i| i.painel.as_mut()) {
+                p.mostrar_albuns(guia == painel::GUIA_ALBUNS);
+            }
+            atualizar_painel(&mut e, &ui);
+        });
+    }
+
+    {
+        let estado = estado.clone();
+        let ui_fraca = ui.as_weak();
+        ui.on_imv_albuns_rolou(move |primeira, quantas| {
+            if ui_fraca.upgrade().is_none() {
+                return;
+            }
+            let mut e = estado.borrow_mut();
+            if let Some(p) = e.imersivo.as_mut().and_then(|i| i.painel.as_mut()) {
+                p.albuns_rolou(primeira.max(0) as usize, quantas.max(0) as usize);
+            }
+        });
+    }
+
+    {
+        let estado = estado.clone();
+        let ui_fraca = ui.as_weak();
+        ui.on_imv_album_clicado(move |posicao| {
+            let Some(ui) = ui_fraca.upgrade() else {
+                return;
+            };
+            let mut e = estado.borrow_mut();
+            let Some(grupo) = e
+                .imersivo
+                .as_ref()
+                .and_then(|i| i.painel.as_ref())
+                .and_then(|p| p.album(posicao.max(0) as usize))
+                .cloned()
+            else {
+                return;
+            };
+            abrir_album(&mut e, &ui, &grupo);
         });
     }
 
@@ -2251,6 +3195,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 verificar_sono(&mut e, &ui);
                 if e.imersivo.is_some() {
                     atualizar_relogio(&ui);
+                    atualizar_previa(&mut e, &ui);
                 }
                 #[cfg(feature = "mpris")]
                 sincronizar_controles(&controles, &mut e);
@@ -2475,6 +3420,79 @@ mod tests {
         assert_eq!(efeito_seek(false, false), EfeitoSeek::Nada);
     }
 
+    /// Renderiza o modo normal num PNG (`target/captura-normal.png`), com as
+    /// faixas da pasta de `FURINAR_CAPTURA_FAIXA`. Manual, como a do imersivo.
+    #[test]
+    #[ignore = "gera PNG para inspeção visual"]
+    fn captura_modo_normal() {
+        use slint::platform::software_renderer::{
+            MinimalSoftwareWindow, PremultipliedRgbaColor, RepaintBufferType,
+        };
+        use slint::platform::{Platform, WindowAdapter};
+
+        struct Plataforma(Rc<MinimalSoftwareWindow>);
+        impl Platform for Plataforma {
+            fn create_window_adapter(&self) -> Result<Rc<dyn WindowAdapter>, slint::PlatformError> {
+                Ok(self.0.clone())
+            }
+        }
+
+        let (largura, altura) = (660u32, 734u32);
+        let janela = MinimalSoftwareWindow::new(RepaintBufferType::NewBuffer);
+        slint::platform::set_platform(Box::new(Plataforma(janela.clone())))
+            .expect("plataforma de teste");
+        janela.set_size(slint::PhysicalSize::new(largura, altura));
+        let ui = MainWindow::new().expect("MainWindow");
+        ui.show().expect("show");
+        aplicar_idioma("pt-br", &ui);
+
+        let caminho = std::env::var_os("FURINAR_CAPTURA_FAIXA")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| fixture("tone.mp3"));
+        let raiz = caminho.parent().map(PathBuf::from).unwrap_or_default();
+        let mut e = EstadoAudio::default();
+        e.pastas
+            .push(PastaMusical::especial(Tipo::Favoritas, Ordem::Padrao));
+        e.pastas
+            .push(PastaMusical::especial(Tipo::MaisTocadas, Ordem::Padrao));
+        e.pastas.push(PastaMusical::pasta(raiz));
+        e.aba_visivel = ESPECIAIS;
+        garantir_pasta_carregada(&mut e, ESPECIAIS);
+        e.pastas[ESPECIAIS].ordem = Ordem::Album;
+        for i in [1, 3] {
+            if let Some(k) = e.pastas[ESPECIAIS].chave_faixa(i) {
+                e.biblioteca.alternar_favorita(&k);
+            }
+        }
+        e.pasta_reproducao = Some(ESPECIAIS);
+        e.arquivo_atual = e.pastas[ESPECIAIS].tracks.get(2).map(|t| t.path.clone());
+        e.indice_atual = Some(2);
+        atualizar_abas(&e, &ui);
+        atualizar_lista(&mut e, &ui);
+        ui.set_sono_texto("14:59".into());
+        ui.set_texto_tempo("01:14 / 03:31".into());
+        ui.set_progresso(0.35);
+
+        for _ in 0..10 {
+            slint::platform::update_timers_and_animations();
+        }
+        let mut pixels = vec![PremultipliedRgbaColor::default(); (largura * altura) as usize];
+        janela.request_redraw();
+        janela.draw_if_needed(|r| {
+            r.render(&mut pixels, largura as usize);
+        });
+        let bytes: Vec<u8> = pixels
+            .iter()
+            .flat_map(|p| [p.red, p.green, p.blue, 255])
+            .collect();
+        let saida = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target/captura-normal.png");
+        image::RgbaImage::from_raw(largura, altura, bytes)
+            .expect("buffer")
+            .save(&saida)
+            .expect("salvar png");
+        println!("captura em {}", saida.display());
+    }
+
     /// Renderiza o modo imersivo num PNG, sem abrir janela, para inspeção
     /// visual. Manual:
     ///
@@ -2521,8 +3539,8 @@ mod tests {
         imv.trocar_faixa(
             &ui,
             Some(imersivo::Faixa {
-                titulo: track::ler_tags(&caminho).0,
-                artista: track::ler_tags(&caminho).1,
+                titulo: track::ler_tags(&caminho).titulo,
+                artista: track::ler_tags(&caminho).artista,
                 pasta_raiz: caminho.parent().map(PathBuf::from).unwrap_or_default(),
                 fundo_global: std::env::var_os("FURINAR_CAPTURA_FUNDO").map(PathBuf::from),
                 caminho: caminho.clone(),
@@ -2542,7 +3560,9 @@ mod tests {
         ui.set_progresso(0.35);
         ui.set_texto_tempo("01:14 / 03:31".into());
         ui.set_imv_relogio("21:47".into());
-        ui.set_imv_sono("29:41".into());
+        ui.set_sono_texto("29:41".into());
+        ui.set_favorita_atual(true);
+        ui.set_imv_proxima("Próxima faixa — Artista".into());
 
         // FURINAR_CAPTURA_PAINEL=1: painel aberto com as faixas da pasta
         if std::env::var_os("FURINAR_CAPTURA_PAINEL").is_some() {
@@ -2552,35 +3572,58 @@ mod tests {
             tracks.sort_by(|a, b| a.path.cmp(&b.path));
             let nome = caminho.strip_prefix(&raiz).ok().and_then(|n| n.to_str());
             let atual = tracks.iter().position(|t| Some(t.path.as_str()) == nome);
-            let pasta = PastaMusical {
-                nome: nome_da_pasta(&raiz),
-                caminho: raiz,
-                tracks,
-                carregada: true,
-            };
+            let mut pasta = PastaMusical::pasta(raiz);
+            pasta.tracks = tracks;
+            pasta.carregada = true;
+            let mut bib = Biblioteca::default();
+            if let Some(k) = atual.and_then(|i| pasta.chave_faixa(i + 1)) {
+                bib.alternar_favorita(&k);
+            }
             ui.set_abas(ModelRc::new(VecModel::from(vec![
+                SharedString::from("Favoritas"),
+                "Mais tocadas".into(),
                 SharedString::from(pasta.nome.as_str()),
                 "Outra pasta".into(),
             ])));
-            ui.set_aba_tocando(0);
+            ui.set_aba_ativa(2);
+            ui.set_aba_tocando(2);
             ui.set_indice_selecionado(atual.map_or(-1, |i| i as i32));
+            // Um quadro antes: a tela imersiva tem que existir para o
+            // `changed painel_aberto` dela disparar e centralizar a lista
+            janela.request_redraw();
+            janela.draw_if_needed(|r| {
+                let mut lixo = vec![PremultipliedRgbaColor::default(); (largura * altura) as usize];
+                r.render(&mut lixo, largura as usize);
+            });
             ui.set_imv_painel_aberto(true);
             let mut p = painel::Painel::novo(&ui);
             let inicio = atual.unwrap_or(0).saturating_sub(6);
             p.rolou(inicio, 17);
             p.publicar(&ui, pasta.tracks.len(), |pos| {
-                item_painel(&pasta, pos, atual)
+                item_painel(&pasta, pos, atual, &bib)
             });
             let fila = (1..=5)
-                .filter_map(|k| item_painel(&pasta, atual.unwrap_or(0) + k, None))
+                .filter_map(|k| item_painel(&pasta, atual.unwrap_or(0) + k, None, &bib))
                 .collect();
             p.publicar_fila(fila);
+            // FURINAR_CAPTURA_ALBUNS=1: a guia da grade
+            if std::env::var_os("FURINAR_CAPTURA_ALBUNS").is_some() {
+                let todas: Vec<usize> = (0..pasta.tracks.len()).collect();
+                p.mostrar_albuns(true);
+                p.albuns_rolou(0, 12);
+                p.publicar_albuns(
+                    track::agrupar_albuns(&pasta.tracks, &todas),
+                    &translations::pt_br(),
+                    |i| pasta.caminho_faixa(i),
+                );
+                ui.set_imv_guia(painel::GUIA_ALBUNS);
+            }
             imv.painel = Some(p);
         }
 
         // Espera a thread da capa e deixa as animações chegarem ao fim
         for _ in 0..40 {
-            imv.tick(&ui, "pt-br", &captura, true);
+            imv.tick(&ui, "pt-br", &captura, true, true);
             slint::platform::update_timers_and_animations();
             std::thread::sleep(Duration::from_millis(50));
         }

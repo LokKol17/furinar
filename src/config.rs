@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
@@ -11,12 +12,23 @@ pub struct AppConfig {
     /// Pastas abertas, na ordem das abas.
     #[serde(default)]
     pub pastas: Vec<String>,
-    /// Aba que estava sendo exibida.
-    #[serde(default)]
+    /// Campos antigos (posições nas listas): só para migrar configs antigas.
+    /// Posição não sobrevive a uma faixa nova na pasta; hoje vale o caminho.
+    #[serde(default, skip_serializing)]
     pub aba_visivel_salva: usize,
-    /// Pasta de onde vinha a faixa que estava tocando.
-    #[serde(default)]
+    #[serde(default, skip_serializing)]
     pub pasta_reproducao_salva: Option<usize>,
+    #[serde(default, skip_serializing)]
+    pub indice_atual: Option<usize>,
+    /// Aba exibida e lista de onde vinha a faixa (caminho da pasta, ou a
+    /// chave de uma lista especial).
+    #[serde(default)]
+    pub aba_salva: Option<String>,
+    #[serde(default)]
+    pub lista_salva: Option<String>,
+    /// Faixa que tocava (caminho absoluto) e a posição, em segundos.
+    #[serde(default)]
+    pub faixa_salva: Option<String>,
     /// Sem `default` o JSON de uma versão antiga não parseava e a configuração
     /// inteira era descartada — com volume virando 0.0 (mudo).
     #[serde(default = "default_volume")]
@@ -30,9 +42,22 @@ pub struct AppConfig {
     #[serde(default)]
     pub modo_shuffle: u8,
     #[serde(default)]
-    pub indice_atual: Option<usize>,
-    #[serde(default)]
     pub tempo_atual: Option<u64>,
+    /// Próximas do shuffle já sorteadas (caminhos absolutos), para retomar a
+    /// mesma fila.
+    #[serde(default)]
+    pub fila_shuffle: Vec<String>,
+    /// Ordem escolhida em cada aba (chave da lista → `Ordem::indice`).
+    #[serde(default)]
+    pub ordens: HashMap<String, u8>,
+    /// Crossfade em segundos (0 = só gapless).
+    #[serde(default)]
+    pub crossfade: u8,
+    #[serde(default = "verdadeiro")]
+    pub replaygain: bool,
+    /// Fundo do modo imersivo pulsando com os graves.
+    #[serde(default = "verdadeiro")]
+    pub fundo_reativo: bool,
     #[serde(default)]
     pub escanear_subpastas: bool,
     /// Tema claro ligado. `false` = escuro (padrão, mantém quem já usa o app).
@@ -52,12 +77,20 @@ impl Default for AppConfig {
             pastas: Vec::new(),
             aba_visivel_salva: 0,
             pasta_reproducao_salva: None,
+            indice_atual: None,
+            aba_salva: None,
+            lista_salva: None,
+            faixa_salva: None,
             volume: default_volume(),
             modo_loop: 0,
             shuffle: false,
             modo_shuffle: 0,
-            indice_atual: None,
             tempo_atual: None,
+            fila_shuffle: Vec::new(),
+            ordens: HashMap::new(),
+            crossfade: 0,
+            replaygain: true,
+            fundo_reativo: true,
             escanear_subpastas: false,
             tema_claro: false,
             idioma: default_idioma(),
@@ -68,6 +101,10 @@ impl Default for AppConfig {
 
 fn default_volume() -> f32 {
     0.8
+}
+
+fn verdadeiro() -> bool {
+    true
 }
 
 fn default_idioma() -> String {
@@ -167,6 +204,9 @@ mod tests {
         assert_eq!(config.modo_loop, 0);
         assert_eq!(config.pastas, vec!["/musica".to_string()]);
         assert!(config.tema_claro);
+        // Opções novas ligadas para quem vem de uma versão antiga
+        assert!(config.replaygain && config.fundo_reativo);
+        assert_eq!(config.crossfade, 0);
     }
 
     #[test]

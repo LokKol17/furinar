@@ -1,10 +1,11 @@
 // ---------------------------------------------------------------------
 // Painel da biblioteca do modo imersivo
 //
-// Gaveta à direita com as abas das pastas, a busca, a lista da aba visível e
-// a fila "a seguir". A lista é virtualizada pelo Rust: chegam só as linhas
-// ao redor do trecho visível (`linhas`, começando em `primeira`), e o painel
-// avisa quando rola (`rolou`).
+// Gaveta à direita com as abas das pastas, a busca, a lista da aba visível,
+// a fila "a seguir" e a grade de álbuns. A lista é virtualizada pelo Rust:
+// chegam só as linhas ao redor do trecho visível (`linhas`, começando em
+// `primeira`), e o painel avisa quando rola (`rolou`). A grade recebe todos
+// os cartões, mas só os à vista têm imagem (`albuns_rolou`).
 // ---------------------------------------------------------------------
 
 import { I18n } from "i18n.slint";
@@ -16,6 +17,14 @@ export struct LinhaPainel {
     capa: image,
     tem_capa: bool,
     tocando: bool,
+    favorita: bool,
+}
+
+export struct CartaoAlbum {
+    nome: string,
+    detalhe: string,
+    capa: image,
+    tem_capa: bool,
 }
 
 component Linha inherits Rectangle {
@@ -23,7 +32,10 @@ component Linha inherits Rectangle {
     in property <bool> selecionada: false;
     in property <color> cor;
     in property <[float]> barras: [];
+    /// Linha da lista (na fila a estrela só aparece, não alterna)
+    in property <bool> com_estrela: true;
     callback clicado();
+    callback estrela();
 
     height: 56px;
     border-radius: 8px;
@@ -75,7 +87,7 @@ component Linha inherits Rectangle {
 
     VerticalLayout {
         x: 60px;
-        width: root.width - self.x - 62px;
+        width: root.width - self.x - 88px;
         alignment: center;
         spacing: 2px;
 
@@ -93,6 +105,21 @@ component Linha inherits Rectangle {
             font-size: 12px;
             overflow: elide;
         }
+    }
+
+    if root.dados.favorita || (root.com_estrela && (toque.has-hover || estrela_toque.has-hover)) : Image {
+        x: root.width - 76px;
+        y: (root.height - self.height) / 2;
+        width: 14px;
+        height: 14px;
+        source: root.dados.favorita ? @image-url("icons/estrela_cheia.svg") : @image-url("icons/estrela.svg");
+        colorize: root.dados.favorita ? root.cor : #ffffff80;
+    }
+    estrela_toque := TouchArea {
+        x: root.width - 84px;
+        width: 30px;
+        enabled: root.com_estrela;
+        clicked => { root.estrela(); }
     }
 
     Text {
@@ -148,7 +175,19 @@ export component PainelBiblioteca inherits Rectangle {
     in property <int> pedido_busca;
     in property <color> cor;
     in property <[float]> barras;
+    in property <[CartaoAlbum]> albuns;
+    /// 0 = biblioteca, 1 = a seguir, 2 = álbuns
+    in-out property <int> guia: 0;
+    in property <int> ordem_atual;
+    in property <[string]> opcoes_ordem;
+    /// Abas especiais no começo (favoritas, mais tocadas)
+    in property <int> especiais;
 
+    callback guia_mudou(int);
+    callback albuns_rolou(int, int);
+    callback album_clicado(int);
+    callback ordem_escolhida(int);
+    callback favorita_alternada(int);
     callback aba_selecionada(int);
     callback busca_mudou(string);
     callback rolou(int, int);
@@ -157,9 +196,25 @@ export component PainelBiblioteca inherits Rectangle {
     callback devolver_foco();
     callback fechar();
 
-    /// 0 = biblioteca, 1 = a seguir
-    property <int> guia: 0;
     property <length> passo: 60px;
+    // Grade: três colunas de cartões
+    property <int> colunas: 3;
+    property <length> vao: 12px;
+    property <length> largura_cartao: (grade.width - (root.colunas - 1) * root.vao) / root.colunas;
+    property <length> altura_cartao: root.largura_cartao + 48px;
+
+    changed guia => {
+        root.guia_mudou(root.guia);
+        if (root.guia == 2) {
+            root.informar_grade();
+        }
+    }
+
+    function informar_grade() {
+        root.albuns_rolou(
+            max(0, floor(-grade.content-y / (root.altura_cartao + root.vao))) * root.colunas,
+            (ceil(grade.height / (root.altura_cartao + root.vao)) + 1) * root.colunas);
+    }
 
     background: #0a0e15eb;
 
@@ -198,6 +253,11 @@ export component PainelBiblioteca inherits Rectangle {
     public function abrir() {
         root.guia = 0;
         root.centralizar();
+    }
+    changed albuns => {
+        if (root.guia == 2) {
+            root.informar_grade();
+        }
     }
     changed pedido_rolar => {
         root.guia = 0;
@@ -240,6 +300,12 @@ export component PainelBiblioteca inherits Rectangle {
             cor: root.cor;
             clicado => { root.guia = 1; }
         }
+        Guia {
+            texto: I18n.albums;
+            ativa: root.guia == 2;
+            cor: root.cor;
+            clicado => { root.guia = 2; }
+        }
         Rectangle { horizontal-stretch: 1; }
         Rectangle {
             width: 32px;
@@ -267,7 +333,7 @@ export component PainelBiblioteca inherits Rectangle {
     Rectangle {
         y: 64px;
         height: root.height - self.y;
-        visible: root.guia == 0;
+        visible: root.guia != 1;
 
         Flickable {
             x: 20px;
@@ -282,14 +348,27 @@ export component PainelBiblioteca inherits Rectangle {
 
                 for nome[i] in root.abas: Rectangle {
                     height: 32px;
-                    width: min(180px, chip_texto.preferred-width + (i == root.aba_tocando ? 40px : 28px));
+                    width: i < root.especiais
+                        ? (i == root.aba_tocando ? 50px : 38px)
+                        : min(180px, chip_texto.preferred-width + (i == root.aba_tocando ? 40px : 28px));
                     border-radius: 16px;
                     background: i == root.aba_ativa ? root.cor.with-alpha(0.28) : (chip_toque.has-hover ? #ffffff1a : #ffffff0d);
                     border-width: 1px;
                     border-color: i == root.aba_ativa ? root.cor.with-alpha(0.7) : #ffffff1a;
                     animate background, border-color { duration: 130ms; }
 
+                    if i < root.especiais : Image {
+                        source: i == 0 ? @image-url("icons/estrela.svg") : @image-url("icons/tocadas.svg");
+                        x: 12px;
+                        y: (parent.height - self.height) / 2;
+                        width: 14px;
+                        height: 14px;
+                        colorize: i == root.aba_ativa ? #ffffff : #ffffffb0;
+                        accessible-role: text;
+                        accessible-label: nome;
+                    }
                     chip_texto := Text {
+                        visible: i >= root.especiais;
                         x: 14px;
                         width: parent.width - (i == root.aba_tocando ? 40px : 28px);
                         height: parent.height;
@@ -322,7 +401,7 @@ export component PainelBiblioteca inherits Rectangle {
         Rectangle {
             x: 20px;
             y: 44px;
-            width: root.width - 40px;
+            width: root.width - 40px - 48px;
             height: 40px;
             border-radius: 20px;
             background: #ffffff14;
@@ -373,7 +452,71 @@ export component PainelBiblioteca inherits Rectangle {
             }
         }
 
+        // Ordenar
+        botao_ordem := Rectangle {
+            x: root.width - 20px - 40px;
+            y: 44px;
+            width: 40px;
+            height: 40px;
+            border-radius: 20px;
+            background: ordem_toque.has-hover ? #ffffff26 : #ffffff14;
+            border-width: 1px;
+            border-color: root.ordem_atual != 0 ? root.cor.with-alpha(0.8) : #ffffff1a;
+            animate background { duration: 120ms; }
+
+            Image {
+                source: @image-url("icons/ordenar.svg");
+                width: 16px;
+                height: 16px;
+                x: (parent.width - self.width) / 2;
+                y: (parent.height - self.height) / 2;
+                colorize: root.ordem_atual != 0 ? root.cor : #ffffffcc;
+            }
+            ordem_toque := TouchArea {
+                clicked => { menu_ordem.show(); }
+            }
+        }
+        menu_ordem := PopupWindow {
+            x: root.width - 20px - 220px;
+            y: 88px;
+            width: 220px;
+
+            Rectangle {
+                background: #101722f5;
+                border-radius: 12px;
+                border-width: 1px;
+                border-color: #ffffff1f;
+
+                VerticalLayout {
+                    padding: 6px;
+
+                    for nome[i] in root.opcoes_ordem: Rectangle {
+                        height: 34px;
+                        border-radius: 8px;
+                        background: opcao_toque.has-hover ? #ffffff14 : transparent;
+
+                        opcao_toque := TouchArea {
+                            clicked => {
+                                root.ordem_escolhida(i);
+                                root.devolver_foco();
+                            }
+                        }
+                        Text {
+                            x: 12px;
+                            height: parent.height;
+                            text: nome;
+                            color: i == root.ordem_atual ? root.cor : #ffffffd0;
+                            font-weight: i == root.ordem_atual ? 700 : 400;
+                            font-size: 13px;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+            }
+        }
+
         lista := Flickable {
+            visible: root.guia == 0;
             x: 12px;
             y: 96px;
             width: root.width - 24px;
@@ -395,10 +538,93 @@ export component PainelBiblioteca inherits Rectangle {
                     root.linha_clicada(root.primeira + i);
                     root.devolver_foco();
                 }
+                estrela => { root.favorita_alternada(root.primeira + i); }
             }
         }
 
-        if root.total == 0 : Text {
+        // Grade de álbuns
+        grade := Flickable {
+            visible: root.guia == 2;
+            x: 20px;
+            y: 96px;
+            width: root.width - 40px;
+            height: parent.height - self.y - 12px;
+            content-height: ceil(root.albuns.length / root.colunas) * (root.altura_cartao + root.vao);
+
+            changed content-y => { root.informar_grade(); }
+            changed height => { root.informar_grade(); }
+
+            for a[i] in root.albuns: Rectangle {
+                x: mod(i, root.colunas) * (root.largura_cartao + root.vao);
+                y: floor(i / root.colunas) * (root.altura_cartao + root.vao);
+                width: root.largura_cartao;
+                height: root.altura_cartao;
+                border-radius: 8px;
+                background: cartao_toque.has-hover ? #ffffff14 : transparent;
+                animate background { duration: 120ms; }
+
+                Rectangle {
+                    x: 0px;
+                    y: 0px;
+                    width: parent.width;
+                    height: parent.width;
+                    border-radius: 6px;
+                    clip: true;
+                    background: root.cor.with-alpha(0.25);
+
+                    if a.tem_capa : Image {
+                        width: parent.width;
+                        height: parent.height;
+                        source: a.capa;
+                        image-fit: cover;
+                    }
+                    if !a.tem_capa : Image {
+                        source: @image-url("icons/disco.svg");
+                        width: parent.width * 0.3;
+                        height: self.width;
+                        x: (parent.width - self.width) / 2;
+                        y: (parent.height - self.height) / 2;
+                        colorize: #ffffff70;
+                    }
+                }
+                Text {
+                    x: 2px;
+                    y: parent.width + 6px;
+                    width: parent.width - 4px;
+                    text: a.nome;
+                    color: #ffffff;
+                    font-size: 13px;
+                    font-weight: 600;
+                    overflow: elide;
+                }
+                Text {
+                    x: 2px;
+                    y: parent.width + 25px;
+                    width: parent.width - 4px;
+                    text: a.detalhe;
+                    color: #ffffff8c;
+                    font-size: 11px;
+                    overflow: elide;
+                }
+                cartao_toque := TouchArea {
+                    clicked => {
+                        root.album_clicado(i);
+                        root.devolver_foco();
+                    }
+                }
+            }
+        }
+
+        if root.guia == 2 && root.albuns.length == 0 : Text {
+            y: 120px;
+            width: root.width;
+            text: I18n.albums_empty;
+            color: #ffffff80;
+            font-size: 14px;
+            horizontal-alignment: center;
+        }
+
+        if root.guia == 0 && root.total == 0 : Text {
             y: 120px;
             width: root.width;
             text: I18n.library_empty;
@@ -422,6 +648,7 @@ export component PainelBiblioteca inherits Rectangle {
             width: root.width - 24px;
             dados: l;
             cor: root.cor;
+            com_estrela: false;
             clicado => {
                 root.fila_clicada(i);
                 root.devolver_foco();

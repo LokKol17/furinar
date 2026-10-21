@@ -23,6 +23,40 @@ pub fn pt_br() -> Translations {
     t.insert("tip_lyrics_only", "Só a letra (H)");
     t.insert("tip_sleep", "Temporizador de sono");
     t.insert("sleep_end", "Fim da faixa");
+    t.insert("tab_favorites", "Favoritas");
+    t.insert("tab_most_played", "Mais tocadas");
+    t.insert(
+        "favorites_empty",
+        "Nenhuma favorita ainda. Marque faixas com a estrela (ou F).",
+    );
+    t.insert(
+        "most_played_empty",
+        "As faixas que você mais ouve aparecem aqui.",
+    );
+    t.insert("tip_sort", "Ordenar");
+    t.insert("tip_favorite", "Favoritar (F)");
+    t.insert("sort_default", "Padrão");
+    t.insert("sort_title", "Título");
+    t.insert("sort_artist", "Artista");
+    t.insert("sort_album", "Álbum");
+    t.insert("sort_duration", "Duração");
+    t.insert("sort_added", "Adicionadas recentemente");
+    t.insert("sort_plays", "Mais tocadas");
+    t.insert("albums", "Álbuns");
+    t.insert("albums_empty", "Nenhum álbum aqui.");
+    t.insert("album_track", "faixa");
+    t.insert("album_tracks", "faixas");
+    t.insert("various_artists", "Vários artistas");
+    t.insert("no_album", "Sem álbum");
+    t.insert("up_next_preview", "A seguir");
+    t.insert("crossfade", "Crossfade");
+    t.insert("crossfade_off", "Desligado");
+    t.insert("replaygain", "Normalizar volume (ReplayGain)");
+    t.insert(
+        "replaygain_desc",
+        "Usa o ganho gravado nas tags para as faixas tocarem no mesmo volume.",
+    );
+    t.insert("reactive_bg", "Fundo da tela cheia pulsa com a música");
     t.insert("stereo", "Estéreo");
     t.insert("mono", "Mono");
     t.insert("decimal_sep", ",");
@@ -76,6 +110,40 @@ pub fn en() -> Translations {
     t.insert("tip_lyrics_only", "Lyrics only (H)");
     t.insert("tip_sleep", "Sleep timer");
     t.insert("sleep_end", "End of track");
+    t.insert("tab_favorites", "Favorites");
+    t.insert("tab_most_played", "Most played");
+    t.insert(
+        "favorites_empty",
+        "No favorites yet. Star tracks (or press F).",
+    );
+    t.insert(
+        "most_played_empty",
+        "The tracks you play the most show up here.",
+    );
+    t.insert("tip_sort", "Sort");
+    t.insert("tip_favorite", "Favorite (F)");
+    t.insert("sort_default", "Default");
+    t.insert("sort_title", "Title");
+    t.insert("sort_artist", "Artist");
+    t.insert("sort_album", "Album");
+    t.insert("sort_duration", "Duration");
+    t.insert("sort_added", "Recently added");
+    t.insert("sort_plays", "Most played");
+    t.insert("albums", "Albums");
+    t.insert("albums_empty", "No albums here.");
+    t.insert("album_track", "track");
+    t.insert("album_tracks", "tracks");
+    t.insert("various_artists", "Various artists");
+    t.insert("no_album", "No album");
+    t.insert("up_next_preview", "Up next");
+    t.insert("crossfade", "Crossfade");
+    t.insert("crossfade_off", "Off");
+    t.insert("replaygain", "Normalize volume (ReplayGain)");
+    t.insert(
+        "replaygain_desc",
+        "Uses the gain stored in the tags so tracks play at the same loudness.",
+    );
+    t.insert("reactive_bg", "Fullscreen background pulses with the music");
     t.insert("stereo", "Stereo");
     t.insert("mono", "Mono");
     t.insert("decimal_sep", ".");

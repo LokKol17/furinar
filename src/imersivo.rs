@@ -48,6 +48,23 @@ pub struct EstadoImersivo {
     barras: Rc<VecModel<f32>>,
     /// Painel da biblioteca; só existe aberto.
     pub painel: Option<Painel>,
+    /// Pulso do fundo (0..1), seguindo os graves.
+    pulso: f32,
+}
+
+/// Barras do visualizador que contam como graves (de 40 Hz até ~150 Hz).
+const BARRAS_GRAVES: usize = 6;
+/// Quanto o pulso cai por tick quando o grave some (sobe na hora).
+const QUEDA_PULSO: f32 = 0.88;
+
+/// Próximo valor do pulso: segue o grave na subida e cai devagar. Arredonda
+/// para centésimos, para a UI só repintar quando muda de verdade.
+fn pulso(anterior: f32, barras: &[f32]) -> f32 {
+    let graves = barras.iter().take(BARRAS_GRAVES).sum::<f32>() / BARRAS_GRAVES as f32;
+    // Ao quadrado: o pulso só aparece nas batidas, não no grave contínuo
+    let alvo = (graves * graves).min(1.0);
+    let v = alvo.max(anterior * QUEDA_PULSO);
+    (v * 100.0).round() / 100.0
 }
 
 impl EstadoImersivo {
@@ -67,6 +84,7 @@ impl EstadoImersivo {
             analisador: Analisador::default(),
             barras,
             painel: None,
+            pulso: 0.0,
         }
     }
 
@@ -113,12 +131,28 @@ impl EstadoImersivo {
     }
 
     /// Chamado pelo timer do modo (~30 fps).
-    pub fn tick(&mut self, ui: &MainWindow, idioma: &str, captura: &Captura, tocando: bool) {
+    pub fn tick(
+        &mut self,
+        ui: &MainWindow,
+        idioma: &str,
+        captura: &Captura,
+        tocando: bool,
+        reativo: bool,
+    ) {
         if let Some(barras) = self.analisador.quadro(captura, tocando) {
             for (i, b) in barras.into_iter().enumerate() {
                 if self.barras.row_data(i) != Some(b) {
                     self.barras.set_row_data(i, b);
                 }
+            }
+            let novo = if reativo {
+                pulso(self.pulso, &barras)
+            } else {
+                0.0
+            };
+            if novo != self.pulso {
+                self.pulso = novo;
+                ui.set_imv_pulso(novo);
             }
         }
 
@@ -213,5 +247,27 @@ pub fn limpar_ui(ui: &MainWindow) {
     ui.set_imv_painel_aberto(false);
     ui.set_imv_so_letra(false);
     ui.set_imv_relogio(SharedString::new());
+    ui.set_imv_proxima(SharedString::new());
+    ui.set_imv_pulso(0.0);
     painel::limpar_ui(ui);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pulso_sobe_na_batida_e_cai_devagar() {
+        let batida = [1.0f32; 48];
+        let silencio = [0.0f32; 48];
+        let p = pulso(0.0, &batida);
+        assert_eq!(p, 1.0);
+        let depois = pulso(p, &silencio);
+        assert!(depois < 1.0 && depois > 0.8, "{depois}");
+        // Grave fraco quase não mexe
+        let mut fraco = [0.0f32; 48];
+        fraco[..6].fill(0.3);
+        assert!(pulso(0.0, &fraco) < 0.1);
+        assert_eq!(pulso(0.0, &silencio), 0.0);
+    }
 }

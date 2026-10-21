@@ -1,5 +1,4 @@
-//! Miniaturas de capa e metadados extras (álbum, duração) para o painel da
-//! biblioteca do modo imersivo.
+//! Miniaturas de capa para o painel da biblioteca do modo imersivo.
 //!
 //! Duas threads atendem uma fila em que o pedido novo substitui o anterior:
 //! rolar a lista rápido não deixa trabalho velho na frente. As capas reduzidas
@@ -32,11 +31,8 @@ const LIMITE_CACHE: u64 = 64 * 1024 * 1024;
 /// capa" também conta.
 const BLOCO: u64 = 4096;
 
-pub struct Meta {
-    pub album: Option<String>,
-    pub duracao: Option<u64>,
-    pub capa: Option<SharedPixelBuffer<Rgba8Pixel>>,
-}
+/// Miniatura pronta para virar `slint::Image` (`None`: a faixa não tem capa).
+pub type Capa = Option<SharedPixelBuffer<Rgba8Pixel>>;
 
 struct Fila {
     pendentes: VecDeque<PathBuf>,
@@ -47,7 +43,7 @@ type Compartilhada = Arc<(Mutex<Fila>, Condvar)>;
 
 pub struct Carregador {
     fila: Compartilhada,
-    rx: Receiver<(PathBuf, Meta)>,
+    rx: Receiver<(PathBuf, Capa)>,
 }
 
 impl Carregador {
@@ -90,7 +86,7 @@ impl Carregador {
         }
     }
 
-    pub fn recebidos(&self) -> impl Iterator<Item = (PathBuf, Meta)> + '_ {
+    pub fn recebidos(&self) -> impl Iterator<Item = (PathBuf, Capa)> + '_ {
         self.rx.try_iter()
     }
 }
@@ -106,7 +102,7 @@ impl Drop for Carregador {
     }
 }
 
-fn trabalhar(fila: &Compartilhada, tx: &Sender<(PathBuf, Meta)>, cache: Option<&Path>) {
+fn trabalhar(fila: &Compartilhada, tx: &Sender<(PathBuf, Capa)>, cache: Option<&Path>) {
     let (trava, sinal) = &**fila;
     loop {
         let caminho = {
@@ -126,59 +122,46 @@ fn trabalhar(fila: &Compartilhada, tx: &Sender<(PathBuf, Meta)>, cache: Option<&
                 };
             }
         };
-        let meta = carregar(&caminho, cache);
-        if tx.send((caminho, meta)).is_err() {
+        let capa = carregar(&caminho, cache);
+        if tx.send((caminho, capa)).is_err() {
             return;
         }
     }
 }
 
-/// Lê álbum e duração e acha a miniatura: do cache, ou da capa embutida /
+/// Acha a miniatura: do cache (sem nem abrir a faixa), ou da capa embutida /
 /// `cover.jpg` (e então grava no cache). Arquivo de cache vazio quer dizer
 /// "essa faixa não tem capa", para não procurar de novo.
-pub fn carregar(caminho: &Path, cache: Option<&Path>) -> Meta {
+pub fn carregar(caminho: &Path, cache: Option<&Path>) -> Capa {
     let arquivo_cache = cache.and_then(|pasta| chave(caminho).map(|k| pasta.join(k)));
-    let em_cache = arquivo_cache.as_ref().and_then(|a| std::fs::read(a).ok());
-    if let (Some(arquivo), Some(_)) = (&arquivo_cache, &em_cache) {
+    if let Some(arquivo) = &arquivo_cache
+        && let Ok(bytes) = std::fs::read(arquivo)
+    {
         tocar(arquivo);
-    }
-
-    let opcoes = ParseOptions::new().read_cover_art(em_cache.is_none());
-    let lido = Probe::open(caminho).and_then(|p| p.options(opcoes).read());
-    let (mut album, mut duracao, mut embutida) = (None, None, None);
-    if let Ok(arquivo) = &lido {
-        duracao = Some(arquivo.properties().duration().as_secs()).filter(|&d| d > 0);
-        if let Some(tag) = arquivo.primary_tag().or_else(|| arquivo.first_tag()) {
-            album = tag
-                .album()
-                .map(|s| s.trim().to_string())
-                .filter(|s| !s.is_empty());
-            embutida = capa::capa_da_tag(tag);
+        if bytes.is_empty() {
+            return None;
         }
-    }
-
-    let capa = match em_cache {
-        Some(bytes) if bytes.is_empty() => None,
-        Some(bytes) => image::load_from_memory_with_format(&bytes, ImageFormat::Jpeg)
+        return image::load_from_memory_with_format(&bytes, ImageFormat::Jpeg)
             .ok()
-            .map(|img| capa::para_buffer(&img.to_rgba8())),
-        None => {
-            let reduzida = embutida
-                .or_else(|| capa::capa_da_pasta(caminho))
-                .and_then(|b| image::load_from_memory(&b).ok())
-                .map(|img| img.resize_to_fill(LADO, LADO, image::imageops::FilterType::Triangle));
-            if let Some(arquivo) = &arquivo_cache {
-                gravar(arquivo, reduzida.as_ref());
-            }
-            reduzida.map(|img| capa::para_buffer(&img.to_rgba8()))
-        }
-    };
-
-    Meta {
-        album,
-        duracao,
-        capa,
+            .map(|img| capa::para_buffer(&img.to_rgba8()));
     }
+
+    let opcoes = ParseOptions::new().read_properties(false);
+    let embutida = Probe::open(caminho)
+        .and_then(|p| p.options(opcoes).read())
+        .ok()
+        .and_then(|arquivo| {
+            let tag = arquivo.primary_tag().or_else(|| arquivo.first_tag())?;
+            capa::capa_da_tag(tag)
+        });
+    let reduzida = embutida
+        .or_else(|| capa::capa_da_pasta(caminho))
+        .and_then(|b| image::load_from_memory(&b).ok())
+        .map(|img| img.resize_to_fill(LADO, LADO, image::imageops::FilterType::Triangle));
+    if let Some(arquivo) = &arquivo_cache {
+        gravar(arquivo, reduzida.as_ref());
+    }
+    reduzida.map(|img| capa::para_buffer(&img.to_rgba8()))
 }
 
 /// Grava via arquivo temporário + rename: outra thread (ou outra instância)
@@ -348,13 +331,12 @@ mod tests {
             .save(musicas.join("cover.png"))
             .unwrap();
 
-        let meta = carregar(&faixa, Some(&cache));
-        let capa = meta.capa.expect("capa da pasta");
+        let capa = carregar(&faixa, Some(&cache)).expect("capa da pasta");
         assert_eq!((capa.width(), capa.height()), (LADO, LADO));
 
         // Sem o cover.png, a miniatura sai do cache
         std::fs::remove_file(musicas.join("cover.png")).unwrap();
-        let de_novo = carregar(&faixa, Some(&cache)).capa.expect("capa do cache");
+        let de_novo = carregar(&faixa, Some(&cache)).expect("capa do cache");
         let px = de_novo.as_slice()[(LADO * LADO / 2) as usize];
         assert!(px.r > 150 && px.g < 80, "cor do cache: {px:?}");
     }
@@ -366,7 +348,7 @@ mod tests {
         std::fs::copy(fixture("tone.mp3"), &faixa).unwrap();
         let cache = tmp.0.join("cache");
 
-        assert!(carregar(&faixa, Some(&cache)).capa.is_none());
+        assert!(carregar(&faixa, Some(&cache)).is_none());
         let marcador = cache.join(chave(&faixa).unwrap());
         assert_eq!(std::fs::metadata(marcador).unwrap().len(), 0);
     }
@@ -427,9 +409,9 @@ mod tests {
         carregador.pedir(vec![fixture("tone.mp3")]);
         let inicio = std::time::Instant::now();
         loop {
-            if let Some((caminho, meta)) = carregador.recebidos().next() {
+            if let Some((caminho, capa)) = carregador.recebidos().next() {
                 assert_eq!(caminho, fixture("tone.mp3"));
-                assert!(meta.capa.is_none());
+                assert!(capa.is_none());
                 break;
             }
             assert!(inicio.elapsed().as_secs() < 5, "carregador não respondeu");

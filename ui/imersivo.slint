@@ -7,7 +7,7 @@
 
 import { Tema, BarraDeslizante } from "theme.slint";
 import { I18n } from "i18n.slint";
-import { PainelBiblioteca, LinhaPainel } from "painel.slint";
+import { PainelBiblioteca, LinhaPainel, CartaoAlbum } from "painel.slint";
 
 // Botão redondo e translúcido, para ficar sobre qualquer fundo
 component BotaoImersivo inherits Rectangle {
@@ -93,6 +93,18 @@ export component TelaImersiva inherits Rectangle {
     in property <string> relogio: "";
     /// Indicador do temporizador de sono ("" = desligado)
     in property <string> sono: "";
+    /// Letra sem tempos: rolável, sem destaque
+    in property <bool> letra_livre: false;
+    in property <bool> favorita: false;
+    /// "Título — Artista" da próxima nos últimos segundos ("" = escondida)
+    in property <string> texto_proxima: "";
+    /// Graves (0..1): o fundo cresce e clareia um pouco nas batidas
+    in property <float> pulso: 0;
+    in property <[CartaoAlbum]> albuns;
+    in-out property <int> guia: 0;
+    in property <int> ordem_atual;
+    in property <[string]> opcoes_ordem;
+    in property <int> especiais;
 
     callback sair();
     callback anterior();
@@ -111,6 +123,12 @@ export component TelaImersiva inherits Rectangle {
     callback fila_clicada(int);
     callback devolver_foco();
     callback alternar_sono();
+    callback alternar_favorita();
+    callback favorita_alternada(int);
+    callback guia_mudou(int);
+    callback albuns_rolou(int, int);
+    callback album_clicado(int);
+    callback ordem_escolhida(int);
 
     background: #05080d;
 
@@ -154,11 +172,15 @@ export component TelaImersiva inherits Rectangle {
         background: @linear-gradient(160deg, root.destaque.darker(0.75), #05080d 70%);
     }
 
-    // Fundo (capa desfocada, imagem, GIF ou vídeo)
+    // Fundo (capa desfocada, imagem, GIF ou vídeo). Cresce um pouco com o
+    // pulso, a partir do centro.
+    property <float> zoom: 1 + root.pulso * 0.035;
     Image {
         visible: root.tem_fundo && self.opacity > 0;
-        width: 100%;
-        height: 100%;
+        width: root.width * root.zoom;
+        height: root.height * root.zoom;
+        x: (root.width - self.width) / 2;
+        y: (root.height - self.height) / 2;
         source: root.fundo_a;
         image-fit: cover;
         image-rendering: root.fundo_pixelado ? ImageRendering.pixelated : ImageRendering.smooth;
@@ -167,8 +189,10 @@ export component TelaImersiva inherits Rectangle {
     }
     Image {
         visible: root.tem_fundo && self.opacity > 0;
-        width: 100%;
-        height: 100%;
+        width: root.width * root.zoom;
+        height: root.height * root.zoom;
+        x: (root.width - self.width) / 2;
+        y: (root.height - self.height) / 2;
         source: root.fundo_b;
         image-fit: cover;
         image-rendering: root.fundo_pixelado ? ImageRendering.pixelated : ImageRendering.smooth;
@@ -180,6 +204,7 @@ export component TelaImersiva inherits Rectangle {
     // uma parada no meio o renderer de software deixa uma linha na emenda.
     Rectangle {
         background: @linear-gradient(180deg, #00000059 0%, #000000d0 100%);
+        opacity: 1 - root.pulso * 0.3;
     }
 
     // Área inteira: mouse se mexendo acorda os controles. Fica embaixo dos
@@ -211,7 +236,7 @@ export component TelaImersiva inherits Rectangle {
         property <length> desloc: self.height / 2 - (max(0, root.letra_indice) + 0.5) * root.altura_linha;
         animate desloc { duration: 450ms; easing: ease-out; }
 
-        for linha[i] in root.letra: Rectangle {
+        for linha[i] in root.letra_livre ? [] : root.letra: Rectangle {
             x: 0px;
             y: letra_area.desloc + i * root.altura_linha;
             width: letra_area.width;
@@ -236,6 +261,28 @@ export component TelaImersiva inherits Rectangle {
             TouchArea {
                 mouse-cursor: root.ocioso ? MouseCursor.none : MouseCursor.pointer;
                 clicked => { root.letra_clicada(i); }
+            }
+        }
+
+        // Sem tempos: o texto inteiro, rolável, todo no mesmo tom
+        if root.letra_livre : Flickable {
+            width: parent.width;
+            height: parent.height;
+            content-height: texto_livre.preferred-height;
+
+            texto_livre := VerticalLayout {
+                padding-top: letra_area.height * 0.2;
+                padding-bottom: letra_area.height * 0.2;
+                spacing: 6px;
+
+                for linha in root.letra: Text {
+                    text: linha;
+                    color: #ffffffd0;
+                    font-size: 22px;
+                    font-weight: 500;
+                    horizontal-alignment: center;
+                    wrap: word-wrap;
+                }
             }
         }
 
@@ -400,6 +447,41 @@ export component TelaImersiva inherits Rectangle {
         }
     }
 
+    // Prévia da próxima: aparece por cima do cartão nos últimos segundos
+    previa := Rectangle {
+        property <bool> ativa: root.texto_proxima != "" && !root.so_letra;
+        x: root.margem;
+        y: root.y_cartao - 46px + (self.ativa ? 0px : 12px);
+        width: min(root.largura_util - 2 * root.margem, previa_texto.preferred-width + 34px);
+        height: 34px;
+        border-radius: 17px;
+        background: #00000080;
+        border-width: 1px;
+        border-color: root.destaque.with-alpha(0.6);
+        opacity: self.ativa ? 1 : 0;
+        visible: self.opacity > 0;
+        animate opacity, y { duration: 400ms; easing: ease-out; }
+
+        // Guarda o último texto para ele não sumir antes do fade
+        property <string> texto;
+        changed ativa => {
+            if (self.ativa) {
+                self.texto = root.texto_proxima;
+            }
+        }
+        previa_texto := Text {
+            x: 17px;
+            width: parent.width - 34px;
+            height: parent.height;
+            text: I18n.up_next_preview + " · " + (root.texto_proxima != "" ? root.texto_proxima : previa.texto);
+            color: #ffffff;
+            font-size: 13px;
+            font-weight: 600;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+    }
+
     controles := Rectangle {
         visible: root.opacidade_extras > 0;
         opacity: root.ocioso ? 0 : root.opacidade_extras;
@@ -491,6 +573,14 @@ export component TelaImersiva inherits Rectangle {
             }
             BotaoImersivo {
                 y: (parent.height - self.height) / 2;
+                icone: root.favorita ? @image-url("icons/estrela_cheia.svg") : @image-url("icons/estrela.svg");
+                dica: I18n.tip_favorite;
+                ativo: root.favorita;
+                cor: root.destaque;
+                clicado => { root.alternar_favorita(); }
+            }
+            BotaoImersivo {
+                y: (parent.height - self.height) / 2;
                 icone: @image-url("icons/lua.svg");
                 dica: I18n.tip_sleep;
                 ativo: root.sono != "";
@@ -547,7 +637,17 @@ export component TelaImersiva inherits Rectangle {
         pedido_busca: root.pedido_busca;
         cor: root.destaque;
         barras: root.barras;
+        albuns: root.albuns;
+        guia <=> root.guia;
+        ordem_atual: root.ordem_atual;
+        opcoes_ordem: root.opcoes_ordem;
+        especiais: root.especiais;
 
+        guia_mudou(g) => { root.guia_mudou(g); }
+        albuns_rolou(a, b) => { root.albuns_rolou(a, b); }
+        album_clicado(i) => { root.album_clicado(i); }
+        ordem_escolhida(i) => { root.ordem_escolhida(i); }
+        favorita_alternada(i) => { root.favorita_alternada(i); }
         aba_selecionada(i) => { root.aba_selecionada(i); }
         busca_mudou(t) => { root.busca_mudou(t); }
         rolou(a, b) => { root.painel_rolou(a, b); }

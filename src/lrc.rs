@@ -1,6 +1,31 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
+use lofty::config::ParseOptions;
+use lofty::file::AudioFile;
+use lofty::id3::v2::{Frame, SynchronizedTextFrame, TimestampFormat};
+use lofty::mpeg::MpegFile;
+use lofty::prelude::*;
+use lofty::probe::Probe;
 use slint::SharedString;
+
+/// Letra de uma faixa.
+#[derive(Debug, PartialEq)]
+pub enum Letra {
+    /// Com tempo em segundos por linha, ordenada.
+    Sincronizada(Vec<(f64, String)>),
+    /// Só o texto, sem tempos: mostrada inteira, sem destaque.
+    Livre(Vec<String>),
+}
+
+impl Letra {
+    /// As linhas no formato da letra sincronizada (a livre, com tempo 0).
+    pub fn linhas(self) -> Vec<(f64, String)> {
+        match self {
+            Letra::Sincronizada(l) => l,
+            Letra::Livre(l) => l.into_iter().map(|t| (0.0, t)).collect(),
+        }
+    }
+}
 
 /// Quantas linhas mandamos pra UI ao redor da linha atual. Ímpar, para a
 /// linha atual poder ficar centralizada.
@@ -76,6 +101,85 @@ pub fn parse_lrc(conteudo: &str) -> Vec<(f64, String)> {
 
     linhas.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
     linhas
+}
+
+/// Letra guardada nas tags da faixa: o quadro SYLT (sincronizado) do ID3v2,
+/// ou o texto de USLT / LYRICS / ©lyr — que muitos programas preenchem com um
+/// LRC inteiro, então ele é tentado como LRC antes de virar letra livre.
+pub fn letra_embutida(caminho: &Path) -> Letra {
+    if let Some(sincronizada) = sylt(caminho)
+        && !sincronizada.is_empty()
+    {
+        return Letra::Sincronizada(sincronizada);
+    }
+    let opcoes = ParseOptions::new()
+        .read_properties(false)
+        .read_cover_art(false);
+    let texto = Probe::open(caminho)
+        .and_then(|p| p.options(opcoes).read())
+        .ok()
+        .and_then(|arquivo| {
+            let tag = arquivo.primary_tag().or_else(|| arquivo.first_tag())?;
+            tag.get_string(ItemKey::Lyrics)
+                .or_else(|| tag.get_string(ItemKey::UnsyncLyrics))
+                .map(String::from)
+        });
+    texto.map_or(Letra::Livre(Vec::new()), |t| letra_do_texto(&t))
+}
+
+/// Texto da tag → letra: LRC quando tem tempos, livre quando não.
+pub fn letra_do_texto(texto: &str) -> Letra {
+    let lrc = parse_lrc(texto);
+    if !lrc.is_empty() {
+        return Letra::Sincronizada(lrc);
+    }
+    let linhas: Vec<String> = texto.lines().map(|l| l.trim().to_string()).collect();
+    // Sem as linhas vazias das pontas
+    let inicio = linhas
+        .iter()
+        .position(|l| !l.is_empty())
+        .unwrap_or(linhas.len());
+    let fim = linhas
+        .iter()
+        .rposition(|l| !l.is_empty())
+        .map_or(inicio, |f| f + 1);
+    Letra::Livre(linhas[inicio..fim].to_vec())
+}
+
+/// Quadro SYLT em milissegundos de um MP3. O lofty não converte esse quadro
+/// para a tag genérica, então lê o ID3v2 direto.
+fn sylt(caminho: &Path) -> Option<Vec<(f64, String)>> {
+    let e_mp3 = caminho
+        .extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|e| e.eq_ignore_ascii_case("mp3"));
+    if !e_mp3 {
+        return None;
+    }
+    let mut arquivo = std::fs::File::open(caminho).ok()?;
+    let opcoes = ParseOptions::new()
+        .read_properties(false)
+        .read_cover_art(false);
+    let mpeg = MpegFile::read_from(&mut arquivo, opcoes).ok()?;
+    let tag = mpeg.id3v2()?;
+    tag.into_iter().find_map(|quadro| {
+        let Frame::Binary(binario) = quadro else {
+            return None;
+        };
+        if binario.id().as_str() != "SYLT" {
+            return None;
+        }
+        let s = SynchronizedTextFrame::parse(&binario.data, binario.flags()).ok()?;
+        (s.timestamp_format == TimestampFormat::MS).then(|| {
+            let mut linhas: Vec<(f64, String)> = s
+                .content
+                .iter()
+                .map(|(ms, t)| (*ms as f64 / 1000.0, t.trim().to_string()))
+                .collect();
+            linhas.sort_by(|a, b| a.0.total_cmp(&b.0));
+            linhas
+        })
+    })
 }
 
 /// Índice da última linha cujo tempo é ≤ `tempo` (-1 se ainda não chegou).
@@ -186,6 +290,25 @@ sem colchete
         assert_eq!(letra[0], (10.0, "Refrão".to_string()));
         assert_eq!(letra[1], (50.0, "Refrão".to_string()));
         assert_eq!(letra[2], (60.0, "Fim".to_string()));
+    }
+
+    #[test]
+    fn texto_da_tag_vira_lrc_ou_letra_livre() {
+        assert_eq!(
+            letra_do_texto("[00:01.00]Oi\n[00:02.00]Tchau"),
+            Letra::Sincronizada(vec![(1.0, "Oi".into()), (2.0, "Tchau".into())])
+        );
+        assert_eq!(
+            letra_do_texto("\n  Primeira  \n\nSegunda\n\n"),
+            Letra::Livre(vec!["Primeira".into(), "".into(), "Segunda".into()])
+        );
+        assert_eq!(letra_do_texto(""), Letra::Livre(Vec::new()));
+    }
+
+    #[test]
+    fn faixa_sem_letra_embutida_volta_vazia() {
+        let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/tone.mp3");
+        assert_eq!(letra_embutida(&fixture), Letra::Livre(Vec::new()));
     }
 
     #[test]

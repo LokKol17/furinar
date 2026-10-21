@@ -1,7 +1,13 @@
 import { Tema, BotaoIcone, BotaoTitulo, BarraDeslizante, CampoBusca, CaixaSelecao } from "theme.slint";
 import { I18n } from "i18n.slint";
 import { TelaImersiva } from "imersivo.slint";
-import { LinhaPainel } from "painel.slint";
+import { LinhaPainel, CartaoAlbum } from "painel.slint";
+
+/// Linha da playlist do modo normal.
+export struct LinhaLista {
+    texto: string,
+    favorita: bool,
+}
 
 export component MainWindow inherits Window {
     title: "Furinar Audio Player";
@@ -33,7 +39,24 @@ export component MainWindow inherits Window {
     in-out property <float> volume: 0.8;
     in-out property <float> progresso: 0.0;
     in-out property <string> texto_tempo: "00:00 / 00:00";
-    in property <[string]> musicas: [];
+    in property <[LinhaLista]> musicas: [];
+    /// Ordem da aba visível (posição em `opcoes_ordem`).
+    in property <int> ordem_atual: 0;
+    /// A faixa que toca está nas favoritas.
+    in property <bool> favorita_atual: false;
+    /// Restante do temporizador de sono ("" = desligado)
+    in property <string> sono_texto: "";
+    /// Letra sem tempos: mostrada inteira, sem destaque
+    in property <bool> letra_livre: false;
+    in property <string> crossfade_texto: "";
+    in-out property <bool> replaygain: true;
+    in-out property <bool> fundo_reativo: true;
+    callback ordem_escolhida(int);
+    callback favorita_alternada(int);
+    callback alternar_favorita_atual();
+    callback alternar_crossfade();
+    callback alternar_replaygain(bool);
+    callback alternar_fundo_reativo(bool);
     in-out property <int> indice_selecionado: -1;
     in property <[string]> abas: [];
     in-out property <int> aba_ativa: 0;
@@ -85,7 +108,16 @@ export component MainWindow inherits Window {
     private property <int> imv_pedido_busca: 0;
     in-out property <bool> imv_so_letra: false;
     in property <string> imv_relogio: "";
-    in property <string> imv_sono: "";
+    /// Prévia da próxima nos últimos segundos ("" = escondida)
+    in property <string> imv_proxima: "";
+    /// Pulso do fundo com os graves (0..1)
+    in property <float> imv_pulso: 0;
+    in property <[CartaoAlbum]> imv_albuns: [];
+    /// Guia do painel: 0 = biblioteca, 1 = a seguir, 2 = álbuns
+    in-out property <int> imv_guia: 0;
+    callback imv_guia_mudou(int);
+    callback imv_albuns_rolou(int, int);
+    callback imv_album_clicado(int);
     callback imv_painel_alternado(bool);
     callback imv_painel_rolou(int, int);
     callback imv_fila_clicada(int);
@@ -125,6 +157,10 @@ export component MainWindow inherits Window {
     private property <length> largura_aba: 150px;
     private property <length> altura_letra_linha: 32px;
     private property <length> altura_barra: 34px;
+    /// Abas especiais (favoritas, mais tocadas) vêm primeiro, só com ícone
+    private property <int> especiais: 2;
+    private property <length> largura_especial: 40px;
+    private property <[string]> opcoes_ordem: [I18n.sort_default, I18n.sort_title, I18n.sort_artist, I18n.sort_album, I18n.sort_duration, I18n.sort_added, I18n.sort_plays];
 
     // Mantém a linha selecionada dentro da área visível da lista
     function manter_visivel() {
@@ -165,6 +201,9 @@ export component MainWindow inherits Window {
             } else if (modo_imersivo && event.text == "/") {
                 imv_painel_aberto = true;
                 imv_pedido_busca += 1;
+                return accept;
+            } else if (event.text == "f" || event.text == "F") {
+                alternar_favorita_atual();
                 return accept;
             } else if (modo_imersivo && (event.text == "h" || event.text == "H")) {
                 imv_so_letra = !imv_so_letra;
@@ -345,6 +384,12 @@ export component MainWindow inherits Window {
                         clicado => { mostrar_letra = !mostrar_letra; }
                     }
                     BotaoIcone {
+                        icone: @image-url("icons/lua.svg");
+                        dica: sono_texto != "" ? I18n.tip_sleep + " · " + sono_texto : I18n.tip_sleep;
+                        ativo: sono_texto != "";
+                        clicado => { alternar_sono(); }
+                    }
+                    BotaoIcone {
                         icone: @image-url("icons/tela_cheia.svg");
                         dica: I18n.tip_immersive;
                         clicado => { alternar_imersivo(); }
@@ -371,7 +416,7 @@ export component MainWindow inherits Window {
                     mudou(v) => { volume_mudou(v); }
                 }
                 BarraDeslizante {
-                    width: 340px;
+                    width: sono_texto != "" ? 280px : 340px;
                     valor <=> progresso;
                     ao_vivo: false;
                     mudou(v) => { progresso_mudou(v); }
@@ -382,17 +427,94 @@ export component MainWindow inherits Window {
                     font-size: 13px;
                     vertical-alignment: center;
                 }
+                if sono_texto != "" : HorizontalLayout {
+                    spacing: 4px;
+
+                    Image {
+                        source: @image-url("icons/lua.svg");
+                        width: 13px;
+                        height: 13px;
+                        y: (parent.height - self.height) / 2;
+                        colorize: Tema.dourado;
+                    }
+                    Text {
+                        text: sono_texto;
+                        color: Tema.dourado;
+                        font-size: 13px;
+                        vertical-alignment: center;
+                    }
+                }
             }
 
             // -------------------------------------------------------------
             // Busca
             // -------------------------------------------------------------
-            busca := CampoBusca {
-                texto <=> texto_busca;
-                placeholder: I18n.search_placeholder;
-                editado(t) => { busca_mudou(t); }
-                // Enter na busca devolve o foco aos atalhos
-                aceito(t) => { atalhos.focus(); }
+            linha_busca := HorizontalLayout {
+                spacing: 8px;
+
+                busca := CampoBusca {
+                    texto <=> texto_busca;
+                    placeholder: I18n.search_placeholder;
+                    editado(t) => { busca_mudou(t); }
+                    // Enter na busca devolve o foco aos atalhos
+                    aceito(t) => { atalhos.focus(); }
+                }
+                botao_ordem := BotaoIcone {
+                    height: 38px;
+                    icone: @image-url("icons/ordenar.svg");
+                    dica: I18n.tip_sort + ": " + opcoes_ordem[ordem_atual];
+                    ativo: ordem_atual != 0;
+                    clicado => { menu_ordem.show(); }
+                }
+            }
+
+            menu_ordem := PopupWindow {
+                x: linha_busca.x + botao_ordem.x + botao_ordem.width - 220px;
+                y: linha_busca.y + botao_ordem.height + 4px;
+                width: 220px;
+
+                Rectangle {
+                    background: Tema.painel;
+                    border-radius: 10px;
+                    border-width: 1px;
+                    border-color: Tema.borda;
+                    drop-shadow-blur: 16px;
+                    drop-shadow-color: #00000050;
+
+                    VerticalLayout {
+                        padding: 6px;
+
+                        for nome[i] in opcoes_ordem: Rectangle {
+                            height: 32px;
+                            border-radius: 6px;
+                            background: opcao_toque.has-hover ? Tema.neutro_hover : transparent;
+
+                            opcao_toque := TouchArea {
+                                clicked => {
+                                    ordem_escolhida(i);
+                                    atalhos.focus();
+                                }
+                            }
+                            Text {
+                                x: 12px;
+                                height: parent.height;
+                                text: nome;
+                                color: i == ordem_atual ? Tema.oceano : Tema.texto;
+                                font-weight: i == ordem_atual ? 700 : 400;
+                                font-size: 13px;
+                                vertical-alignment: center;
+                            }
+                            if i == ordem_atual : Image {
+                                source: @image-url("icons/check.svg");
+                                x: parent.width - 26px;
+                                width: 12px;
+                                height: 12px;
+                                y: (parent.height - self.height) / 2;
+                                colorize: Tema.oceano;
+                            }
+                        }
+                    }
+                }
             }
 
             // -------------------------------------------------------------
@@ -407,7 +529,7 @@ export component MainWindow inherits Window {
                 Flickable {
                     horizontal-stretch: 1;
                     height: 32px;
-                    content-width: abas.length * (largura_aba + 6px);
+                    content-width: max(0, abas.length - especiais) * (largura_aba + 6px) + min(abas.length, especiais) * (largura_especial + 6px);
                     content-height: 32px;
 
                     HorizontalLayout {
@@ -415,7 +537,7 @@ export component MainWindow inherits Window {
                         spacing: 6px;
 
                         for nome[i] in abas: Rectangle {
-                            width: largura_aba;
+                            width: i < especiais ? largura_especial : largura_aba;
                             height: 32px;
                             border-radius: 8px;
                             background: i == aba_ativa ? Tema.oceano.with-alpha(0.16) : Tema.neutro;
@@ -442,7 +564,18 @@ export component MainWindow inherits Window {
                                 background: Tema.oceano;
                             }
 
-                            Text {
+                            // Especiais: só o ícone (o nome fica na dica)
+                            if i < especiais : Image {
+                                source: i == 0 ? @image-url("icons/estrela.svg") : @image-url("icons/tocadas.svg");
+                                width: 15px;
+                                height: 15px;
+                                x: (parent.width - self.width) / 2;
+                                y: (parent.height - 4px - self.height) / 2;
+                                colorize: i == aba_ativa ? Tema.dourado : Tema.texto_suave;
+                                accessible-role: text;
+                                accessible-label: nome;
+                            }
+                            if i >= especiais : Text {
                                 x: 12px;
                                 y: 0px;
                                 width: parent.width - 50px;
@@ -458,7 +591,7 @@ export component MainWindow inherits Window {
                             // Pontinho dourado: de onde vem o som agora
                             Rectangle {
                                 visible: i == aba_tocando;
-                                x: parent.width - 32px;
+                                x: i < especiais ? parent.width - 9px : parent.width - 32px;
                                 y: (parent.height - self.height) / 2;
                                 width: 6px;
                                 height: 6px;
@@ -466,9 +599,10 @@ export component MainWindow inherits Window {
                                 background: Tema.dourado;
                             }
 
-                            // Fechar: só na aba ativa, para não poluir
+                            // Fechar: só na aba ativa, para não poluir (as
+                            // especiais não fecham)
                             Rectangle {
-                                visible: i == aba_ativa;
+                                visible: i == aba_ativa && i >= especiais;
                                 x: parent.width - 22px;
                                 y: 8px;
                                 width: 16px;
@@ -576,22 +710,55 @@ export component MainWindow inherits Window {
                             }
 
                             Text {
-                                text: musica;
+                                text: musica.texto;
                                 color: Tema.texto;
                                 font-size: 13px;
                                 vertical-alignment: center;
                                 x: 14px;
+                                width: parent.width - 52px;
+                                overflow: elide;
                             }
 
-                            TouchArea {
+                            linha_toque := TouchArea {
                                 clicked => {
                                     musica_selecionada(i);
                                     // Devolve o foco para os atalhos de teclado
                                     atalhos.focus();
                                 }
                             }
+
+                            // Estrela: sempre nas favoritas, no hover nas outras
+                            if musica.favorita || linha_toque.has-hover || estrela_toque.has-hover : Image {
+                                x: parent.width - 30px;
+                                y: (parent.height - self.height) / 2;
+                                width: 14px;
+                                height: 14px;
+                                source: musica.favorita ? @image-url("icons/estrela_cheia.svg") : @image-url("icons/estrela.svg");
+                                colorize: musica.favorita ? Tema.dourado : Tema.texto_suave;
+                            }
+                            estrela_toque := TouchArea {
+                                x: parent.width - 38px;
+                                width: 30px;
+                                clicked => {
+                                    favorita_alternada(i);
+                                    atalhos.focus();
+                                }
+                            }
                         }
                     }
+                }
+
+                // Lista especial vazia: diz como ela se enche
+                if !mostrar_letra && musicas.length == 0 && aba_ativa < especiais : Text {
+                    x: 24px;
+                    width: parent.width - 48px;
+                    height: parent.height;
+                    text: aba_ativa == 0 ? I18n.favorites_empty : I18n.most_played_empty;
+                    color: Tema.texto_suave;
+                    font-size: 13px;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                    wrap: word-wrap;
                 }
 
                 // Painel de letra: sobrepõe exatamente a área da lista
@@ -603,7 +770,7 @@ export component MainWindow inherits Window {
                     height: parent.height;
                     background: transparent;
 
-                    if letra.length == 0 : VerticalLayout {
+                    if letra.length == 0 && !letra_livre : VerticalLayout {
                         x: 0px;
                         y: 0px;
                         width: painel_letra.width;
@@ -620,7 +787,29 @@ export component MainWindow inherits Window {
                         }
                     }
 
-                    if letra.length > 0 : VerticalLayout {
+                    // Letra sem tempos: o texto inteiro, rolável
+                    if letra_livre : Flickable {
+                        x: 0px;
+                        y: 0px;
+                        width: painel_letra.width;
+                        height: painel_letra.height;
+                        content-height: livre.preferred-height;
+
+                        livre := VerticalLayout {
+                            padding: 18px;
+                            spacing: 4px;
+
+                            for linha in letra_completa: Text {
+                                text: linha;
+                                color: Tema.texto.with-alpha(0.85);
+                                font-size: 15px;
+                                horizontal-alignment: center;
+                                wrap: word-wrap;
+                            }
+                        }
+                    }
+
+                    if letra.length > 0 && !letra_livre : VerticalLayout {
                         x: 0px;
                         y: 0px;
                         width: painel_letra.width;
@@ -713,7 +902,22 @@ export component MainWindow inherits Window {
         pedido_busca: imv_pedido_busca;
         so_letra <=> imv_so_letra;
         relogio: imv_relogio;
-        sono: imv_sono;
+        sono: sono_texto;
+        letra_livre: letra_livre;
+        favorita: favorita_atual;
+        texto_proxima: imv_proxima;
+        pulso: imv_pulso;
+        albuns: imv_albuns;
+        guia <=> imv_guia;
+        ordem_atual: ordem_atual;
+        opcoes_ordem: opcoes_ordem;
+        especiais: especiais;
+        alternar_favorita => { alternar_favorita_atual(); }
+        favorita_alternada(i) => { favorita_alternada(i); }
+        guia_mudou(g) => { imv_guia_mudou(g); }
+        albuns_rolou(a, b) => { imv_albuns_rolou(a, b); }
+        album_clicado(i) => { imv_album_clicado(i); }
+        ordem_escolhida(i) => { ordem_escolhida(i); }
         painel_alternado(aberto) => { imv_painel_alternado(aberto); }
         aba_selecionada(i) => { aba_selecionada(i); }
         busca_mudou(t) => { busca_mudou(t); }
@@ -812,7 +1016,7 @@ export component MainWindow inherits Window {
 
     config_popup := PopupWindow {
         x: 170px;
-        y: 299px;
+        y: 120px;
 
         Rectangle {
             background: Tema.painel;
@@ -848,6 +1052,45 @@ export component MainWindow inherits Window {
                     font-size: 12px;
                     color: Tema.texto_suave;
                     wrap: word-wrap;
+                }
+
+                CaixaSelecao {
+                    rotulo: I18n.replaygain;
+                    marcado <=> replaygain;
+                    alternado(v) => { alternar_replaygain(v); }
+                }
+                Text {
+                    text: I18n.replaygain_desc;
+                    font-size: 12px;
+                    color: Tema.texto_suave;
+                    wrap: word-wrap;
+                }
+
+                // Crossfade: cada clique passa para a próxima duração
+                Rectangle {
+                    height: 30px;
+                    border-radius: 8px;
+                    border-width: 1px;
+                    border-color: Tema.borda;
+                    background: ta_crossfade.has-hover ? Tema.neutro_hover : Tema.neutro;
+                    animate background { duration: 120ms; }
+
+                    ta_crossfade := TouchArea {
+                        clicked => { alternar_crossfade(); }
+                    }
+                    Text {
+                        text: crossfade_texto;
+                        color: Tema.texto;
+                        font-size: 13px;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                }
+
+                CaixaSelecao {
+                    rotulo: I18n.reactive_bg;
+                    marcado <=> fundo_reativo;
+                    alternado(v) => { alternar_fundo_reativo(v); }
                 }
 
                 Rectangle {
@@ -917,4 +1160,4 @@ export component MainWindow inherits Window {
     }
 }
 
-export { I18n, LinhaPainel }
+export { I18n, LinhaPainel, CartaoAlbum }
