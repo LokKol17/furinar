@@ -82,6 +82,10 @@ reqwest = { version = "0.12", default-features = false, features = [
     "rustls-tls",
 ] }
 base64 = "0.22"
+# Assinatura dos pedidos ao Last.fm
+md5 = "0.7"
+# "Ouvindo Furinar" no Discord (IPC local, sem rede)
+discord-rich-presence = "1"
 # Impressão digital do áudio (AcoustID), em Rust puro
 rusty-chromaprint = "0.3"
 # Relógio do modo imersivo (hora local). O Slint já compila o chrono com

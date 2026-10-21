@@ -324,6 +324,38 @@ pub(crate) fn processar_web(estado: &mut EstadoAudio, ui: &MainWindow) {
                     renovar = true;
                 }
             }
+            buscador::Resposta::TocandoAgora => {}
+            buscador::Resposta::Scrobble { sobrou, erro } => {
+                estado.fila_scrobble.extend(sobrou);
+                scrobble::salvar_fila(&estado.fila_scrobble);
+                let texto = erro
+                    .map(|e| format!("{}: {e}", t("info_error")))
+                    .unwrap_or_default();
+                ui.set_scrobble_estado(texto.into());
+            }
+            buscador::Resposta::LastfmToken(resultado) => match resultado {
+                Ok((token, url)) => {
+                    estado.lastfm_token = Some(token);
+                    abrir_no_navegador(&url);
+                    publicar_lastfm(estado, ui);
+                }
+                Err(e) => ui.set_lastfm_estado(format!("{}: {e}", t("info_error")).into()),
+            },
+            buscador::Resposta::LastfmSessao(resultado) => {
+                estado.lastfm_token = None;
+                match resultado {
+                    Ok((sessao, usuario)) => {
+                        estado.contas.lastfm_sessao = sessao;
+                        estado.lastfm_usuario = usuario;
+                        salvar_configuracao(estado);
+                        publicar_lastfm(estado, ui);
+                    }
+                    Err(e) => {
+                        publicar_lastfm(estado, ui);
+                        ui.set_lastfm_estado(format!("{}: {e}", t("info_error")).into());
+                    }
+                }
+            }
             buscador::Resposta::Gravadas { ok, falhas } => {
                 let mut texto = t("tags_written").replace("{n}", &ok.to_string());
                 if let Some(f) = falhas.first() {
@@ -343,6 +375,87 @@ pub(crate) fn processar_web(estado: &mut EstadoAudio, ui: &MainWindow) {
         estado.buscador = None;
         Timer::single_shot(Duration::from_millis(500), memoria::aparar);
     }
+}
+
+/// A faixa atual como escuta: começou a tocar há `tempo_decorrido`.
+fn escuta_atual(estado: &EstadoAudio) -> Option<scrobble::Escuta> {
+    let pasta = estado.pastas.get(estado.pasta_reproducao?)?;
+    let indice = estado.indice_atual?;
+    let t = pasta.tracks.get(indice)?;
+    let agora = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs());
+    let gravacao = pasta
+        .chave_faixa(indice)
+        .and_then(|k| estado.metadados.correcao(&k)?.gravacao.clone());
+    Some(scrobble::Escuta {
+        // Sem artista os serviços recusam: vai o título como está
+        artista: t.artista.clone()?,
+        titulo: t.titulo.clone(),
+        album: t.album.clone(),
+        duracao: estado.duracao_total_secs,
+        quando: agora.saturating_sub(estado.tempo_decorrido as u64),
+        gravacao,
+    })
+}
+
+/// "Tocando agora": uma vez por faixa, quando ela começa a tocar.
+pub(crate) fn atualizar_scrobble(estado: &mut EstadoAudio) {
+    if !estado.contas.alguma() {
+        return;
+    }
+    let tocando = estado.audio_player.as_ref().is_some_and(|p| !p.is_paused());
+    let chave = chave_atual(estado);
+    if !tocando || chave.is_none() || chave == estado.avisada {
+        return;
+    }
+    estado.avisada = chave;
+    if let Some(escuta) = escuta_atual(estado) {
+        let contas = estado.contas.clone();
+        pedir_web(estado, buscador::Pedido::TocandoAgora(contas, escuta));
+    }
+}
+
+/// A faixa atual contou como ouvida: vai para os serviços (com o que estava
+/// na fila).
+pub(crate) fn scrobble_ouvida(estado: &mut EstadoAudio) {
+    if !estado.contas.alguma() {
+        return;
+    }
+    if let Some(escuta) = escuta_atual(estado).filter(scrobble::conta) {
+        for servico in estado.contas.servicos() {
+            estado.fila_scrobble.push((servico, escuta.clone()));
+        }
+    }
+    enviar_fila_scrobble(estado);
+}
+
+pub(crate) fn enviar_fila_scrobble(estado: &mut EstadoAudio) {
+    if estado.fila_scrobble.is_empty() || !estado.contas.alguma() {
+        return;
+    }
+    let fila = std::mem::take(&mut estado.fila_scrobble);
+    // Se o app fechar no meio, a fila não se perde
+    scrobble::salvar_fila(&fila);
+    let contas = estado.contas.clone();
+    pedir_web(estado, buscador::Pedido::Scrobble(contas, fila));
+}
+
+/// Estado da conta do Last.fm na tela.
+pub(crate) fn publicar_lastfm(estado: &EstadoAudio, ui: &MainWindow) {
+    let lang = translations::get_translations(&estado.idioma);
+    let t = |k: &str| lang.get(k).copied().unwrap_or("").to_string();
+    let conectado = !estado.contas.lastfm_sessao.is_empty();
+    ui.set_lastfm_conectado(conectado);
+    ui.set_lastfm_aguardando(estado.lastfm_token.is_some());
+    let texto = if conectado {
+        t("lastfm_connected").replace("{u}", &estado.lastfm_usuario)
+    } else if estado.lastfm_token.is_some() {
+        t("lastfm_waiting")
+    } else {
+        String::new()
+    };
+    ui.set_lastfm_estado(texto.into());
 }
 
 /// Liga os callbacks da UI desta área.
@@ -589,6 +702,88 @@ pub(crate) fn ligar(ui: &MainWindow, estado: &Rc<RefCell<EstadoAudio>>) {
                 e.buscador = None;
             }
             salvar_configuracao(&e);
+        });
+    }
+
+    {
+        let estado = estado.clone();
+        ui.on_listenbrainz_mudou(move |token| {
+            let mut e = estado.borrow_mut();
+            e.contas.listenbrainz = token.trim().to_string();
+            salvar_configuracao(&e);
+        });
+    }
+
+    {
+        let estado = estado.clone();
+        let ui_fraca = ui.as_weak();
+        ui.on_lastfm_credenciais_mudou(move |chave, segredo| {
+            let mut e = estado.borrow_mut();
+            let mudou =
+                e.contas.lastfm_chave != chave.trim() || e.contas.lastfm_segredo != segredo.trim();
+            e.contas.lastfm_chave = chave.trim().to_string();
+            e.contas.lastfm_segredo = segredo.trim().to_string();
+            // Outra chave: a sessão era da antiga
+            if mudou && !e.contas.lastfm_sessao.is_empty() {
+                e.contas.lastfm_sessao.clear();
+                e.lastfm_usuario.clear();
+            }
+            salvar_configuracao(&e);
+            if let Some(ui) = ui_fraca.upgrade() {
+                publicar_lastfm(&e, &ui);
+            }
+        });
+    }
+
+    {
+        let estado = estado.clone();
+        ui.on_lastfm_conectar(move || {
+            let mut e = estado.borrow_mut();
+            let (chave, segredo) = (
+                e.contas.lastfm_chave.clone(),
+                e.contas.lastfm_segredo.clone(),
+            );
+            if chave.is_empty() || segredo.is_empty() {
+                return;
+            }
+            pedir_web(&mut e, buscador::Pedido::LastfmToken { chave, segredo });
+        });
+    }
+
+    {
+        let estado = estado.clone();
+        ui.on_lastfm_concluir(move || {
+            let mut e = estado.borrow_mut();
+            let Some(token) = e.lastfm_token.clone() else {
+                return;
+            };
+            let (chave, segredo) = (
+                e.contas.lastfm_chave.clone(),
+                e.contas.lastfm_segredo.clone(),
+            );
+            pedir_web(
+                &mut e,
+                buscador::Pedido::LastfmSessao {
+                    chave,
+                    segredo,
+                    token,
+                },
+            );
+        });
+    }
+
+    {
+        let estado = estado.clone();
+        let ui_fraca = ui.as_weak();
+        ui.on_lastfm_desconectar(move || {
+            let mut e = estado.borrow_mut();
+            e.contas.lastfm_sessao.clear();
+            e.lastfm_usuario.clear();
+            e.lastfm_token = None;
+            salvar_configuracao(&e);
+            if let Some(ui) = ui_fraca.upgrade() {
+                publicar_lastfm(&e, &ui);
+            }
         });
     }
 }

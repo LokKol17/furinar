@@ -111,6 +111,42 @@ component OpcaoImersiva inherits Rectangle {
     }
 }
 
+// Campo de texto de uma linha no estilo da tela cheia
+component CampoImersivo inherits Rectangle {
+    in-out property <string> texto;
+    in property <bool> senha: false;
+    in property <string> placeholder: "";
+    in property <color> cor;
+    callback editado(string);
+
+    height: 34px;
+    border-radius: 10px;
+    background: #ffffff12;
+    border-width: 1px;
+    border-color: entrada.has-focus ? root.cor : #ffffff1f;
+
+    Text {
+        x: 12px;
+        height: parent.height;
+        text: root.texto == "" ? root.placeholder : "";
+        color: #ffffff59;
+        font-size: 13px;
+        vertical-alignment: center;
+    }
+    entrada := TextInput {
+        x: 12px;
+        width: parent.width - 24px;
+        height: parent.height;
+        color: #ffffff;
+        font-size: 13px;
+        vertical-alignment: center;
+        single-line: true;
+        input-type: root.senha ? InputType.password : InputType.text;
+        text <=> root.texto;
+        edited => { root.editado(self.text); }
+    }
+}
+
 // Botão de texto translúcido (opções da tela cheia)
 component BotaoTexto inherits Rectangle {
     in property <string> texto;
@@ -205,6 +241,14 @@ export component TelaImersiva inherits Rectangle {
     in-out property <bool> fundo_reativo;
     in property <string> fundo_global_nome;
     in-out property <bool> letras_web;
+    in-out property <bool> discord;
+    in-out property <string> listenbrainz_token;
+    in-out property <string> lastfm_chave;
+    in-out property <string> lastfm_segredo;
+    in property <bool> lastfm_conectado;
+    in property <bool> lastfm_aguardando;
+    in property <string> lastfm_estado;
+    in property <string> scrobble_estado;
     in-out property <string> chave_acoustid;
 
     callback sair();
@@ -237,6 +281,12 @@ export component TelaImersiva inherits Rectangle {
     callback limpar_fundo();
     callback abrir_info();
     callback alternar_letras_web(bool);
+    callback alternar_discord(bool);
+    callback listenbrainz_mudou(string);
+    callback lastfm_credenciais_mudou(string, string);
+    callback lastfm_conectar();
+    callback lastfm_concluir();
+    callback lastfm_desconectar();
     callback chave_acoustid_mudou(string);
 
     background: #05080d;
@@ -773,7 +823,7 @@ export component TelaImersiva inherits Rectangle {
 
         cartao_config := Rectangle {
             width: min(440px, root.largura_util - 2 * root.margem);
-            height: conteudo_config.preferred-height;
+            height: min(root.height - 80px, conteudo_config.preferred-height);
             x: (root.largura_util - self.width) / 2;
             y: (root.height - self.height) / 2;
             border-radius: 18px;
@@ -786,148 +836,228 @@ export component TelaImersiva inherits Rectangle {
             // Engole o clique para não fechar
             TouchArea { }
 
-            conteudo_config := VerticalLayout {
-                padding: 20px;
-                spacing: 8px;
+            clip: true;
 
-                HorizontalLayout {
-                    Text {
-                        text: I18n.config_title;
-                        color: #ffffff;
-                        font-size: 20px;
-                        font-weight: 800;
-                        vertical-alignment: center;
-                    }
-                    Rectangle { horizontal-stretch: 1; }
-                    BotaoImersivo {
-                        icone: @image-url("icons/x.svg");
-                        dica: I18n.tip_close;
-                        clicado => { root.config_aberta = false; }
-                    }
-                }
+            Flickable {
+                content-height: conteudo_config.preferred-height;
 
-                OpcaoImersiva {
-                    rotulo: I18n.replaygain;
-                    descricao: I18n.replaygain_desc;
-                    ligado <=> root.replaygain;
-                    cor: root.destaque;
-                    alternado(v) => { root.alternar_replaygain(v); }
-                }
-                OpcaoImersiva {
-                    rotulo: I18n.reactive_bg;
-                    ligado <=> root.fundo_reativo;
-                    cor: root.destaque;
-                    alternado(v) => { root.alternar_fundo_reativo(v); }
-                }
-
-                OpcaoImersiva {
-                    rotulo: I18n.lyrics_web;
-                    descricao: I18n.lyrics_web_desc;
-                    ligado <=> root.letras_web;
-                    cor: root.destaque;
-                    alternado(v) => { root.alternar_letras_web(v); }
-                }
-
-                // Crossfade: cada clique passa para a próxima duração
-                Rectangle {
-                    height: 44px;
-                    border-radius: 10px;
-                    background: crossfade_toque.has-hover ? #ffffff0f : transparent;
-                    animate background { duration: 120ms; }
-
-                    Text {
-                        x: 12px;
-                        height: parent.height;
-                        text: root.crossfade_texto;
-                        color: #ffffff;
-                        font-size: 14px;
-                        vertical-alignment: center;
-                    }
-                    Image {
-                        source: @image-url("icons/proxima.svg");
-                        x: parent.width - 34px;
-                        y: (parent.height - self.height) / 2;
-                        width: 14px;
-                        height: 14px;
-                        colorize: root.destaque;
-                    }
-                    crossfade_toque := TouchArea {
-                        clicked => { root.alternar_crossfade(); }
-                    }
-                }
-
-                // Chave do AcoustID
-                VerticalLayout {
-                    padding-left: 12px;
-                    padding-right: 12px;
-                    spacing: 6px;
-
-                    Text {
-                        text: I18n.acoustid_key;
-                        color: #ffffff;
-                        font-size: 14px;
-                    }
-                    Rectangle {
-                        height: 34px;
-                        border-radius: 10px;
-                        background: #ffffff12;
-                        border-width: 1px;
-                        border-color: campo_chave.has-focus ? root.destaque : #ffffff1f;
-
-                        campo_chave := TextInput {
-                            x: 12px;
-                            width: parent.width - 24px;
-                            height: parent.height;
-                            color: #ffffff;
-                            font-size: 13px;
-                            vertical-alignment: center;
-                            single-line: true;
-                            text <=> root.chave_acoustid;
-                            edited => { root.chave_acoustid_mudou(self.text); }
-                        }
-                    }
-                    Text {
-                        text: I18n.acoustid_desc;
-                        color: #ffffff80;
-                        font-size: 12px;
-                        wrap: word-wrap;
-                    }
-                }
-
-                Rectangle {
-                    height: 1px;
-                    background: #ffffff14;
-                }
-
-                // Fundo da tela cheia
-                VerticalLayout {
-                    padding-left: 12px;
-                    padding-right: 12px;
-                    padding-top: 4px;
+                conteudo_config := VerticalLayout {
+                    padding: 20px;
                     spacing: 8px;
 
-                    Text {
-                        text: I18n.bg_label;
-                        color: #ffffff;
-                        font-size: 14px;
-                    }
-                    Text {
-                        text: root.fundo_global_nome != "" ? root.fundo_global_nome : I18n.bg_none;
-                        color: #ffffff80;
-                        font-size: 12px;
-                        overflow: elide;
-                    }
                     HorizontalLayout {
-                        alignment: start;
+                        Text {
+                            text: I18n.config_title;
+                            color: #ffffff;
+                            font-size: 20px;
+                            font-weight: 800;
+                            vertical-alignment: center;
+                        }
+                        Rectangle { horizontal-stretch: 1; }
+                        BotaoImersivo {
+                            icone: @image-url("icons/x.svg");
+                            dica: I18n.tip_close;
+                            clicado => { root.config_aberta = false; }
+                        }
+                    }
+
+                    OpcaoImersiva {
+                        rotulo: I18n.replaygain;
+                        descricao: I18n.replaygain_desc;
+                        ligado <=> root.replaygain;
+                        cor: root.destaque;
+                        alternado(v) => { root.alternar_replaygain(v); }
+                    }
+                    OpcaoImersiva {
+                        rotulo: I18n.reactive_bg;
+                        ligado <=> root.fundo_reativo;
+                        cor: root.destaque;
+                        alternado(v) => { root.alternar_fundo_reativo(v); }
+                    }
+
+                    OpcaoImersiva {
+                        rotulo: I18n.discord_status;
+                        ligado <=> root.discord;
+                        cor: root.destaque;
+                        alternado(v) => { root.alternar_discord(v); }
+                    }
+                    OpcaoImersiva {
+                        rotulo: I18n.lyrics_web;
+                        descricao: I18n.lyrics_web_desc;
+                        ligado <=> root.letras_web;
+                        cor: root.destaque;
+                        alternado(v) => { root.alternar_letras_web(v); }
+                    }
+
+                    // Crossfade: cada clique passa para a próxima duração
+                    Rectangle {
+                        height: 44px;
+                        border-radius: 10px;
+                        background: crossfade_toque.has-hover ? #ffffff0f : transparent;
+                        animate background { duration: 120ms; }
+
+                        Text {
+                            x: 12px;
+                            height: parent.height;
+                            text: root.crossfade_texto;
+                            color: #ffffff;
+                            font-size: 14px;
+                            vertical-alignment: center;
+                        }
+                        Image {
+                            source: @image-url("icons/proxima.svg");
+                            x: parent.width - 34px;
+                            y: (parent.height - self.height) / 2;
+                            width: 14px;
+                            height: 14px;
+                            colorize: root.destaque;
+                        }
+                        crossfade_toque := TouchArea {
+                            clicked => { root.alternar_crossfade(); }
+                        }
+                    }
+
+                    // Chave do AcoustID
+                    VerticalLayout {
+                        padding-left: 12px;
+                        padding-right: 12px;
+                        spacing: 6px;
+
+                        Text {
+                            text: I18n.acoustid_key;
+                            color: #ffffff;
+                            font-size: 14px;
+                        }
+                        Rectangle {
+                            height: 34px;
+                            border-radius: 10px;
+                            background: #ffffff12;
+                            border-width: 1px;
+                            border-color: campo_chave.has-focus ? root.destaque : #ffffff1f;
+
+                            campo_chave := TextInput {
+                                x: 12px;
+                                width: parent.width - 24px;
+                                height: parent.height;
+                                color: #ffffff;
+                                font-size: 13px;
+                                vertical-alignment: center;
+                                single-line: true;
+                                text <=> root.chave_acoustid;
+                                edited => { root.chave_acoustid_mudou(self.text); }
+                            }
+                        }
+                        Text {
+                            text: I18n.acoustid_desc;
+                            color: #ffffff80;
+                            font-size: 12px;
+                            wrap: word-wrap;
+                        }
+                    }
+
+                    // Scrobble
+                    VerticalLayout {
+                        padding-left: 12px;
+                        padding-right: 12px;
+                        spacing: 6px;
+
+                        Text {
+                            text: I18n.scrobble_title;
+                            color: #ffffff;
+                            font-size: 14px;
+                            font-weight: 700;
+                        }
+                        CampoImersivo {
+                            texto <=> root.listenbrainz_token;
+                            placeholder: I18n.listenbrainz_token;
+                            senha: true;
+                            cor: root.destaque;
+                            editado(t) => { root.listenbrainz_mudou(t); }
+                        }
+                        HorizontalLayout {
+                            spacing: 8px;
+
+                            CampoImersivo {
+                                texto <=> root.lastfm_chave;
+                                placeholder: I18n.lastfm_key;
+                                cor: root.destaque;
+                                editado(t) => { root.lastfm_credenciais_mudou(t, root.lastfm_segredo); }
+                            }
+                            CampoImersivo {
+                                texto <=> root.lastfm_segredo;
+                                placeholder: I18n.lastfm_secret;
+                                senha: true;
+                                cor: root.destaque;
+                                editado(t) => { root.lastfm_credenciais_mudou(root.lastfm_chave, t); }
+                            }
+                        }
+                        HorizontalLayout {
+                            spacing: 8px;
+
+                            BotaoTexto {
+                                texto: root.lastfm_conectado ? I18n.lastfm_disconnect : (root.lastfm_aguardando ? I18n.lastfm_finish : I18n.lastfm_connect);
+                                clicado => {
+                                    if (root.lastfm_conectado) {
+                                        root.lastfm_desconectar();
+                                    } else if (root.lastfm_aguardando) {
+                                        root.lastfm_concluir();
+                                    } else {
+                                        root.lastfm_conectar();
+                                    }
+                                }
+                            }
+                            Text {
+                                text: root.lastfm_estado;
+                                color: #ffffff80;
+                                font-size: 12px;
+                                vertical-alignment: center;
+                                horizontal-stretch: 1;
+                                wrap: word-wrap;
+                            }
+                        }
+                        Text {
+                            text: root.scrobble_estado != "" ? root.scrobble_estado : I18n.scrobble_desc;
+                            color: #ffffff80;
+                            font-size: 12px;
+                            wrap: word-wrap;
+                        }
+                    }
+
+                    Rectangle {
+                        height: 1px;
+                        background: #ffffff14;
+                    }
+
+                    // Fundo da tela cheia
+                    VerticalLayout {
+                        padding-left: 12px;
+                        padding-right: 12px;
+                        padding-top: 4px;
                         spacing: 8px;
 
-                        BotaoTexto {
-                            texto: I18n.bg_choose;
-                            clicado => { root.escolher_fundo(); }
+                        Text {
+                            text: I18n.bg_label;
+                            color: #ffffff;
+                            font-size: 14px;
                         }
-                        if root.fundo_global_nome != "" : BotaoTexto {
-                            texto: I18n.bg_clear;
-                            clicado => { root.limpar_fundo(); }
+                        Text {
+                            text: root.fundo_global_nome != "" ? root.fundo_global_nome : I18n.bg_none;
+                            color: #ffffff80;
+                            font-size: 12px;
+                            overflow: elide;
+                        }
+                        HorizontalLayout {
+                            alignment: start;
+                            spacing: 8px;
+
+                            BotaoTexto {
+                                texto: I18n.bg_choose;
+                                clicado => { root.escolher_fundo(); }
+                            }
+                            if root.fundo_global_nome != "" : BotaoTexto {
+                                texto: I18n.bg_clear;
+                                clicado => { root.limpar_fundo(); }
+                            }
                         }
                     }
                 }

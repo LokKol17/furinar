@@ -60,6 +60,21 @@ pub fn pt_br() -> Translations {
     t.insert("batch_running", "Indexando…");
     t.insert("batch_summary", "{auto} corrigidas sozinhas · {revisar} para revisar · {nada} sem resultado · {letras} letras baixadas");
     t.insert("info_error", "Erro");
+    t.insert("discord_status", "Mostrar no Discord o que está tocando");
+    t.insert("scrobble_title", "Scrobble");
+    t.insert("listenbrainz_token", "Token do ListenBrainz");
+    t.insert("lastfm_keys", "Last.fm: chave e segredo da API");
+    t.insert("lastfm_key", "Chave da API");
+    t.insert("lastfm_secret", "Segredo");
+    t.insert("lastfm_connect", "Conectar Last.fm");
+    t.insert("lastfm_finish", "Concluir conexão");
+    t.insert("lastfm_disconnect", "Desconectar Last.fm");
+    t.insert("scrobble_desc", "Token em listenbrainz.org/settings. Chave do Last.fm em last.fm/api/account/create. Cada faixa conta depois de metade ou 4 min.");
+    t.insert(
+        "lastfm_waiting",
+        "Autorize no navegador e clique em Concluir.",
+    );
+    t.insert("lastfm_connected", "Conectado como {u}");
     t.insert("info_by_sound", "identificada pelo som");
     t.insert("info_nothing", "Nada encontrado.");
     t.insert("info_results", "{n} resultados — escolha um");
@@ -195,6 +210,21 @@ pub fn en() -> Translations {
     t.insert("batch_running", "Indexing…");
     t.insert("batch_summary", "{auto} fixed automatically · {revisar} to review · {nada} not found · {letras} lyrics downloaded");
     t.insert("info_error", "Error");
+    t.insert("discord_status", "Show what's playing on Discord");
+    t.insert("scrobble_title", "Scrobble");
+    t.insert("listenbrainz_token", "ListenBrainz token");
+    t.insert("lastfm_keys", "Last.fm: API key and secret");
+    t.insert("lastfm_key", "API key");
+    t.insert("lastfm_secret", "Secret");
+    t.insert("lastfm_connect", "Connect Last.fm");
+    t.insert("lastfm_finish", "Finish connecting");
+    t.insert("lastfm_disconnect", "Disconnect Last.fm");
+    t.insert("scrobble_desc", "Token at listenbrainz.org/settings. Last.fm key at last.fm/api/account/create. A track counts after half of it or 4 min.");
+    t.insert(
+        "lastfm_waiting",
+        "Authorize in the browser, then click Finish.",
+    );
+    t.insert("lastfm_connected", "Connected as {u}");
     t.insert("info_by_sound", "matched by sound");
     t.insert("info_nothing", "Nothing found.");
     t.insert("info_results", "{n} results — pick one");

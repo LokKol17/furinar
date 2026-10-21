@@ -181,6 +181,16 @@ pub(crate) struct EstadoAudio {
     pub(crate) letras_web: bool,
     /// Chave de aplicativo do AcoustID ("" = sem impressão digital).
     pub(crate) chave_acoustid: String,
+    /// Status no Discord ligado, e a conexão (só existe ligado).
+    pub(crate) discord_ativo: bool,
+    pub(crate) discord: Option<discord::Discord>,
+    /// Scrobble: contas, escutas que ainda não foram, a faixa cujo "tocando
+    /// agora" já foi avisado, e a conexão do Last.fm em andamento.
+    pub(crate) contas: scrobble::Contas,
+    pub(crate) fila_scrobble: scrobble::Fila,
+    pub(crate) avisada: Option<String>,
+    pub(crate) lastfm_token: Option<String>,
+    pub(crate) lastfm_usuario: String,
     /// Tela de informações: faixa (chave) e candidatos da última busca.
     pub(crate) info_chave: Option<String>,
     pub(crate) info_candidatos: Vec<metadados::Candidato>,
@@ -249,6 +259,13 @@ impl Default for EstadoAudio {
             buscador: None,
             letras_web: false,
             chave_acoustid: String::new(),
+            discord_ativo: false,
+            discord: None,
+            contas: scrobble::Contas::default(),
+            fila_scrobble: Vec::new(),
+            avisada: None,
+            lastfm_token: None,
+            lastfm_usuario: String::new(),
             info_chave: None,
             info_candidatos: Vec::new(),
             revisao: Vec::new(),
@@ -319,6 +336,12 @@ pub(crate) fn salvar_configuracao(estado: &EstadoAudio) {
         crossfade: estado.crossfade,
         letras_web: estado.letras_web,
         chave_acoustid: estado.chave_acoustid.clone(),
+        discord: estado.discord_ativo,
+        listenbrainz_token: estado.contas.listenbrainz.clone(),
+        lastfm_chave: estado.contas.lastfm_chave.clone(),
+        lastfm_segredo: estado.contas.lastfm_segredo.clone(),
+        lastfm_sessao: estado.contas.lastfm_sessao.clone(),
+        lastfm_usuario: estado.lastfm_usuario.clone(),
         replaygain: estado.replaygain,
         fundo_reativo: estado.fundo_reativo,
         volume: estado.volume_atual,

@@ -404,6 +404,7 @@ pub(crate) fn contar_reproducao(estado: &mut EstadoAudio, ui: &MainWindow) {
     estado.biblioteca.contar(&chave);
     estado.biblioteca.salvar();
     renovar_especial(estado, ui, POS_MAIS_TOCADAS);
+    scrobble_ouvida(estado);
 }
 
 /// Marca ou desmarca uma faixa como favorita e atualiza o que mostra isso.

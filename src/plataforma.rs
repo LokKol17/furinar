@@ -468,3 +468,61 @@ pub(crate) fn arredondar_cantos(ui: &MainWindow) {
 
 #[cfg(not(target_os = "windows"))]
 pub(crate) fn arredondar_cantos(_ui: &MainWindow) {}
+
+/// Status do Discord a partir do que está tocando (pausado ou parado limpa).
+/// Com a opção desligada a conexão é solta.
+pub(crate) fn atualizar_discord(estado: &mut EstadoAudio) {
+    if !estado.discord_ativo {
+        estado.discord = None;
+        return;
+    }
+    let tocando = estado.audio_player.as_ref().is_some_and(|p| !p.is_paused());
+    let status = tocando
+        .then(|| {
+            let pasta = estado.pastas.get(estado.pasta_reproducao?)?;
+            let indice = estado.indice_atual?;
+            let t = pasta.tracks.get(indice)?;
+            let capa = pasta
+                .chave_faixa(indice)
+                .and_then(|k| estado.metadados.correcao(&k)?.lancamento.clone())
+                .map(|l| format!("https://coverartarchive.org/release/{l}/front-250"));
+            Some(discord::Status {
+                titulo: t.titulo.clone(),
+                artista: t.artista.clone(),
+                album: t.album.clone(),
+                posicao: estado.tempo_decorrido as u64,
+                duracao: estado.duracao_total_secs,
+                capa,
+            })
+        })
+        .flatten();
+    estado
+        .discord
+        .get_or_insert_with(discord::Discord::novo)
+        .mostrar(status);
+}
+
+/// Abre uma página no navegador padrão.
+pub(crate) fn abrir_no_navegador(url: &str) {
+    #[cfg(target_os = "windows")]
+    let comando = std::process::Command::new("cmd")
+        .args(["/C", "start", "", url])
+        .spawn();
+    #[cfg(not(target_os = "windows"))]
+    let comando = std::process::Command::new("xdg-open").arg(url).spawn();
+    let _ = comando;
+}
+
+/// Liga os callbacks da UI desta área.
+pub(crate) fn ligar(ui: &MainWindow, estado: &Rc<RefCell<EstadoAudio>>) {
+    {
+        let estado = estado.clone();
+        ui.on_alternar_discord(move |ligado| {
+            let mut e = estado.borrow_mut();
+            e.discord_ativo = ligado;
+            // Desligar solta a conexão já (e o Discord limpa o status)
+            atualizar_discord(&mut e);
+            salvar_configuracao(&e);
+        });
+    }
+}

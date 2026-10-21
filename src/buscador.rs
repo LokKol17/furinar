@@ -15,7 +15,7 @@ use std::time::{Duration, Instant};
 use crate::letras_web;
 use crate::metadados::{CONFIANCA_AUTOMATICA, Candidato, Consulta, Correcao};
 use crate::rede::Cliente;
-use crate::{acoustid, musicbrainz};
+use crate::{acoustid, musicbrainz, scrobble};
 
 pub enum Pedido {
     /// Letra de uma faixa (ao tocar, ou pelo botão).
@@ -32,6 +32,17 @@ pub enum Pedido {
     Capa { chave: String, lancamento: String },
     /// Escreve as correções nos arquivos.
     GravarTags(Vec<(PathBuf, Correcao)>),
+    /// Avisa os serviços de scrobble que a faixa começou.
+    TocandoAgora(scrobble::Contas, scrobble::Escuta),
+    /// Envia escutas (a fila pendente junto).
+    Scrobble(scrobble::Contas, scrobble::Fila),
+    /// Conexão com o Last.fm: token + página de autorização, depois a sessão.
+    LastfmToken { chave: String, segredo: String },
+    LastfmSessao {
+        chave: String,
+        segredo: String,
+        token: String,
+    },
 }
 
 pub enum Resposta {
@@ -65,6 +76,16 @@ pub enum Resposta {
         ok: usize,
         falhas: Vec<String>,
     },
+    TocandoAgora,
+    /// O que não foi (volta para a fila) e o último erro.
+    Scrobble {
+        sobrou: scrobble::Fila,
+        erro: Option<String>,
+    },
+    /// (token, URL para autorizar)
+    LastfmToken(Result<(String, String), String>),
+    /// (sessão, usuário)
+    LastfmSessao(Result<(String, String), String>),
 }
 
 impl Resposta {
@@ -196,6 +217,34 @@ fn trabalhar(
                 }
                 Resposta::Gravadas { ok, falhas }
             }
+            Pedido::TocandoAgora(contas, escuta) => {
+                if let Ok(c) = conectar(&mut conexao) {
+                    scrobble::tocando_agora(c, &contas, &escuta);
+                }
+                Resposta::TocandoAgora
+            }
+            Pedido::Scrobble(contas, fila) => match conectar(&mut conexao) {
+                Ok(c) => {
+                    let (sobrou, erro) = scrobble::enviar(c, &contas, fila);
+                    Resposta::Scrobble { sobrou, erro }
+                }
+                Err(e) => Resposta::Scrobble {
+                    sobrou: fila,
+                    erro: Some(e),
+                },
+            },
+            Pedido::LastfmToken { chave, segredo } => {
+                Resposta::LastfmToken(conectar(&mut conexao).and_then(|c| {
+                    scrobble::lastfm_token(c, &chave, &segredo).map_err(|e| e.to_string())
+                }))
+            }
+            Pedido::LastfmSessao {
+                chave,
+                segredo,
+                token,
+            } => Resposta::LastfmSessao(conectar(&mut conexao).and_then(|c| {
+                scrobble::lastfm_sessao(c, &chave, &segredo, &token).map_err(|e| e.to_string())
+            })),
         };
         if tx.send(resposta).is_err() {
             return;

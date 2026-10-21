@@ -60,6 +60,21 @@ pub struct AppConfig {
     /// Chave de aplicativo do AcoustID (impressão digital).
     #[serde(default)]
     pub chave_acoustid: String,
+    /// Mostrar a faixa tocando no perfil do Discord.
+    #[serde(default)]
+    pub discord: bool,
+    /// Scrobble: token do ListenBrainz e conta do Last.fm (chave e segredo da
+    /// "API account" do usuário, sessão obtida na conexão).
+    #[serde(default)]
+    pub listenbrainz_token: String,
+    #[serde(default)]
+    pub lastfm_chave: String,
+    #[serde(default)]
+    pub lastfm_segredo: String,
+    #[serde(default)]
+    pub lastfm_sessao: String,
+    #[serde(default)]
+    pub lastfm_usuario: String,
     #[serde(default = "verdadeiro")]
     pub replaygain: bool,
     /// Fundo do modo imersivo pulsando com os graves. Desligado por padrão:
@@ -103,6 +118,12 @@ impl Default for AppConfig {
             crossfade: 0,
             letras_web: false,
             chave_acoustid: String::new(),
+            discord: false,
+            listenbrainz_token: String::new(),
+            lastfm_chave: String::new(),
+            lastfm_segredo: String::new(),
+            lastfm_sessao: String::new(),
+            lastfm_usuario: String::new(),
             replaygain: true,
             fundo_reativo: false,
             escanear_subpastas: false,

@@ -1,4 +1,4 @@
-import { Tema, BotaoIcone, BotaoTitulo, BarraDeslizante, CampoBusca, CaixaSelecao } from "theme.slint";
+import { Tema, BotaoIcone, BotaoTitulo, BarraDeslizante, CampoBusca, CaixaSelecao, CampoTexto, BotaoTexto } from "theme.slint";
 import { I18n } from "i18n.slint";
 import { TelaImersiva } from "imersivo.slint";
 import { LinhaPainel, CartaoAlbum } from "painel.slint";
@@ -78,6 +78,21 @@ export component MainWindow inherits Window {
     in property <[ItemRevisao]> revisao;
     in property <string> tags_texto;
     in-out property <bool> letras_web: false;
+    in-out property <bool> discord: false;
+    callback alternar_discord(bool);
+    // Scrobble
+    in-out property <string> listenbrainz_token;
+    in-out property <string> lastfm_chave;
+    in-out property <string> lastfm_segredo;
+    in property <bool> lastfm_conectado;
+    in property <bool> lastfm_aguardando;
+    in property <string> lastfm_estado;
+    in property <string> scrobble_estado;
+    callback listenbrainz_mudou(string);
+    callback lastfm_credenciais_mudou(string, string);
+    callback lastfm_conectar();
+    callback lastfm_concluir();
+    callback lastfm_desconectar();
     in-out property <string> chave_acoustid: "";
     callback abrir_info();
     callback info_buscar();
@@ -988,6 +1003,20 @@ export component MainWindow inherits Window {
         limpar_fundo => { limpar_fundo(); }
         abrir_info => { abrir_info(); }
         letras_web <=> letras_web;
+        discord <=> discord;
+        alternar_discord(v) => { alternar_discord(v); }
+        listenbrainz_token <=> listenbrainz_token;
+        lastfm_chave <=> lastfm_chave;
+        lastfm_segredo <=> lastfm_segredo;
+        lastfm_conectado: lastfm_conectado;
+        lastfm_aguardando: lastfm_aguardando;
+        lastfm_estado: lastfm_estado;
+        scrobble_estado: scrobble_estado;
+        listenbrainz_mudou(t) => { listenbrainz_mudou(t); }
+        lastfm_credenciais_mudou(a, b) => { lastfm_credenciais_mudou(a, b); }
+        lastfm_conectar => { lastfm_conectar(); }
+        lastfm_concluir => { lastfm_concluir(); }
+        lastfm_desconectar => { lastfm_desconectar(); }
         chave_acoustid <=> chave_acoustid;
         alternar_letras_web(v) => { alternar_letras_web(v); }
         chave_acoustid_mudou(c) => { chave_acoustid_mudou(c); }
@@ -1235,6 +1264,12 @@ export component MainWindow inherits Window {
                     }
 
                     CaixaSelecao {
+                        rotulo: I18n.discord_status;
+                        marcado <=> discord;
+                        alternado(v) => { alternar_discord(v); }
+                    }
+
+                    CaixaSelecao {
                         rotulo: I18n.lyrics_web;
                         marcado <=> letras_web;
                         alternado(v) => { alternar_letras_web(v); }
@@ -1274,6 +1309,77 @@ export component MainWindow inherits Window {
                     }
                     Text {
                         text: I18n.acoustid_desc;
+                        font-size: 12px;
+                        color: Tema.texto_suave;
+                        wrap: word-wrap;
+                    }
+
+                    // Scrobble
+                    Text {
+                        text: I18n.scrobble_title;
+                        color: Tema.texto;
+                        font-size: 14px;
+                        font-weight: 700;
+                    }
+                    Text {
+                        text: I18n.listenbrainz_token;
+                        color: Tema.texto;
+                        font-size: 13px;
+                    }
+                    CampoTexto {
+                        texto <=> listenbrainz_token;
+                        senha: true;
+                        editado(t) => { listenbrainz_mudou(t); }
+                        aceito => { atalhos.focus(); }
+                    }
+                    Text {
+                        text: I18n.lastfm_keys;
+                        color: Tema.texto;
+                        font-size: 13px;
+                    }
+                    HorizontalLayout {
+                        spacing: 8px;
+
+                        CampoTexto {
+                            texto <=> lastfm_chave;
+                            placeholder: I18n.lastfm_key;
+                            editado(t) => { lastfm_credenciais_mudou(t, lastfm_segredo); }
+                            aceito => { atalhos.focus(); }
+                        }
+                        CampoTexto {
+                            texto <=> lastfm_segredo;
+                            placeholder: I18n.lastfm_secret;
+                            senha: true;
+                            editado(t) => { lastfm_credenciais_mudou(lastfm_chave, t); }
+                            aceito => { atalhos.focus(); }
+                        }
+                    }
+                    HorizontalLayout {
+                        spacing: 8px;
+
+                        BotaoTexto {
+                            texto: lastfm_conectado ? I18n.lastfm_disconnect : (lastfm_aguardando ? I18n.lastfm_finish : I18n.lastfm_connect);
+                            clicado => {
+                                if (lastfm_conectado) {
+                                    lastfm_desconectar();
+                                } else if (lastfm_aguardando) {
+                                    lastfm_concluir();
+                                } else {
+                                    lastfm_conectar();
+                                }
+                            }
+                        }
+                        Text {
+                            text: lastfm_estado;
+                            color: Tema.texto_suave;
+                            font-size: 12px;
+                            vertical-alignment: center;
+                            horizontal-stretch: 1;
+                            wrap: word-wrap;
+                        }
+                    }
+                    Text {
+                        text: scrobble_estado != "" ? scrobble_estado : I18n.scrobble_desc;
                         font-size: 12px;
                         color: Tema.texto_suave;
                         wrap: word-wrap;

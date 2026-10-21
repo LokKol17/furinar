@@ -365,3 +365,72 @@ export component CaixaSelecao inherits Rectangle {
         }
     ]
 }
+
+// ---------------------------------------------------------------------
+// Campo de texto de uma linha (configurações)
+// ---------------------------------------------------------------------
+
+export component CampoTexto inherits Rectangle {
+    in-out property <string> texto;
+    /// Esconde o que foi digitado (tokens, segredos)
+    in property <bool> senha: false;
+    in property <string> placeholder: "";
+    callback editado(string);
+    callback aceito();
+
+    height: 30px;
+    border-radius: 8px;
+    background: Tema.neutro;
+    border-width: 1px;
+    border-color: entrada.has-focus ? Tema.foco : Tema.borda;
+
+    Text {
+        x: 10px;
+        height: parent.height;
+        text: root.texto == "" ? root.placeholder : "";
+        color: Tema.texto_suave;
+        font-size: 13px;
+        vertical-alignment: center;
+    }
+    entrada := TextInput {
+        x: 10px;
+        width: parent.width - 20px;
+        height: parent.height;
+        color: Tema.texto;
+        font-size: 13px;
+        vertical-alignment: center;
+        single-line: true;
+        input-type: root.senha ? InputType.password : InputType.text;
+        text <=> root.texto;
+        edited => { root.editado(self.text); }
+        accepted => { root.aceito(); }
+    }
+}
+
+// ---------------------------------------------------------------------
+// Botão de texto (configurações)
+// ---------------------------------------------------------------------
+
+export component BotaoTexto inherits Rectangle {
+    in property <string> texto;
+    callback clicado();
+
+    height: 30px;
+    min-width: rotulo.preferred-width + 24px;
+    border-radius: 8px;
+    border-width: 1px;
+    border-color: Tema.borda;
+    background: toque.has-hover ? Tema.neutro_hover : Tema.neutro;
+    animate background { duration: 120ms; }
+
+    rotulo := Text {
+        text: root.texto;
+        color: Tema.texto;
+        font-size: 13px;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+    toque := TouchArea {
+        clicked => { root.clicado(); }
+    }
+}

@@ -8,6 +8,7 @@ mod biblioteca;
 mod buscador;
 mod capa;
 mod config;
+mod discord;
 mod estado;
 mod fundo;
 mod imersivo;
@@ -23,6 +24,7 @@ mod plataforma;
 mod ponte_imersivo;
 mod rede;
 mod reproducao;
+mod scrobble;
 mod sono;
 mod track;
 mod transicao;
@@ -182,6 +184,16 @@ fn aplicar_idioma(idioma: &str, ui: &MainWindow) {
     i18n.set_lyrics_web_desc(g("lyrics_web_desc"));
     i18n.set_acoustid_key(g("acoustid_key"));
     i18n.set_acoustid_desc(g("acoustid_desc"));
+    i18n.set_discord_status(g("discord_status"));
+    i18n.set_scrobble_title(g("scrobble_title"));
+    i18n.set_listenbrainz_token(g("listenbrainz_token"));
+    i18n.set_lastfm_keys(g("lastfm_keys"));
+    i18n.set_lastfm_key(g("lastfm_key"));
+    i18n.set_lastfm_secret(g("lastfm_secret"));
+    i18n.set_lastfm_connect(g("lastfm_connect"));
+    i18n.set_lastfm_finish(g("lastfm_finish"));
+    i18n.set_lastfm_disconnect(g("lastfm_disconnect"));
+    i18n.set_scrobble_desc(g("scrobble_desc"));
     i18n.set_tip_sort(g("tip_sort"));
     i18n.set_tip_favorite(g("tip_favorite"));
     i18n.set_sort_default(g("sort_default"));
@@ -340,6 +352,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         e.metadados = metadados::Banco::carregar();
         e.letras_web = config.letras_web;
         e.chave_acoustid = config.chave_acoustid.clone();
+        e.discord_ativo = config.discord;
+        e.contas = scrobble::Contas {
+            listenbrainz: config.listenbrainz_token.clone(),
+            lastfm_chave: config.lastfm_chave.clone(),
+            lastfm_segredo: config.lastfm_segredo.clone(),
+            lastfm_sessao: config.lastfm_sessao.clone(),
+        };
+        e.lastfm_usuario = config.lastfm_usuario.clone();
+        e.fila_scrobble = scrobble::carregar_fila();
+        ui.set_listenbrainz_token(config.listenbrainz_token.as_str().into());
+        ui.set_lastfm_chave(config.lastfm_chave.as_str().into());
+        ui.set_lastfm_segredo(config.lastfm_segredo.as_str().into());
+        publicar_lastfm(&e, &ui);
+        // O que ficou de uma sessão sem rede vai agora
+        enviar_fila_scrobble(&mut e);
+        ui.set_discord(config.discord);
         ui.set_letras_web(config.letras_web);
         ui.set_chave_acoustid(config.chave_acoustid.as_str().into());
         e.crossfade = config.crossfade;
@@ -437,6 +465,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     reproducao::ligar(&ui, &estado);
     ponte_imersivo::ligar(&ui, &estado);
     web_ui::ligar(&ui, &estado);
+    plataforma::ligar(&ui, &estado);
 
     {
         let estado = estado.clone();
@@ -533,6 +562,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 atualizar_progresso(&mut e, &ui);
                 verificar_sono(&mut e, &ui);
                 processar_web(&mut e, &ui);
+                atualizar_discord(&mut e);
+                atualizar_scrobble(&mut e);
                 if e.imersivo.is_some() {
                     atualizar_relogio(&ui);
                     atualizar_previa(&mut e, &ui);

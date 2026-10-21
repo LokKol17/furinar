@@ -51,6 +51,8 @@ fn intervalo(host: &str) -> Duration {
         "musicbrainz.org" => Duration::from_millis(1100),
         // AcoustID: até 3/s
         "api.acoustid.org" => Duration::from_millis(350),
+        // Last.fm pede no máximo ~5/s
+        "ws.audioscrobbler.com" => Duration::from_millis(250),
         _ => Duration::from_millis(200),
     }
 }
@@ -137,6 +139,26 @@ impl Cliente {
         let resposta = self.pedir(host, |c| c.post(url).form(formulario))?;
         resposta
             .map(|r| r.json::<T>().map_err(|e| Erro::Formato(e.to_string())))
+            .transpose()
+    }
+
+    /// POST com corpo JSON e cabeçalhos extras (token do ListenBrainz).
+    pub fn post_json(
+        &mut self,
+        host: &'static str,
+        url: &str,
+        cabecalhos: &[(&str, String)],
+        corpo: &serde_json::Value,
+    ) -> Result<Option<serde_json::Value>, Erro> {
+        let resposta = self.pedir(host, |c| {
+            let mut r = c.post(url).json(corpo);
+            for (k, v) in cabecalhos {
+                r = r.header(*k, v);
+            }
+            r
+        })?;
+        resposta
+            .map(|r| r.json().map_err(|e| Erro::Formato(e.to_string())))
             .transpose()
     }
 
