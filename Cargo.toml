@@ -107,3 +107,10 @@ opt-level = 3
 lto = "fat"
 codegen-units = 1
 strip = true
+
+# Dependências otimizadas também no `cargo run`: o renderer de software do
+# Slint sem otimização leva ~140 ms por quadro em 1920x1080, e o modo
+# imersivo cai para ~5 fps. O código do próprio furinar segue em opt-level 0,
+# então a recompilação incremental continua rápida.
+[profile.dev.package."*"]
+opt-level = 3
