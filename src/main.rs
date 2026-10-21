@@ -5,6 +5,7 @@ slint::include_modules!();
 
 mod capa;
 mod config;
+mod fundo;
 mod imersivo;
 mod lrc;
 mod memoria;
@@ -123,6 +124,10 @@ fn aplicar_idioma(idioma: &str, ui: &MainWindow) {
     i18n.set_tip_settings(g("tip_settings"));
     i18n.set_tip_immersive(g("tip_immersive"));
     i18n.set_tip_exit_immersive(g("tip_exit_immersive"));
+    i18n.set_bg_label(g("bg_label"));
+    i18n.set_bg_choose(g("bg_choose"));
+    i18n.set_bg_clear(g("bg_clear"));
+    i18n.set_bg_none(g("bg_none"));
     i18n.set_search_placeholder(g("search_placeholder"));
     i18n.set_no_lyrics(g("no_lyrics"));
     i18n.set_config_title(g("config_title"));
@@ -208,6 +213,8 @@ struct EstadoAudio {
     letra_janela_inicio: usize,
     /// Modo imersivo (tela cheia). `None` = desligado, nada alocado.
     imersivo: Option<imersivo::EstadoImersivo>,
+    /// Fundo do modo imersivo escolhido nas configurações.
+    fundo_global: Option<PathBuf>,
     #[cfg(feature = "mpris")]
     faixa_controles: Option<String>,
     #[cfg(feature = "mpris")]
@@ -241,6 +248,7 @@ impl Default for EstadoAudio {
             letra_indice: -1,
             letra_janela_inicio: 0,
             imersivo: None,
+            fundo_global: None,
             #[cfg(feature = "mpris")]
             faixa_controles: None,
             #[cfg(feature = "mpris")]
@@ -266,6 +274,10 @@ fn salvar_configuracao(estado: &EstadoAudio) {
         escanear_subpastas: estado.escanear_subpastas,
         tema_claro: estado.tema_claro,
         idioma: estado.idioma.clone(),
+        fundo_tela_cheia: estado
+            .fundo_global
+            .as_ref()
+            .map(|p| p.to_string_lossy().to_string()),
         indice_atual: estado.indice_atual,
         tempo_atual: if estado.tempo_decorrido > 0.0 {
             Some(estado.tempo_decorrido as u64)
@@ -496,14 +508,24 @@ fn publicar_letra(estado: &mut EstadoAudio, ui: &MainWindow) {
 // Modo imersivo
 // ---------------------------------------------------------------------
 
+/// Nome do arquivo de fundo global para mostrar nas configurações.
+fn nome_fundo(caminho: Option<&std::path::Path>) -> String {
+    caminho
+        .and_then(|p| p.file_name())
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_default()
+}
+
 /// Faixa atual no formato que o modo imersivo usa.
 fn faixa_imersiva(estado: &EstadoAudio) -> Option<imersivo::Faixa> {
     let pasta = estado.pastas.get(estado.pasta_reproducao?)?;
     let track = pasta.tracks.get(estado.indice_atual?)?;
     Some(imersivo::Faixa {
         caminho: pasta.caminho.join(&track.path),
+        pasta_raiz: pasta.caminho.clone(),
         titulo: track.titulo.clone(),
         artista: track.artista.clone(),
+        fundo_global: estado.fundo_global.clone(),
     })
 }
 
@@ -1476,6 +1498,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         e.modo_shuffle = config.modo_shuffle;
         e.escanear_subpastas = config.escanear_subpastas;
         e.idioma = config.idioma.clone();
+        e.fundo_global = config.fundo_tela_cheia.as_ref().map(PathBuf::from);
+        ui.set_fundo_global_nome(nome_fundo(e.fundo_global.as_deref()).into());
 
         ui.set_volume(config.volume);
         let lang = translations::get_translations(&config.idioma);
@@ -1857,6 +1881,39 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     {
         let estado = estado.clone();
         let ui_fraca = ui.as_weak();
+        ui.on_escolher_fundo(move || {
+            let extensoes = fundo::extensoes_aceitas();
+            let Some(caminho) = rfd::FileDialog::new()
+                .add_filter("Imagem, GIF/WebP ou vídeo", &extensoes)
+                .pick_file()
+            else {
+                return;
+            };
+            if let Some(ui) = ui_fraca.upgrade() {
+                let mut e = estado.borrow_mut();
+                ui.set_fundo_global_nome(nome_fundo(Some(&caminho)).into());
+                e.fundo_global = Some(caminho);
+                salvar_configuracao(&e);
+            }
+        });
+    }
+
+    {
+        let estado = estado.clone();
+        let ui_fraca = ui.as_weak();
+        ui.on_limpar_fundo(move || {
+            if let Some(ui) = ui_fraca.upgrade() {
+                let mut e = estado.borrow_mut();
+                e.fundo_global = None;
+                ui.set_fundo_global_nome(SharedString::new());
+                salvar_configuracao(&e);
+            }
+        });
+    }
+
+    {
+        let estado = estado.clone();
+        let ui_fraca = ui.as_weak();
         ui.on_letra_completa_clicada(move |indice| {
             if let Some(ui) = ui_fraca.upgrade() {
                 let mut e = estado.borrow_mut();
@@ -2186,6 +2243,8 @@ mod tests {
             Some(imersivo::Faixa {
                 titulo: track::ler_tags(&caminho).0,
                 artista: track::ler_tags(&caminho).1,
+                pasta_raiz: caminho.parent().map(PathBuf::from).unwrap_or_default(),
+                fundo_global: std::env::var_os("FURINAR_CAPTURA_FUNDO").map(PathBuf::from),
                 caminho: caminho.clone(),
             }),
         );

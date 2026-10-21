@@ -68,6 +68,10 @@ export component MainWindow inherits Window {
     in property <[string]> letra_completa: [];
     in property <int> letra_indice: -1;
     callback alternar_imersivo();
+    /// Nome do arquivo de fundo global ("" = capa desfocada)
+    in property <string> fundo_global_nome: "";
+    callback escolher_fundo();
+    callback limpar_fundo();
     callback letra_completa_clicada(int);
 
     callback abrir_pasta();
@@ -800,6 +804,49 @@ export component MainWindow inherits Window {
                         font-size: 13px;
                         horizontal-alignment: center;
                         vertical-alignment: center;
+                    }
+                }
+
+                // Fundo do modo imersivo
+                Text {
+                    text: I18n.bg_label;
+                    color: Tema.texto;
+                    font-size: 14px;
+                }
+                Text {
+                    text: fundo_global_nome != "" ? fundo_global_nome : I18n.bg_none;
+                    color: Tema.texto_suave;
+                    font-size: 12px;
+                    overflow: elide;
+                }
+                HorizontalLayout {
+                    spacing: 8px;
+
+                    for botao[i] in [I18n.bg_choose, I18n.bg_clear]: Rectangle {
+                        visible: i == 0 || fundo_global_nome != "";
+                        height: 30px;
+                        border-radius: 8px;
+                        border-width: 1px;
+                        border-color: Tema.borda;
+                        background: ta_fundo.has-hover ? Tema.neutro_hover : Tema.neutro;
+                        animate background { duration: 120ms; }
+
+                        ta_fundo := TouchArea {
+                            clicked => {
+                                if (i == 0) {
+                                    escolher_fundo();
+                                } else {
+                                    limpar_fundo();
+                                }
+                            }
+                        }
+                        Text {
+                            text: botao;
+                            color: Tema.texto;
+                            font-size: 13px;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
                     }
                 }
             }

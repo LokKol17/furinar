@@ -6,18 +6,24 @@
 
 use std::path::PathBuf;
 use std::sync::mpsc::{self, Receiver, Sender};
+use std::time::Instant;
 
 use slint::{Image, SharedString};
 
 use crate::MainWindow;
 use crate::capa::{self, Carregado};
+use crate::fundo::{self, Reprodutor};
 use crate::translations;
 
 /// O que o modo precisa saber da faixa atual.
 pub struct Faixa {
     pub caminho: PathBuf,
+    /// Pasta da aba de onde a faixa vem (onde também se procura fundo).
+    pub pasta_raiz: PathBuf,
     pub titulo: String,
     pub artista: Option<String>,
+    /// Fundo escolhido nas configurações.
+    pub fundo_global: Option<PathBuf>,
 }
 
 pub struct EstadoImersivo {
@@ -30,6 +36,10 @@ pub struct EstadoImersivo {
     artista: Option<String>,
     /// Qual camada de fundo está visível (crossfade A/B).
     mostra_a: bool,
+    /// Fundo personalizado tocando. `None`: usa a capa desfocada.
+    fundo: Option<Reprodutor>,
+    /// O próximo quadro do fundo é o primeiro: entra com crossfade.
+    fundo_novo: bool,
 }
 
 impl EstadoImersivo {
@@ -42,6 +52,8 @@ impl EstadoImersivo {
             faixa: None,
             artista: None,
             mostra_a: true,
+            fundo: None,
+            fundo_novo: false,
         }
     }
 
@@ -66,6 +78,19 @@ impl EstadoImersivo {
         self.faixa = Some(faixa.caminho.clone());
         self.artista = faixa.artista;
 
+        // Mesmo fundo da faixa anterior (mesma pasta): continua tocando sem
+        // reiniciar. Vídeo sem ffmpeg no PATH não abre e cai para a capa.
+        let pasta_faixa = faixa.caminho.parent().unwrap_or(&faixa.pasta_raiz);
+        let alvo = fundo::resolver(
+            pasta_faixa,
+            &faixa.pasta_raiz,
+            faixa.fundo_global.as_deref(),
+        );
+        if self.fundo.as_ref().map(|r| &r.caminho) != alvo.as_ref() {
+            self.fundo = alvo.as_deref().and_then(Reprodutor::abrir);
+            self.fundo_novo = self.fundo.is_some();
+        }
+
         let geracao = self.geracao;
         let tx = self.tx.clone();
         let caminho = faixa.caminho;
@@ -79,6 +104,21 @@ impl EstadoImersivo {
         while let Ok((geracao, carregado)) = self.rx.try_recv() {
             if geracao == self.geracao {
                 self.aplicar(ui, carregado, idioma);
+            }
+        }
+
+        let quadro = self.fundo.as_mut().and_then(|r| r.proximo(Instant::now()));
+        if let Some(q) = quadro {
+            let pixelado = q.pixels.width() <= fundo::LARGURA_PIXEL_ART;
+            let imagem = Image::from_rgba8(q.pixels);
+            if self.fundo_novo {
+                self.fundo_novo = false;
+                self.trocar_fundo(ui, imagem, pixelado);
+            } else if self.mostra_a {
+                // Quadros seguintes vão direto na camada visível
+                ui.set_imv_fundo_a(imagem);
+            } else {
+                ui.set_imv_fundo_b(imagem);
             }
         }
     }
@@ -104,10 +144,12 @@ impl EstadoImersivo {
             None => ui.set_imv_tem_cor(false),
         }
 
-        // Fundo: por enquanto a capa desfocada
-        match c.desfocada {
-            Some(buf) => self.trocar_fundo(ui, Image::from_rgba8(buf), false),
-            None => ui.set_imv_tem_fundo(false),
+        // Sem fundo personalizado, a capa desfocada faz o papel
+        if self.fundo.is_none() {
+            match c.desfocada {
+                Some(buf) => self.trocar_fundo(ui, Image::from_rgba8(buf), false),
+                None => ui.set_imv_tem_fundo(false),
+            }
         }
     }
 

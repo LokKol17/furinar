@@ -40,6 +40,9 @@ pub struct AppConfig {
     pub tema_claro: bool,
     #[serde(default = "default_idioma")]
     pub idioma: String,
+    /// Fundo do modo imersivo (imagem, GIF/WebP ou vídeo).
+    #[serde(default)]
+    pub fundo_tela_cheia: Option<String>,
 }
 
 impl Default for AppConfig {
@@ -58,6 +61,7 @@ impl Default for AppConfig {
             escanear_subpastas: false,
             tema_claro: false,
             idioma: default_idioma(),
+            fundo_tela_cheia: None,
         }
     }
 }

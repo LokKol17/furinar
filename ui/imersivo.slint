@@ -104,14 +104,17 @@ export component TelaImersiva inherits Rectangle {
         auto_hide.restart();
     }
 
-    // Sem imagem: gradiente tingido pela cor da capa
+    // Sem imagem: gradiente tingido pela cor da capa. O renderer de software
+    // pinta cada camada de tela cheia a cada quadro do fundo, então camada
+    // escondida atrás de outra opaca fica invisível de verdade.
     Rectangle {
+        visible: !root.tem_fundo;
         background: @linear-gradient(160deg, root.destaque.darker(0.75), #05080d 70%);
     }
 
     // Fundo (capa desfocada, imagem, GIF ou vídeo)
     Image {
-        visible: root.tem_fundo;
+        visible: root.tem_fundo && self.opacity > 0;
         width: 100%;
         height: 100%;
         source: root.fundo_a;
@@ -121,7 +124,7 @@ export component TelaImersiva inherits Rectangle {
         animate opacity { duration: 600ms; easing: ease-in-out; }
     }
     Image {
-        visible: root.tem_fundo;
+        visible: root.tem_fundo && self.opacity > 0;
         width: 100%;
         height: 100%;
         source: root.fundo_b;
@@ -134,7 +137,7 @@ export component TelaImersiva inherits Rectangle {
     // Véu: escurece mais no rodapé, para o texto ler. Duas paradas só: com
     // uma parada no meio o renderer de software deixa uma linha na emenda.
     Rectangle {
-        background: @linear-gradient(180deg, #00000030 0%, #000000c8 100%);
+        background: @linear-gradient(180deg, #00000059 0%, #000000d0 100%);
     }
 
     // Área inteira: mouse se mexendo acorda os controles. Fica embaixo dos

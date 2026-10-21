@@ -18,6 +18,10 @@ pub fn pt_br() -> Translations {
     t.insert("stereo", "Estéreo");
     t.insert("mono", "Mono");
     t.insert("decimal_sep", ",");
+    t.insert("bg_label", "Fundo da tela cheia");
+    t.insert("bg_choose", "Escolher…");
+    t.insert("bg_clear", "Limpar");
+    t.insert("bg_none", "Capa desfocada (padrão)");
     t.insert("search_placeholder", "Buscar por título ou artista...");
     t.insert("no_lyrics", "Sem letra disponível para esta faixa.");
     t.insert("config_title", "Configurações");
@@ -59,6 +63,10 @@ pub fn en() -> Translations {
     t.insert("stereo", "Stereo");
     t.insert("mono", "Mono");
     t.insert("decimal_sep", ".");
+    t.insert("bg_label", "Fullscreen background");
+    t.insert("bg_choose", "Choose…");
+    t.insert("bg_clear", "Clear");
+    t.insert("bg_none", "Blurred cover (default)");
     t.insert("search_placeholder", "Search by title or artist...");
     t.insert("no_lyrics", "No lyrics available for this track.");
     t.insert("config_title", "Settings");
