@@ -55,6 +55,8 @@ The visual palette — deep navy, cyan, and gold (or baby blue and pearl white i
 - Custom backgrounds: drop a `background.*` (or `furinar-bg.*`) into the music folder, or pick a global one in Settings. Images, animated GIF/WebP, and videos (mp4/webm/mkv/mov/avi — played through your system `ffmpeg`, if installed). Small pixel-art backgrounds stay crisp. No background? The blurred cover takes its place
 - Accent color taken from the cover, crossfade between tracks, controls that hide after 3 s of stillness
 - Spectrum visualizer reacting to the music
+- Library drawer (`L`, or `/` to search): folder tabs, search, and a list with cover thumbnails, artist • album and duration; plus an "Up next" queue that respects shuffle and loop
+- Lyrics-only view (`H`), a clock, and a sleep timer (15/30/60 min or end of track) that fades the volume out
 - Everything in this mode is only allocated while it's on — back in normal mode, Furinar is as light as before
 
 <div align="center">
@@ -67,7 +69,7 @@ The visual palette — deep navy, cyan, and gold (or baby blue and pearl white i
 **Windows integration**
 - **Play/Pause, Previous, and Next** buttons right on the taskbar thumbnail preview
 - System media controls (keyboard media keys, action center) via SMTC
-- Keyboard shortcuts: `Space` play/pause, `←`/`→` seek ±5s, `↑`/`↓` navigate the list, `Enter` plays the selected track, `F11` immersive mode, `Esc` leaves it
+- Keyboard shortcuts: `Space` play/pause, `←`/`→` seek ±5s, `↑`/`↓` navigate the list, `Enter` plays the selected track, `F11` immersive mode, `Esc` leaves it (in immersive mode: `L` library, `/` search, `H` lyrics only)
 
 <div align="center">
   <table>

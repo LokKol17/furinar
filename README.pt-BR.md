@@ -55,6 +55,8 @@ A paleta visual — azul-marinho profundo, ciano e dourado (ou azul-bebê e bran
 - Fundos personalizados: coloque um `background.*` (ou `furinar-bg.*`) na pasta da música, ou escolha um fundo global nas Configurações. Imagens, GIF/WebP animado e vídeos (mp4/webm/mkv/mov/avi — tocados pelo `ffmpeg` do sistema, se instalado). Fundos pequenos em pixel art ficam nítidos. Sem fundo? A capa desfocada assume
 - Cor de destaque tirada da capa, crossfade entre faixas, controles que somem após 3 s parado
 - Visualizador de espectro reagindo à música
+- Painel da biblioteca (`L`, ou `/` para buscar): abas das pastas, busca e lista com miniatura da capa, artista • álbum e duração; mais a fila "a seguir", que respeita shuffle e loop
+- Modo só letra (`H`), relógio e temporizador de sono (15/30/60 min ou fim da faixa) que baixa o volume aos poucos
 - Nada desse modo fica alocado fora dele — de volta ao modo normal, o Furinar é tão leve quanto antes
 
 <div align="center">
@@ -67,7 +69,7 @@ A paleta visual — azul-marinho profundo, ciano e dourado (ou azul-bebê e bran
 **Integração com o Windows**
 - Botões de **Play/Pause, Anterior e Próxima** direto na miniatura da barra de tarefas
 - Controles multimídia do sistema (teclas de mídia do teclado, central de ações) via SMTC
-- Atalhos de teclado: `Espaço` pausa/retoma, `←`/`→` pulam 5s, `↑`/`↓` navegam a lista, `Enter` toca a faixa selecionada, `F11` modo imersivo, `Esc` sai dele
+- Atalhos de teclado: `Espaço` pausa/retoma, `←`/`→` pulam 5s, `↑`/`↓` navegam a lista, `Enter` toca a faixa selecionada, `F11` modo imersivo, `Esc` sai dele (no modo imersivo: `L` biblioteca, `/` busca, `H` só a letra)
 
 <div align="center">
   <table>
