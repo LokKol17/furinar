@@ -3563,6 +3563,12 @@ mod tests {
         ui.set_sono_texto("29:41".into());
         ui.set_favorita_atual(true);
         ui.set_imv_proxima("Próxima faixa — Artista".into());
+        // FURINAR_CAPTURA_CONFIG=1: configurações abertas
+        if std::env::var_os("FURINAR_CAPTURA_CONFIG").is_some() {
+            ui.set_crossfade_texto("Crossfade: 6 s".into());
+            ui.set_fundo_global_nome("pixel-city.gif".into());
+            ui.set_imv_config_aberta(true);
+        }
 
         // FURINAR_CAPTURA_PAINEL=1: painel aberto com as faixas da pasta
         if std::env::var_os("FURINAR_CAPTURA_PAINEL").is_some() {

@@ -47,6 +47,93 @@ component BotaoImersivo inherits Rectangle {
     ]
 }
 
+// Interruptor no estilo da tela cheia
+component OpcaoImersiva inherits Rectangle {
+    in property <string> rotulo;
+    in property <string> descricao: "";
+    in-out property <bool> ligado;
+    in property <color> cor;
+    callback alternado(bool);
+
+    height: textos.preferred-height + 16px;
+    border-radius: 10px;
+    background: toque.has-hover ? #ffffff0f : transparent;
+    animate background { duration: 120ms; }
+
+    textos := VerticalLayout {
+        x: 12px;
+        width: parent.width - 80px;
+        alignment: center;
+        spacing: 2px;
+
+        Text {
+            text: root.rotulo;
+            color: #ffffff;
+            font-size: 14px;
+            wrap: word-wrap;
+        }
+        if root.descricao != "" : Text {
+            text: root.descricao;
+            color: #ffffff80;
+            font-size: 12px;
+            wrap: word-wrap;
+        }
+    }
+
+    // Trilho + bolinha
+    Rectangle {
+        x: parent.width - 56px;
+        y: (parent.height - self.height) / 2;
+        width: 40px;
+        height: 22px;
+        border-radius: 11px;
+        background: root.ligado ? root.cor : #ffffff2e;
+        animate background { duration: 160ms; }
+
+        Rectangle {
+            x: root.ligado ? parent.width - self.width - 3px : 3px;
+            y: 3px;
+            width: 16px;
+            height: 16px;
+            border-radius: 8px;
+            background: #ffffff;
+            animate x { duration: 160ms; easing: ease-out; }
+        }
+    }
+
+    toque := TouchArea {
+        clicked => {
+            root.ligado = !root.ligado;
+            root.alternado(root.ligado);
+        }
+    }
+}
+
+// Botão de texto translúcido (opções da tela cheia)
+component BotaoTexto inherits Rectangle {
+    in property <string> texto;
+    callback clicado();
+
+    height: 34px;
+    min-width: rotulo.preferred-width + 28px;
+    border-radius: 17px;
+    background: toque.has-hover ? #ffffff2e : #ffffff17;
+    border-width: 1px;
+    border-color: #ffffff1f;
+    animate background { duration: 120ms; }
+
+    rotulo := Text {
+        text: root.texto;
+        color: #ffffff;
+        font-size: 13px;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+    toque := TouchArea {
+        clicked => { root.clicado(); }
+    }
+}
+
 export component TelaImersiva inherits Rectangle {
     // Fundo: duas camadas para o crossfade. O Rust escreve na camada oculta e
     // inverte `mostra_a`; quadros de animação vão direto na camada visível.
@@ -106,6 +193,13 @@ export component TelaImersiva inherits Rectangle {
     in property <[string]> opcoes_ordem;
     in property <int> especiais;
 
+    // Configurações da tela cheia
+    in-out property <bool> config_aberta: false;
+    in property <string> crossfade_texto;
+    in-out property <bool> replaygain;
+    in-out property <bool> fundo_reativo;
+    in property <string> fundo_global_nome;
+
     callback sair();
     callback anterior();
     callback play_pause();
@@ -129,6 +223,11 @@ export component TelaImersiva inherits Rectangle {
     callback albuns_rolou(int, int);
     callback album_clicado(int);
     callback ordem_escolhida(int);
+    callback alternar_crossfade();
+    callback alternar_replaygain(bool);
+    callback alternar_fundo_reativo(bool);
+    callback escolher_fundo();
+    callback limpar_fundo();
 
     background: #05080d;
 
@@ -217,7 +316,7 @@ export component TelaImersiva inherits Rectangle {
 
     auto_hide := Timer {
         interval: 3s;
-        running: !root.ocioso && !root.painel_aberto;
+        running: !root.ocioso && !root.painel_aberto && !root.config_aberta;
         triggered => { root.ocioso = true; }
     }
 
@@ -487,12 +586,36 @@ export component TelaImersiva inherits Rectangle {
         opacity: root.ocioso ? 0 : root.opacidade_extras;
         animate opacity { duration: 450ms; easing: ease-in-out; }
 
-        BotaoImersivo {
+        // Navegação no alto; embaixo fica só o que mexe na música
+        HorizontalLayout {
             x: 18px;
             y: 18px;
-            icone: @image-url("icons/voltar.svg");
-            dica: I18n.tip_exit_immersive;
-            clicado => { root.sair(); }
+            width: self.preferred-width;
+            height: 36px;
+            spacing: 6px;
+
+            BotaoImersivo {
+                icone: @image-url("icons/voltar.svg");
+                dica: I18n.tip_exit_immersive;
+                clicado => { root.sair(); }
+            }
+            BotaoImersivo {
+                icone: @image-url("icons/biblioteca.svg");
+                dica: I18n.tip_library;
+                ativo: root.painel_aberto;
+                cor: root.destaque;
+                clicado => { root.painel_aberto = !root.painel_aberto; }
+            }
+            BotaoImersivo {
+                icone: @image-url("icons/config.svg");
+                dica: I18n.tip_settings;
+                ativo: root.config_aberta;
+                cor: root.destaque;
+                clicado => {
+                    root.config_aberta = !root.config_aberta;
+                    root.acordar();
+                }
+            }
         }
 
         HorizontalLayout {
@@ -559,14 +682,6 @@ export component TelaImersiva inherits Rectangle {
             }
             BotaoImersivo {
                 y: (parent.height - self.height) / 2;
-                icone: @image-url("icons/biblioteca.svg");
-                dica: I18n.tip_library;
-                ativo: root.painel_aberto;
-                cor: root.destaque;
-                clicado => { root.painel_aberto = !root.painel_aberto; }
-            }
-            BotaoImersivo {
-                y: (parent.height - self.height) / 2;
                 icone: @image-url("icons/letra.svg");
                 dica: I18n.tip_lyrics_only;
                 clicado => { root.so_letra = true; }
@@ -610,6 +725,135 @@ export component TelaImersiva inherits Rectangle {
                 icone: @image-url("icons/sair_tela_cheia.svg");
                 dica: I18n.tip_exit_immersive;
                 clicado => { root.sair(); }
+            }
+        }
+    }
+
+    // -------------------------------------------------------------
+    // Configurações: cartão de vidro escuro sobre a tela
+    // -------------------------------------------------------------
+    if root.config_aberta : Rectangle {
+        background: #00000070;
+
+        // Clique fora fecha
+        TouchArea {
+            clicked => { root.config_aberta = false; }
+        }
+
+        cartao_config := Rectangle {
+            width: min(440px, root.largura_util - 2 * root.margem);
+            height: conteudo_config.preferred-height;
+            x: (root.largura_util - self.width) / 2;
+            y: (root.height - self.height) / 2;
+            border-radius: 18px;
+            background: #0b1019;
+            border-width: 1px;
+            border-color: root.destaque.with-alpha(0.35);
+            drop-shadow-blur: 40px;
+            drop-shadow-color: #000000a0;
+
+            // Engole o clique para não fechar
+            TouchArea { }
+
+            conteudo_config := VerticalLayout {
+                padding: 20px;
+                spacing: 8px;
+
+                HorizontalLayout {
+                    Text {
+                        text: I18n.config_title;
+                        color: #ffffff;
+                        font-size: 20px;
+                        font-weight: 800;
+                        vertical-alignment: center;
+                    }
+                    Rectangle { horizontal-stretch: 1; }
+                    BotaoImersivo {
+                        icone: @image-url("icons/x.svg");
+                        dica: I18n.tip_close;
+                        clicado => { root.config_aberta = false; }
+                    }
+                }
+
+                OpcaoImersiva {
+                    rotulo: I18n.replaygain;
+                    descricao: I18n.replaygain_desc;
+                    ligado <=> root.replaygain;
+                    cor: root.destaque;
+                    alternado(v) => { root.alternar_replaygain(v); }
+                }
+                OpcaoImersiva {
+                    rotulo: I18n.reactive_bg;
+                    ligado <=> root.fundo_reativo;
+                    cor: root.destaque;
+                    alternado(v) => { root.alternar_fundo_reativo(v); }
+                }
+
+                // Crossfade: cada clique passa para a próxima duração
+                Rectangle {
+                    height: 44px;
+                    border-radius: 10px;
+                    background: crossfade_toque.has-hover ? #ffffff0f : transparent;
+                    animate background { duration: 120ms; }
+
+                    Text {
+                        x: 12px;
+                        height: parent.height;
+                        text: root.crossfade_texto;
+                        color: #ffffff;
+                        font-size: 14px;
+                        vertical-alignment: center;
+                    }
+                    Image {
+                        source: @image-url("icons/proxima.svg");
+                        x: parent.width - 34px;
+                        y: (parent.height - self.height) / 2;
+                        width: 14px;
+                        height: 14px;
+                        colorize: root.destaque;
+                    }
+                    crossfade_toque := TouchArea {
+                        clicked => { root.alternar_crossfade(); }
+                    }
+                }
+
+                Rectangle {
+                    height: 1px;
+                    background: #ffffff14;
+                }
+
+                // Fundo da tela cheia
+                VerticalLayout {
+                    padding-left: 12px;
+                    padding-right: 12px;
+                    padding-top: 4px;
+                    spacing: 8px;
+
+                    Text {
+                        text: I18n.bg_label;
+                        color: #ffffff;
+                        font-size: 14px;
+                    }
+                    Text {
+                        text: root.fundo_global_nome != "" ? root.fundo_global_nome : I18n.bg_none;
+                        color: #ffffff80;
+                        font-size: 12px;
+                        overflow: elide;
+                    }
+                    HorizontalLayout {
+                        alignment: start;
+                        spacing: 8px;
+
+                        BotaoTexto {
+                            texto: I18n.bg_choose;
+                            clicado => { root.escolher_fundo(); }
+                        }
+                        if root.fundo_global_nome != "" : BotaoTexto {
+                            texto: I18n.bg_clear;
+                            clicado => { root.limpar_fundo(); }
+                        }
+                    }
+                }
             }
         }
     }

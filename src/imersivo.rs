@@ -246,6 +246,7 @@ pub fn limpar_ui(ui: &MainWindow) {
     ui.set_imv_barras(slint::ModelRc::default());
     ui.set_imv_painel_aberto(false);
     ui.set_imv_so_letra(false);
+    ui.set_imv_config_aberta(false);
     ui.set_imv_relogio(SharedString::new());
     ui.set_imv_proxima(SharedString::new());
     ui.set_imv_pulso(0.0);

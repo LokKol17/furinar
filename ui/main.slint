@@ -107,6 +107,7 @@ export component MainWindow inherits Window {
     private property <int> imv_pedido_rolar: 0;
     private property <int> imv_pedido_busca: 0;
     in-out property <bool> imv_so_letra: false;
+    in-out property <bool> imv_config_aberta: false;
     in property <string> imv_relogio: "";
     /// Prévia da próxima nos últimos segundos ("" = escondida)
     in property <string> imv_proxima: "";
@@ -186,8 +187,10 @@ export component MainWindow inherits Window {
                 alternar_imersivo();
                 return accept;
             } else if (event.text == Key.Escape && modo_imersivo) {
-                // Esc em camadas: painel, depois só letra, depois sai
-                if (imv_painel_aberto) {
+                // Esc em camadas: configurações, painel, só letra, e sai
+                if (imv_config_aberta) {
+                    imv_config_aberta = false;
+                } else if (imv_painel_aberto) {
                     imv_painel_aberto = false;
                 } else if (imv_so_letra) {
                     imv_so_letra = false;
@@ -918,6 +921,16 @@ export component MainWindow inherits Window {
         albuns_rolou(a, b) => { imv_albuns_rolou(a, b); }
         album_clicado(i) => { imv_album_clicado(i); }
         ordem_escolhida(i) => { ordem_escolhida(i); }
+        config_aberta <=> imv_config_aberta;
+        crossfade_texto: crossfade_texto;
+        replaygain <=> replaygain;
+        fundo_reativo <=> fundo_reativo;
+        fundo_global_nome: fundo_global_nome;
+        alternar_crossfade => { alternar_crossfade(); }
+        alternar_replaygain(v) => { alternar_replaygain(v); }
+        alternar_fundo_reativo(v) => { alternar_fundo_reativo(v); }
+        escolher_fundo => { escolher_fundo(); }
+        limpar_fundo => { limpar_fundo(); }
         painel_alternado(aberto) => { imv_painel_alternado(aberto); }
         aba_selecionada(i) => { aba_selecionada(i); }
         busca_mudou(t) => { busca_mudou(t); }
@@ -1017,6 +1030,8 @@ export component MainWindow inherits Window {
     config_popup := PopupWindow {
         x: 170px;
         y: 120px;
+        // Só fecha clicando fora: mexer numa opção não pode fechar o menu
+        close-policy: close-on-click-outside;
 
         Rectangle {
             background: Tema.painel;
