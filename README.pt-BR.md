@@ -62,6 +62,7 @@ A paleta visual — azul-marinho profundo, ciano e dourado (ou azul-bebê e bran
 - Visualizador de espectro reagindo à música
 - Painel da biblioteca (`L`, ou `/` para buscar): abas das pastas, busca e lista com miniatura da capa, artista • álbum e duração; a fila "a seguir", que respeita shuffle e loop; e a grade de **álbuns** — clicar num álbum abre uma aba com ele e começa a tocar
 - Aviso "a seguir" nos últimos 10 s da faixa e fundo que pulsa com os graves (desligável nas Configurações)
+- Configurações da tela cheia sem sair dela (ícone de engrenagem no alto)
 - Modo só letra (`H`), relógio e temporizador de sono
 - Nada desse modo fica alocado fora dele — de volta ao modo normal, o Furinar é tão leve quanto antes
 

@@ -21,7 +21,9 @@ e o projeto adere ao [Semantic Versioning](https://semver.org/).
   - `Esc` em camadas: fecha o painel, depois o modo só letra, depois sai.
   - grade de álbuns no painel: clicar num álbum abre uma aba temporária com ele, na ordem do disco, e toca;
   - aviso "a seguir" nos últimos 10 s da faixa;
-  - fundo que pulsa com os graves (opção nas configurações).
+  - fundo que pulsa com os graves (opção nas configurações);
+  - configurações próprias da tela cheia (ReplayGain, fundo reativo, crossfade, fundo), no visual escuro do modo; `Esc` fecha;
+  - sair, biblioteca e configurações ficam no canto superior esquerdo; o rodapé fica só com os controles da música.
 - Nada do modo imersivo fica alocado fora dele; ao sair, a memória é devolvida.
 - Reprodução sem silêncio entre faixas (gapless): a próxima entra na fila do player 2 s antes do fim.
 - Crossfade opcional de 3, 6 ou 10 s (configurações). Faixas seguidas do mesmo álbum, em ordem, emendam sem crossfade.
@@ -45,6 +47,7 @@ e o projeto adere ao [Semantic Versioning](https://semver.org/).
 - Linux: páginas limpas de código e fontes são devolvidas ao sistema (`madvise`) 5 s após abrir, depois da checagem de update e ao minimizar — RSS cai de ~52 MB para ~29 MB
 
 ### Corrigido
+- Clicar numa opção das configurações fechava o menu
 - O estado "baixando" da atualização nunca era limpo: a thread de download chamava `upgrade()` fora da thread da UI
 
 ## [1.5.3] — 2026-09-23
