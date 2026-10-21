@@ -513,7 +513,8 @@ export component TelaImersiva inherits Rectangle {
     VerticalLayout {
         visible: root.opacidade_extras > 0;
         opacity: root.opacidade_extras;
-        x: root.largura_util - self.width - root.margem;
+        // Ao lado do botão da biblioteca
+        x: root.largura_util - self.width - root.margem - 48px;
         y: 22px;
         width: 160px;
         height: self.preferred-height;
@@ -586,6 +587,17 @@ export component TelaImersiva inherits Rectangle {
         opacity: root.ocioso ? 0 : root.opacidade_extras;
         animate opacity { duration: 450ms; easing: ease-in-out; }
 
+        // Biblioteca no alto à direita, do lado de onde a gaveta abre
+        BotaoImersivo {
+            x: root.largura_util - root.margem - self.width;
+            y: 18px;
+            icone: @image-url("icons/biblioteca.svg");
+            dica: I18n.tip_library;
+            ativo: root.painel_aberto;
+            cor: root.destaque;
+            clicado => { root.painel_aberto = !root.painel_aberto; }
+        }
+
         // Navegação no alto; embaixo fica só o que mexe na música
         HorizontalLayout {
             x: 18px;
@@ -598,13 +610,6 @@ export component TelaImersiva inherits Rectangle {
                 icone: @image-url("icons/voltar.svg");
                 dica: I18n.tip_exit_immersive;
                 clicado => { root.sair(); }
-            }
-            BotaoImersivo {
-                icone: @image-url("icons/biblioteca.svg");
-                dica: I18n.tip_library;
-                ativo: root.painel_aberto;
-                cor: root.destaque;
-                clicado => { root.painel_aberto = !root.painel_aberto; }
             }
             BotaoImersivo {
                 icone: @image-url("icons/config.svg");

@@ -65,9 +65,13 @@ pub struct AppConfig {
     pub tema_claro: bool,
     #[serde(default = "default_idioma")]
     pub idioma: String,
-    /// Fundo do modo imersivo (imagem, GIF/WebP ou vídeo).
-    #[serde(default)]
+    /// Campo antigo (um fundo só). Existe apenas para migrar configs antigas.
+    #[serde(default, skip_serializing)]
     pub fundo_tela_cheia: Option<String>,
+    /// Fundos do modo imersivo (imagem, GIF/WebP ou vídeo); com mais de um,
+    /// trocam a cada faixa.
+    #[serde(default)]
+    pub fundos_tela_cheia: Vec<String>,
 }
 
 impl Default for AppConfig {
@@ -95,6 +99,7 @@ impl Default for AppConfig {
             tema_claro: false,
             idioma: default_idioma(),
             fundo_tela_cheia: None,
+            fundos_tela_cheia: Vec::new(),
         }
     }
 }
@@ -179,6 +184,11 @@ impl AppConfig {
         if self.modo_shuffle == 0 && self.shuffle {
             self.modo_shuffle = 1;
         }
+        if self.fundos_tela_cheia.is_empty()
+            && let Some(antigo) = self.fundo_tela_cheia.take()
+        {
+            self.fundos_tela_cheia.push(antigo);
+        }
     }
 
     pub fn salvar(&self) {
@@ -244,6 +254,13 @@ mod tests {
 
         assert_eq!(config.pastas, vec!["/antiga".to_string()]);
         assert_eq!(config.pasta_reproducao_salva, Some(0));
+    }
+
+    #[test]
+    fn migra_fundo_unico_para_a_lista() {
+        let mut config = AppConfig::desde_json(r#"{"fundo_tela_cheia":"/f.gif"}"#);
+        config.migrar();
+        assert_eq!(config.fundos_tela_cheia, vec!["/f.gif".to_string()]);
     }
 
     #[test]

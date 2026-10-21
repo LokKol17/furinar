@@ -357,8 +357,8 @@ struct EstadoAudio {
     letra_janela_inicio: usize,
     /// Modo imersivo (tela cheia). `None` = desligado, nada alocado.
     imersivo: Option<imersivo::EstadoImersivo>,
-    /// Fundo do modo imersivo escolhido nas configurações.
-    fundo_global: Option<PathBuf>,
+    /// Fundos do modo imersivo escolhidos nas configurações.
+    fundos_globais: Vec<PathBuf>,
     #[cfg(feature = "mpris")]
     faixa_controles: Option<String>,
     #[cfg(feature = "mpris")]
@@ -405,7 +405,7 @@ impl Default for EstadoAudio {
             letra_indice: -1,
             letra_janela_inicio: 0,
             imersivo: None,
-            fundo_global: None,
+            fundos_globais: Vec::new(),
             #[cfg(feature = "mpris")]
             faixa_controles: None,
             #[cfg(feature = "mpris")]
@@ -468,10 +468,12 @@ fn salvar_configuracao(estado: &EstadoAudio) {
         escanear_subpastas: estado.escanear_subpastas,
         tema_claro: estado.tema_claro,
         idioma: estado.idioma.clone(),
-        fundo_tela_cheia: estado
-            .fundo_global
-            .as_ref()
-            .map(|p| p.to_string_lossy().to_string()),
+        fundo_tela_cheia: None,
+        fundos_tela_cheia: estado
+            .fundos_globais
+            .iter()
+            .map(|p| p.to_string_lossy().to_string())
+            .collect(),
         tempo_atual: if estado.tempo_decorrido > 0.0 {
             Some(estado.tempo_decorrido as u64)
         } else {
@@ -935,12 +937,23 @@ fn publicar_letra(estado: &mut EstadoAudio, ui: &MainWindow) {
 // Modo imersivo
 // ---------------------------------------------------------------------
 
-/// Nome do arquivo de fundo global para mostrar nas configurações.
-fn nome_fundo(caminho: Option<&std::path::Path>) -> String {
-    caminho
-        .and_then(|p| p.file_name())
-        .map(|n| n.to_string_lossy().to_string())
-        .unwrap_or_default()
+/// Resumo dos fundos globais nas configurações: o nome do arquivo, ou
+/// quantos são ("" = nenhum).
+fn nome_fundo(fundos: &[PathBuf], idioma: &str) -> String {
+    match fundos {
+        [] => String::new(),
+        [um] => um
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_default(),
+        varios => {
+            let lang = translations::get_translations(idioma);
+            lang.get("bg_count")
+                .copied()
+                .unwrap_or("{n}")
+                .replace("{n}", &varios.len().to_string())
+        }
+    }
 }
 
 /// Faixa atual no formato que o modo imersivo usa.
@@ -953,7 +966,7 @@ fn faixa_imersiva(estado: &EstadoAudio) -> Option<imersivo::Faixa> {
         pasta_raiz: pasta.raiz_da_faixa(indice),
         titulo: track.titulo.clone(),
         artista: track.artista.clone(),
-        fundo_global: estado.fundo_global.clone(),
+        fundos_globais: estado.fundos_globais.clone(),
     })
 }
 
@@ -2430,8 +2443,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         e.modo_shuffle = config.modo_shuffle;
         e.escanear_subpastas = config.escanear_subpastas;
         e.idioma = config.idioma.clone();
-        e.fundo_global = config.fundo_tela_cheia.as_ref().map(PathBuf::from);
-        ui.set_fundo_global_nome(nome_fundo(e.fundo_global.as_deref()).into());
+        e.fundos_globais = config.fundos_tela_cheia.iter().map(PathBuf::from).collect();
+        ui.set_fundo_global_nome(nome_fundo(&e.fundos_globais, &config.idioma).into());
         e.biblioteca = Biblioteca::carregar();
         e.crossfade = config.crossfade;
         e.replaygain = config.replaygain;
@@ -2697,6 +2710,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 ui.set_texto_shuffle(texto_shuffle(e.modo_shuffle, &lang).into());
                 publicar_crossfade(&e, &ui);
                 atualizar_abas(&e, &ui);
+                ui.set_fundo_global_nome(nome_fundo(&e.fundos_globais, &e.idioma).into());
                 let t = idioma.to_string();
                 drop(e);
                 aplicar_idioma(&t, &ui);
@@ -2849,16 +2863,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let ui_fraca = ui.as_weak();
         ui.on_escolher_fundo(move || {
             let extensoes = fundo::extensoes_aceitas();
-            let Some(caminho) = rfd::FileDialog::new()
+            // Vários de uma vez; somam aos que já estavam (rodízio)
+            let Some(caminhos) = rfd::FileDialog::new()
                 .add_filter("Imagem, GIF/WebP ou vídeo", &extensoes)
-                .pick_file()
+                .pick_files()
             else {
                 return;
             };
             if let Some(ui) = ui_fraca.upgrade() {
                 let mut e = estado.borrow_mut();
-                ui.set_fundo_global_nome(nome_fundo(Some(&caminho)).into());
-                e.fundo_global = Some(caminho);
+                for c in caminhos {
+                    if !e.fundos_globais.contains(&c) {
+                        e.fundos_globais.push(c);
+                    }
+                }
+                ui.set_fundo_global_nome(nome_fundo(&e.fundos_globais, &e.idioma).into());
                 salvar_configuracao(&e);
             }
         });
@@ -2870,7 +2889,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ui.on_limpar_fundo(move || {
             if let Some(ui) = ui_fraca.upgrade() {
                 let mut e = estado.borrow_mut();
-                e.fundo_global = None;
+                e.fundos_globais.clear();
                 ui.set_fundo_global_nome(SharedString::new());
                 salvar_configuracao(&e);
             }
@@ -3542,7 +3561,10 @@ mod tests {
                 titulo: track::ler_tags(&caminho).titulo,
                 artista: track::ler_tags(&caminho).artista,
                 pasta_raiz: caminho.parent().map(PathBuf::from).unwrap_or_default(),
-                fundo_global: std::env::var_os("FURINAR_CAPTURA_FUNDO").map(PathBuf::from),
+                fundos_globais: std::env::var_os("FURINAR_CAPTURA_FUNDO")
+                    .map(PathBuf::from)
+                    .into_iter()
+                    .collect(),
                 caminho: caminho.clone(),
             }),
         );

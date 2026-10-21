@@ -57,7 +57,7 @@ A paleta visual — azul-marinho profundo, ciano e dourado (ou azul-bebê e bran
 **Modo imersivo** (botão de tela cheia, `F11` ou `furinar --imersivo`; `Esc` sai)
 - Capa da faixa (embutida, ou `cover`/`folder`/`front`.* na pasta) com artista, álbum, ano, formato, taxa e canais
 - Letra inteira rolando suave, linha atual em destaque; clique numa linha para pular até ela
-- Fundos personalizados: coloque um `background.*` (ou `furinar-bg.*`) na pasta da música, ou escolha um fundo global nas Configurações. Imagens, GIF/WebP animado e vídeos (mp4/webm/mkv/mov/avi — tocados pelo `ffmpeg` do sistema, se instalado). Fundos pequenos em pixel art ficam nítidos. Sem fundo? A capa desfocada assume
+- Fundos personalizados: coloque um `background.*` (ou `furinar-bg.*`) na pasta da música, ou escolha fundos globais nas Configurações. Vários (`background-1.png`, `background-2.gif`... ou vários globais) trocam a cada faixa. Imagens, GIF/WebP animado e vídeos (mp4/webm/mkv/mov/avi — tocados pelo `ffmpeg` do sistema, se instalado). Fundos pequenos em pixel art ficam nítidos. Sem fundo? A capa desfocada assume
 - Cor de destaque tirada da capa, crossfade entre faixas, controles que somem após 3 s parado
 - Visualizador de espectro reagindo à música
 - Painel da biblioteca (`L`, ou `/` para buscar): abas das pastas, busca e lista com miniatura da capa, artista • álbum e duração; a fila "a seguir", que respeita shuffle e loop; e a grade de **álbuns** — clicar num álbum abre uma aba com ele e começa a tocar

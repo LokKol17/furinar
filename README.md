@@ -57,7 +57,7 @@ The visual palette — deep navy, cyan, and gold (or baby blue and pearl white i
 **Immersive mode** (fullscreen button, `F11` or `furinar --imersivo`; `Esc` leaves)
 - Cover art (embedded, or `cover`/`folder`/`front`.* in the folder) with artist, album, year, format, sample rate and channels
 - Full lyrics scrolling smoothly, current line highlighted; click a line to jump there
-- Custom backgrounds: drop a `background.*` (or `furinar-bg.*`) into the music folder, or pick a global one in Settings. Images, animated GIF/WebP, and videos (mp4/webm/mkv/mov/avi — played through your system `ffmpeg`, if installed). Small pixel-art backgrounds stay crisp. No background? The blurred cover takes its place
+- Custom backgrounds: drop a `background.*` (or `furinar-bg.*`) into the music folder, or pick global ones in Settings. Several (`background-1.png`, `background-2.gif`... or several global ones) rotate, one per track. Images, animated GIF/WebP, and videos (mp4/webm/mkv/mov/avi — played through your system `ffmpeg`, if installed). Small pixel-art backgrounds stay crisp. No background? The blurred cover takes its place
 - Accent color taken from the cover, crossfade between tracks, controls that hide after 3 s of stillness
 - Spectrum visualizer reacting to the music
 - Library drawer (`L`, or `/` to search): folder tabs, search, and a list with cover thumbnails, artist • album and duration; an "Up next" queue that respects shuffle and loop; and an **albums** grid — clicking an album opens it in a tab and starts playing

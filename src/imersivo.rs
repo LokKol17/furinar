@@ -25,8 +25,8 @@ pub struct Faixa {
     pub pasta_raiz: PathBuf,
     pub titulo: String,
     pub artista: Option<String>,
-    /// Fundo escolhido nas configurações.
-    pub fundo_global: Option<PathBuf>,
+    /// Fundos escolhidos nas configurações (rodízio a cada faixa).
+    pub fundos_globais: Vec<PathBuf>,
 }
 
 pub struct EstadoImersivo {
@@ -112,11 +112,9 @@ impl EstadoImersivo {
         // Mesmo fundo da faixa anterior (mesma pasta): continua tocando sem
         // reiniciar. Vídeo sem ffmpeg no PATH não abre e cai para a capa.
         let pasta_faixa = faixa.caminho.parent().unwrap_or(&faixa.pasta_raiz);
-        let alvo = fundo::resolver(
-            pasta_faixa,
-            &faixa.pasta_raiz,
-            faixa.fundo_global.as_deref(),
-        );
+        let candidatos = fundo::resolver(pasta_faixa, &faixa.pasta_raiz, &faixa.fundos_globais);
+        let atual = self.fundo.as_ref().map(|r| r.caminho.as_path());
+        let alvo = fundo::escolher(&candidatos, atual, rand::random::<u32>() as usize);
         if self.fundo.as_ref().map(|r| &r.caminho) != alvo.as_ref() {
             self.fundo = alvo.as_deref().and_then(Reprodutor::abrir);
             self.fundo_novo = self.fundo.is_some();

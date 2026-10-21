@@ -64,11 +64,25 @@ fn tipo(caminho: &Path) -> Option<Tipo> {
     }
 }
 
-/// Fundo para a faixa: `background.*`/`furinar-bg.*` na pasta da faixa, depois
-/// na pasta raiz da aba, depois o global das configurações.
-pub fn resolver(pasta_faixa: &Path, pasta_raiz: &Path, global: Option<&Path>) -> Option<PathBuf> {
-    let na_pasta = |pasta: &Path| -> Option<PathBuf> {
-        let entradas = std::fs::read_dir(pasta).ok()?;
+/// `background`, `background2`, `background-chuva`, `furinar-bg_1`...: o
+/// nome-base, seguido ou não de um sufixo depois de dígito, `-`, `_` ou espaço.
+fn e_nome_de_fundo(stem: &str) -> bool {
+    let stem = stem.to_lowercase();
+    NOMES_FUNDO.iter().any(|n| match stem.strip_prefix(n) {
+        Some("") => true,
+        Some(resto) => resto.starts_with(|c: char| c.is_ascii_digit() || "-_ ".contains(c)),
+        None => false,
+    })
+}
+
+/// Fundos possíveis para a faixa: os `background*`/`furinar-bg*` da pasta da
+/// faixa; senão os da pasta raiz da aba; senão os globais das configurações.
+/// Mais de um = rodízio, um diferente a cada faixa (`escolher`).
+pub fn resolver(pasta_faixa: &Path, pasta_raiz: &Path, globais: &[PathBuf]) -> Vec<PathBuf> {
+    let na_pasta = |pasta: &Path| -> Vec<PathBuf> {
+        let Ok(entradas) = std::fs::read_dir(pasta) else {
+            return Vec::new();
+        };
         let mut achados: Vec<PathBuf> = entradas
             .flatten()
             .map(|e| e.path())
@@ -77,21 +91,35 @@ pub fn resolver(pasta_faixa: &Path, pasta_raiz: &Path, global: Option<&Path>) ->
                     && tipo(p).is_some()
                     && p.file_stem()
                         .and_then(|s| s.to_str())
-                        .is_some_and(|s| NOMES_FUNDO.iter().any(|n| s.eq_ignore_ascii_case(n)))
+                        .is_some_and(e_nome_de_fundo)
             })
             .collect();
-        // Determinístico quando há mais de um (background.gif e .png, p.ex.)
+        // Determinístico: o rodízio anda sempre na mesma ordem
         achados.sort();
-        achados.into_iter().next()
+        achados
     };
 
-    na_pasta(pasta_faixa)
-        .or_else(|| {
-            (pasta_raiz != pasta_faixa)
-                .then(|| na_pasta(pasta_raiz))
-                .flatten()
-        })
-        .or_else(|| global.filter(|g| g.is_file()).map(Path::to_path_buf))
+    let mut achados = na_pasta(pasta_faixa);
+    if achados.is_empty() && pasta_raiz != pasta_faixa {
+        achados = na_pasta(pasta_raiz);
+    }
+    if achados.is_empty() {
+        achados = globais.iter().filter(|g| g.is_file()).cloned().collect();
+    }
+    achados
+}
+
+/// Fundo da próxima faixa entre os `candidatos`. Com um só, é ele; com mais,
+/// sorteia (`sorteio`, qualquer número) um que não seja o `atual`, para o
+/// fundo trocar de verdade a cada faixa.
+pub fn escolher(candidatos: &[PathBuf], atual: Option<&Path>, sorteio: usize) -> Option<PathBuf> {
+    let outros: Vec<&PathBuf> = candidatos
+        .iter()
+        .filter(|c| candidatos.len() == 1 || Some(c.as_path()) != atual)
+        .collect();
+    outros
+        .get(sorteio % outros.len().max(1))
+        .map(|c| (*c).clone())
 }
 
 pub struct Quadro {
@@ -360,21 +388,43 @@ mod tests {
         let global = raiz.0.join("global.png");
         std::fs::write(&global, b"x").unwrap();
 
+        let globais = [global.clone()];
+
         // Só o global
-        assert_eq!(
-            resolver(&album, &raiz.0, Some(&global)),
-            Some(global.clone())
-        );
+        assert_eq!(resolver(&album, &raiz.0, &globais), globais);
 
         // Raiz ganha do global
         let na_raiz = raiz.0.join("furinar-bg.gif");
         std::fs::write(&na_raiz, b"x").unwrap();
-        assert_eq!(resolver(&album, &raiz.0, Some(&global)), Some(na_raiz));
+        assert_eq!(resolver(&album, &raiz.0, &globais), [na_raiz]);
 
-        // Pasta da faixa ganha de tudo; maiúsculas não importam
+        // Pasta da faixa ganha de tudo; maiúsculas não importam; vários
+        // entram no rodízio, em ordem
         let no_album = album.join("Background.MP4");
+        let segundo = album.join("background-2.png");
         std::fs::write(&no_album, b"x").unwrap();
-        assert_eq!(resolver(&album, &raiz.0, Some(&global)), Some(no_album));
+        std::fs::write(&segundo, b"x").unwrap();
+        std::fs::write(album.join("backgroundsss.png"), b"x").unwrap();
+        assert_eq!(resolver(&album, &raiz.0, &globais), [no_album, segundo]);
+    }
+
+    #[test]
+    fn rodizio_troca_de_fundo_a_cada_faixa() {
+        let a = PathBuf::from("a.png");
+        let b = PathBuf::from("b.png");
+        let c = PathBuf::from("c.png");
+        // Um só: sempre ele, mesmo sendo o atual
+        assert_eq!(
+            escolher(std::slice::from_ref(&a), Some(&a), 7),
+            Some(a.clone())
+        );
+        // Vários: nunca repete o atual
+        let todos = [a.clone(), b.clone(), c.clone()];
+        for sorteio in 0..10 {
+            assert_ne!(escolher(&todos, Some(&b), sorteio), Some(b.clone()));
+        }
+        assert_eq!(escolher(&todos, None, 4), Some(b));
+        assert_eq!(escolher(&[], None, 0), None);
     }
 
     #[test]
@@ -382,7 +432,7 @@ mod tests {
         let raiz = TempDir::novo("ignora");
         std::fs::write(raiz.0.join("background.txt"), b"x").unwrap();
         let fantasma = raiz.0.join("nao-existe.png");
-        assert_eq!(resolver(&raiz.0, &raiz.0, Some(&fantasma)), None);
+        assert!(resolver(&raiz.0, &raiz.0, &[fantasma]).is_empty());
     }
 
     #[test]

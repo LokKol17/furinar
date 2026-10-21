@@ -61,7 +61,8 @@ pub fn pt_br() -> Translations {
     t.insert("mono", "Mono");
     t.insert("decimal_sep", ",");
     t.insert("bg_label", "Fundo da tela cheia");
-    t.insert("bg_choose", "Escolher…");
+    t.insert("bg_choose", "Adicionar…");
+    t.insert("bg_count", "{n} fundos — trocam a cada faixa");
     t.insert("bg_clear", "Limpar");
     t.insert("bg_none", "Capa desfocada (padrão)");
     t.insert("search_placeholder", "Buscar por título ou artista...");
@@ -148,7 +149,8 @@ pub fn en() -> Translations {
     t.insert("mono", "Mono");
     t.insert("decimal_sep", ".");
     t.insert("bg_label", "Fullscreen background");
-    t.insert("bg_choose", "Choose…");
+    t.insert("bg_choose", "Add…");
+    t.insert("bg_count", "{n} backgrounds — one per track");
     t.insert("bg_clear", "Clear");
     t.insert("bg_none", "Blurred cover (default)");
     t.insert("search_placeholder", "Search by title or artist...");
