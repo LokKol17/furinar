@@ -244,7 +244,7 @@ impl Default for EstadoAudio {
             controle: transicao::Controle::default(),
             crossfade: 0,
             replaygain: true,
-            fundo_reativo: true,
+            fundo_reativo: false,
             metadados: metadados::Banco::default(),
             buscador: None,
             letras_web: false,

@@ -56,14 +56,31 @@ pub struct EstadoImersivo {
     barras: Rc<VecModel<f32>>,
     /// Painel da biblioteca; só existe aberto.
     pub painel: Option<Painel>,
-    /// Pulso do fundo (0..1), seguindo os graves.
+    /// Pulso do fundo (0..1), seguindo os graves, e o valor que está na UI.
     pulso: f32,
+    pulso_na_tela: f32,
+    /// Ticks desde a última vez que o pulso foi para a UI.
+    ticks_pulso: u8,
 }
 
 /// Barras do visualizador que contam como graves (de 40 Hz até ~150 Hz).
 const BARRAS_GRAVES: usize = 6;
 /// Quanto o pulso cai por tick quando o grave some (sobe na hora).
 const QUEDA_PULSO: f32 = 0.88;
+
+/// O pulso vai para a UI a cada tantos ticks (33 ms): ~15 fps. Cada mudança
+/// repinta a tela inteira no renderer de software (~10 ms em 1080p); a 30 fps
+/// o fundo reativo sozinho custava ~20% de um núcleo.
+const TICKS_POR_PULSO: u8 = 2;
+/// Diferença mínima para valer repintar (o olho não nota menos que isso).
+const PASSO_PULSO: f32 = 0.05;
+
+/// Se o pulso deve ir para a UI agora: só no ritmo de `TICKS_POR_PULSO` e
+/// quando mudou o bastante (ou chegou a zero, para não ficar parado inflado).
+fn publicar_pulso(atual: f32, na_tela: f32, ticks: u8) -> bool {
+    ticks >= TICKS_POR_PULSO
+        && ((atual - na_tela).abs() >= PASSO_PULSO || (atual == 0.0 && na_tela != 0.0))
+}
 
 /// Próximo valor do pulso: segue o grave na subida e cai devagar. Arredonda
 /// para centésimos, para a UI só repintar quando muda de verdade.
@@ -95,6 +112,8 @@ impl EstadoImersivo {
             barras,
             painel: None,
             pulso: 0.0,
+            pulso_na_tela: 0.0,
+            ticks_pulso: 0,
         }
     }
 
@@ -173,9 +192,12 @@ impl EstadoImersivo {
             } else {
                 0.0
             };
-            if novo != self.pulso {
-                self.pulso = novo;
-                ui.set_imv_pulso(novo);
+            self.pulso = novo;
+            self.ticks_pulso = self.ticks_pulso.saturating_add(1);
+            if publicar_pulso(self.pulso, self.pulso_na_tela, self.ticks_pulso) {
+                self.pulso_na_tela = self.pulso;
+                self.ticks_pulso = 0;
+                ui.set_imv_pulso(self.pulso);
             }
         }
 
@@ -299,5 +321,17 @@ mod tests {
         fraco[..6].fill(0.3);
         assert!(pulso(0.0, &fraco) < 0.1);
         assert_eq!(pulso(0.0, &silencio), 0.0);
+    }
+
+    #[test]
+    fn pulso_so_repinta_no_ritmo_e_com_mudanca_visivel() {
+        // Cedo demais, mesmo mudando muito
+        assert!(!publicar_pulso(1.0, 0.0, 1));
+        assert!(publicar_pulso(1.0, 0.0, TICKS_POR_PULSO));
+        // Mudança pequena não repinta
+        assert!(!publicar_pulso(0.52, 0.5, 9));
+        // Chegar a zero sempre vai, para o fundo voltar ao tamanho normal
+        assert!(publicar_pulso(0.0, 0.03, TICKS_POR_PULSO));
+        assert!(!publicar_pulso(0.0, 0.0, 9));
     }
 }

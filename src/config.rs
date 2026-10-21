@@ -62,8 +62,9 @@ pub struct AppConfig {
     pub chave_acoustid: String,
     #[serde(default = "verdadeiro")]
     pub replaygain: bool,
-    /// Fundo do modo imersivo pulsando com os graves.
-    #[serde(default = "verdadeiro")]
+    /// Fundo do modo imersivo pulsando com os graves. Desligado por padrão:
+    /// cada pulso repinta a tela inteira no renderer de software.
+    #[serde(default)]
     pub fundo_reativo: bool,
     #[serde(default)]
     pub escanear_subpastas: bool,
@@ -103,7 +104,7 @@ impl Default for AppConfig {
             letras_web: false,
             chave_acoustid: String::new(),
             replaygain: true,
-            fundo_reativo: true,
+            fundo_reativo: false,
             escanear_subpastas: false,
             tema_claro: false,
             idioma: default_idioma(),
@@ -223,8 +224,9 @@ mod tests {
         assert_eq!(config.modo_loop, 0);
         assert_eq!(config.pastas, vec!["/musica".to_string()]);
         assert!(config.tema_claro);
-        // Opções novas ligadas para quem vem de uma versão antiga
-        assert!(config.replaygain && config.fundo_reativo);
+        // ReplayGain ligado para quem vem de uma versão antiga; o fundo
+        // reativo (mais CPU) só se a pessoa ligar
+        assert!(config.replaygain && !config.fundo_reativo);
         assert_eq!(config.crossfade, 0);
     }
 

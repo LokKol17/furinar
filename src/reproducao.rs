@@ -173,6 +173,10 @@ pub(crate) fn abrir_fonte(
 pub(crate) fn mixer(estado: &mut EstadoAudio) -> Option<&rodio::mixer::Mixer> {
     if estado.saida.is_none() {
         estado.saida = DeviceSinkBuilder::open_default_sink().ok();
+        // Abrir o dispositivo carrega o código das bibliotecas de áudio
+        // (ALSA/PipeWire); passada a inicialização, boa parte não é mais
+        // tocada e pode voltar ao sistema (~6 MB)
+        Timer::single_shot(Duration::from_secs(4), memoria::aparar);
     }
     estado.saida.as_ref().map(|s| s.mixer())
 }

@@ -100,7 +100,10 @@ pub fn pt_br() -> Translations {
         "replaygain_desc",
         "Usa o ganho gravado nas tags para as faixas tocarem no mesmo volume.",
     );
-    t.insert("reactive_bg", "Fundo da tela cheia pulsa com a música");
+    t.insert(
+        "reactive_bg",
+        "Fundo da tela cheia pulsa com a música (usa mais CPU)",
+    );
     t.insert("stereo", "Estéreo");
     t.insert("mono", "Mono");
     t.insert("decimal_sep", ",");
@@ -232,7 +235,10 @@ pub fn en() -> Translations {
         "replaygain_desc",
         "Uses the gain stored in the tags so tracks play at the same loudness.",
     );
-    t.insert("reactive_bg", "Fullscreen background pulses with the music");
+    t.insert(
+        "reactive_bg",
+        "Fullscreen background pulses with the music (uses more CPU)",
+    );
     t.insert("stereo", "Stereo");
     t.insert("mono", "Mono");
     t.insert("decimal_sep", ".");
