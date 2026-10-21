@@ -34,6 +34,11 @@ pub fn chave_faixa(raiz: &Path, relativo: &str) -> String {
     raiz.join(relativo).to_string_lossy().replace('\\', "/")
 }
 
+/// A mesma chave a partir do caminho completo.
+pub fn chave_caminho(caminho: &Path) -> String {
+    caminho.to_string_lossy().replace('\\', "/")
+}
+
 impl Biblioteca {
     pub fn carregar() -> Self {
         let caminho = crate::config::config_path().with_file_name("furinar_biblioteca.json");

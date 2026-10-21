@@ -14,7 +14,7 @@ use std::rc::Rc;
 
 use slint::{Image, Model, ModelRc, VecModel};
 
-use crate::miniaturas::Carregador;
+use crate::miniaturas::{Carregador, Pedido};
 use crate::track::GrupoAlbum;
 use crate::translations::Translations;
 use crate::{CartaoAlbum, LinhaPainel, MainWindow};
@@ -36,6 +36,8 @@ pub struct Item {
     pub duracao: u32,
     pub tocando: bool,
     pub favorita: bool,
+    /// Capa baixada da web (se a faixa e a pasta não têm uma).
+    pub capa_web: Option<PathBuf>,
 }
 
 /// Miniatura de uma faixa.
@@ -61,7 +63,7 @@ pub struct Painel {
     mostrando_albuns: bool,
     albuns: Vec<GrupoAlbum>,
     /// De onde vem a capa de cada álbum (a primeira faixa).
-    capas_albuns: Vec<Option<PathBuf>>,
+    capas_albuns: Vec<Option<Pedido>>,
     /// Cartões à vista, como a UI informou.
     albuns_visiveis: Range<usize>,
     cartoes: Rc<VecModel<CartaoAlbum>>,
@@ -153,7 +155,7 @@ impl Painel {
         &mut self,
         grupos: Vec<GrupoAlbum>,
         lang: &Translations,
-        capa_de: impl Fn(usize) -> Option<PathBuf>,
+        capa_de: impl Fn(usize) -> Option<Pedido>,
     ) {
         if grupos == self.albuns {
             return;
@@ -181,6 +183,12 @@ impl Painel {
         self.albuns_visiveis = novo;
         self.pedir_faltantes();
         self.atualizar_cartoes();
+    }
+
+    /// Esquece a miniatura da faixa (chegou uma capa nova da web).
+    pub fn esquecer(&mut self, caminho: &std::path::Path) {
+        self.infos.remove(caminho);
+        self.pedir_faltantes();
     }
 
     pub fn album(&self, posicao: usize) -> Option<&GrupoAlbum> {
@@ -250,7 +258,7 @@ impl Painel {
         if !self.albuns_visiveis.contains(&i) {
             return None;
         }
-        let caminho = self.capas_albuns.get(i)?.as_ref()?;
+        let (caminho, _) = self.capas_albuns.get(i)?.as_ref()?;
         self.infos.get(caminho)?.capa.clone()
     }
 
@@ -282,26 +290,28 @@ impl Painel {
             .iter()
             .take(self.albuns_visiveis.len())
             .flatten();
+        let pedido = |i: &Item| (i.caminho.clone(), i.capa_web.clone());
         let ordem = perto
             .into_iter()
-            .map(|(_, i)| &i.caminho)
-            .chain(self.fila.iter().map(|i| &i.caminho))
-            .chain(albuns)
-            .chain(longe.into_iter().map(|(_, i)| &i.caminho));
+            .map(|(_, i)| pedido(i))
+            .chain(self.fila.iter().map(pedido))
+            .chain(albuns.cloned())
+            .chain(longe.into_iter().map(|(_, i)| pedido(i)));
 
         let mut vistos = HashSet::new();
         let mut pedidos = Vec::new();
-        for caminho in ordem {
-            if !vistos.insert(caminho) {
+        for (caminho, web) in ordem {
+            if vistos.contains(&caminho) {
                 continue;
             }
-            let falta = match self.infos.get(caminho) {
+            let falta = match self.infos.get(&caminho) {
                 None => true,
                 Some(info) => info.tem_capa && info.capa.is_none(),
             };
             if falta {
-                pedidos.push(caminho.clone());
+                pedidos.push((caminho.clone(), web));
             }
+            vistos.insert(caminho);
         }
         self.carregador.pedir(pedidos);
 
@@ -389,6 +399,7 @@ mod tests {
             duracao: 201,
             tocando: true,
             favorita: true,
+            capa_web: None,
         };
         let l = linha(&item, None);
         assert_eq!(l.detalhe, "Banda • Disco");

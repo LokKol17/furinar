@@ -18,6 +18,13 @@ pub enum Letra {
 }
 
 impl Letra {
+    pub fn vazia(&self) -> bool {
+        match self {
+            Letra::Sincronizada(l) => l.is_empty(),
+            Letra::Livre(l) => l.is_empty(),
+        }
+    }
+
     /// As linhas no formato da letra sincronizada (a livre, com tempo 0).
     pub fn linhas(self) -> Vec<(f64, String)> {
         match self {

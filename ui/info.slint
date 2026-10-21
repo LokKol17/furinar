@@ -1,0 +1,579 @@
+// ---------------------------------------------------------------------
+// Informações da faixa (busca na web)
+//
+// Cartão sobre a janela, nos dois modos: no normal segue o tema, no
+// imersivo fica escuro com a cor da capa. Duas guias: a faixa que toca
+// (candidatos do MusicBrainz/AcoustID, letra) e a aba inteira (lote com
+// revisão).
+// ---------------------------------------------------------------------
+
+import { Tema } from "theme.slint";
+import { I18n } from "i18n.slint";
+
+export struct CandidatoInfo {
+    titulo: string,
+    detalhe: string,
+    /// 0 a 100
+    confianca: int,
+    /// Veio da impressão digital do áudio
+    digital: bool,
+}
+
+export struct ItemRevisao {
+    original: string,
+    sugestao: string,
+    confianca: int,
+}
+
+// Botão de texto nas duas paletas
+component Botao inherits Rectangle {
+    in property <string> texto;
+    in property <bool> principal: false;
+    in property <bool> habilitado: true;
+    in property <color> destaque;
+    in property <color> cor_texto;
+    in property <color> neutro;
+    callback clicado();
+
+    height: 32px;
+    min-width: rotulo.preferred-width + 26px;
+    border-radius: 8px;
+    border-width: root.principal ? 0px : 1px;
+    border-color: root.destaque.with-alpha(0.45);
+    opacity: root.habilitado ? 1 : 0.45;
+    background: root.principal
+        ? (toque.has-hover ? root.destaque.brighter(0.12) : root.destaque)
+        : (toque.has-hover ? root.neutro.brighter(0.15) : root.neutro);
+    animate background { duration: 120ms; }
+
+    rotulo := Text {
+        text: root.texto;
+        color: root.principal ? #ffffff : root.cor_texto;
+        font-size: 13px;
+        font-weight: root.principal ? 600 : 400;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+    toque := TouchArea {
+        enabled: root.habilitado;
+        clicked => { root.clicado(); }
+    }
+}
+
+// Pílula com a confiança: verde, amarela ou vermelha
+component Nota inherits Rectangle {
+    in property <int> valor;
+    width: 44px;
+    height: 20px;
+    border-radius: 10px;
+    background: (root.valor >= 90 ? #2e9d5b : (root.valor >= 70 ? #c9a050 : #c9564f)).with-alpha(0.25);
+
+    Text {
+        text: root.valor + "%";
+        color: root.valor >= 90 ? #4cd685 : (root.valor >= 70 ? #e3bd6a : #ef7d75);
+        font-size: 11px;
+        font-weight: 700;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+}
+
+export component JanelaInfo inherits Rectangle {
+    in-out property <bool> aberta;
+    /// Paleta escura do modo imersivo
+    in property <bool> imersivo: false;
+    in property <color> cor_imersivo;
+
+    in property <string> titulo;
+    in property <string> artista;
+    in property <string> album;
+    in property <bool> corrigida;
+    in property <string> letra;
+    in property <string> estado;
+    in property <bool> ocupado;
+    in property <[CandidatoInfo]> candidatos;
+
+    in property <bool> lote_ativo;
+    in property <float> lote_progresso;
+    in property <string> lote_texto;
+    in property <[ItemRevisao]> revisao;
+    in property <string> tags_texto;
+
+    callback buscar();
+    callback aplicar(int, bool);
+    callback restaurar();
+    callback baixar_letra();
+    callback lote_iniciar();
+    callback lote_cancelar();
+    /// (posição, aceitar); posição -1 = todas
+    callback revisao_decidir(int, bool);
+    callback gravar_tags_aba();
+
+    // Paleta
+    property <color> fundo: root.imersivo ? #0b1019 : Tema.painel;
+    property <color> texto: root.imersivo ? #ffffff : Tema.texto;
+    property <color> suave: root.imersivo ? #ffffff8c : Tema.texto_suave;
+    property <color> borda: root.imersivo ? #ffffff1f : Tema.borda;
+    property <color> destaque: root.imersivo ? root.cor_imersivo : Tema.oceano;
+    property <color> neutro: root.imersivo ? #ffffff17 : Tema.neutro;
+    property <color> hover: root.imersivo ? #ffffff12 : Tema.neutro_hover;
+
+    /// 0 = faixa, 1 = aba inteira
+    in-out property <int> guia: 0;
+    property <int> escolhido: -1;
+    /// "Gravar nas tags" pede um segundo clique
+    property <bool> confirmar_tags: false;
+    property <bool> confirmar_tags_aba: false;
+
+    changed candidatos => {
+        root.escolhido = root.candidatos.length > 0 ? 0 : -1;
+        root.confirmar_tags = false;
+    }
+    changed aberta => {
+        root.confirmar_tags = false;
+        root.confirmar_tags_aba = false;
+    }
+
+    visible: root.aberta;
+    background: #00000080;
+
+    // Clique fora fecha
+    TouchArea {
+        clicked => { root.aberta = false; }
+    }
+
+    cartao := Rectangle {
+        width: min(600px, root.width - 32px);
+        height: min(root.height - 32px, 640px);
+        x: (root.width - self.width) / 2;
+        y: (root.height - self.height) / 2;
+        border-radius: 16px;
+        background: root.fundo;
+        border-width: 1px;
+        border-color: root.imersivo ? root.destaque.with-alpha(0.35) : root.borda;
+        drop-shadow-blur: 30px;
+        drop-shadow-color: #00000080;
+        clip: true;
+
+        // Engole o clique para não fechar
+        TouchArea { }
+
+        VerticalLayout {
+            padding: 18px;
+            spacing: 12px;
+
+            // Cabeçalho + guias
+            HorizontalLayout {
+                spacing: 6px;
+
+                for nome[i] in [I18n.info_tab_track, I18n.info_tab_batch]: Rectangle {
+                    height: 30px;
+                    width: rotulo_guia.preferred-width + 24px;
+                    border-radius: 15px;
+                    background: i == root.guia ? root.destaque.with-alpha(0.22) : (toque_guia.has-hover ? root.hover : transparent);
+
+                    rotulo_guia := Text {
+                        text: nome;
+                        color: i == root.guia ? root.texto : root.suave;
+                        font-size: 14px;
+                        font-weight: i == root.guia ? 700 : 400;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                    toque_guia := TouchArea {
+                        clicked => { root.guia = i; }
+                    }
+                }
+                Rectangle { horizontal-stretch: 1; }
+                Rectangle {
+                    width: 30px;
+                    height: 30px;
+                    border-radius: 15px;
+                    background: fechar.has-hover ? root.hover : transparent;
+
+                    Image {
+                        source: @image-url("icons/x.svg");
+                        width: 12px;
+                        height: 12px;
+                        x: (parent.width - self.width) / 2;
+                        y: (parent.height - self.height) / 2;
+                        colorize: root.suave;
+                    }
+                    fechar := TouchArea {
+                        clicked => { root.aberta = false; }
+                    }
+                }
+            }
+
+            // ---------------------------------------------------------
+            // Faixa
+            // ---------------------------------------------------------
+            if root.guia == 0 : VerticalLayout {
+                spacing: 10px;
+                vertical-stretch: 1;
+
+                VerticalLayout {
+                    spacing: 2px;
+                    vertical-stretch: 0;
+
+                    Text {
+                        text: root.titulo;
+                        color: root.texto;
+                        font-size: 18px;
+                        font-weight: 700;
+                        overflow: elide;
+                    }
+                    Text {
+                        text: root.artista + (root.album != "" ? " · " + root.album : "");
+                        color: root.suave;
+                        font-size: 13px;
+                        overflow: elide;
+                    }
+                }
+
+                if root.corrigida : HorizontalLayout {
+                    spacing: 8px;
+                    alignment: start;
+                    vertical-stretch: 0;
+
+                    Text {
+                        text: I18n.info_corrected;
+                        color: root.destaque;
+                        font-size: 12px;
+                        vertical-alignment: center;
+                    }
+                    Botao {
+                        height: 26px;
+                        texto: I18n.info_restore;
+                        destaque: root.destaque;
+                        cor_texto: root.texto;
+                        neutro: root.neutro;
+                        clicado => { root.restaurar(); }
+                    }
+                }
+
+                HorizontalLayout {
+                    spacing: 8px;
+                    vertical-stretch: 0;
+
+                    Text {
+                        text: I18n.info_lyrics_label + ": " + root.letra;
+                        color: root.suave;
+                        font-size: 13px;
+                        vertical-alignment: center;
+                        horizontal-stretch: 1;
+                        overflow: elide;
+                    }
+                    Botao {
+                        texto: I18n.info_get_lyrics;
+                        habilitado: !root.ocupado;
+                        destaque: root.destaque;
+                        cor_texto: root.texto;
+                        neutro: root.neutro;
+                        clicado => { root.baixar_letra(); }
+                    }
+                }
+
+                Rectangle {
+                    height: 1px;
+                    background: root.borda;
+                }
+
+                HorizontalLayout {
+                    spacing: 10px;
+                    vertical-stretch: 0;
+
+                    Botao {
+                        texto: I18n.info_search_web;
+                        principal: true;
+                        habilitado: !root.ocupado;
+                        destaque: root.destaque;
+                        cor_texto: root.texto;
+                        neutro: root.neutro;
+                        clicado => { root.buscar(); }
+                    }
+                    Text {
+                        text: root.estado;
+                        color: root.suave;
+                        font-size: 12px;
+                        vertical-alignment: center;
+                        horizontal-stretch: 1;
+                        overflow: elide;
+                    }
+                }
+
+                // Candidatos
+                Flickable {
+                    vertical-stretch: 1;
+                    min-height: 80px;
+                    content-height: lista_candidatos.preferred-height;
+
+                    lista_candidatos := VerticalLayout {
+                        alignment: start;
+                        spacing: 4px;
+
+                        for c[i] in root.candidatos: Rectangle {
+                            height: 52px;
+                            border-radius: 8px;
+                            background: i == root.escolhido ? root.destaque.with-alpha(0.18) : (toque_c.has-hover ? root.hover : transparent);
+                            border-width: i == root.escolhido ? 1px : 0px;
+                            border-color: root.destaque.with-alpha(0.6);
+
+                            toque_c := TouchArea {
+                                clicked => {
+                                    root.escolhido = i;
+                                    root.confirmar_tags = false;
+                                }
+                            }
+                            VerticalLayout {
+                                x: 12px;
+                                width: parent.width - 80px;
+                                alignment: center;
+                                spacing: 2px;
+
+                                Text {
+                                    text: c.titulo;
+                                    color: root.texto;
+                                    font-size: 14px;
+                                    font-weight: 600;
+                                    overflow: elide;
+                                }
+                                Text {
+                                    text: c.detalhe;
+                                    color: root.suave;
+                                    font-size: 12px;
+                                    overflow: elide;
+                                }
+                            }
+                            Nota {
+                                x: parent.width - self.width - 12px;
+                                y: (parent.height - self.height) / 2;
+                                valor: c.confianca;
+                            }
+                        }
+                    }
+                }
+
+                if root.tags_texto != "" : Text {
+                    text: root.tags_texto;
+                    color: root.suave;
+                    font-size: 12px;
+                    wrap: word-wrap;
+                }
+
+                if root.candidatos.length > 0 : HorizontalLayout {
+                    spacing: 8px;
+                    alignment: end;
+
+                    Text {
+                        text: root.confirmar_tags ? I18n.info_confirm_tags : "";
+                        color: #e3bd6a;
+                        font-size: 12px;
+                        vertical-alignment: center;
+                        horizontal-stretch: 1;
+                        wrap: word-wrap;
+                    }
+                    Botao {
+                        texto: root.confirmar_tags ? I18n.info_confirm_button : I18n.info_apply_tags;
+                        habilitado: root.escolhido >= 0;
+                        destaque: root.destaque;
+                        cor_texto: root.texto;
+                        neutro: root.neutro;
+                        clicado => {
+                            if (root.confirmar_tags) {
+                                root.confirmar_tags = false;
+                                root.aplicar(root.escolhido, true);
+                            } else {
+                                root.confirmar_tags = true;
+                            }
+                        }
+                    }
+                    Botao {
+                        texto: I18n.info_apply;
+                        principal: true;
+                        habilitado: root.escolhido >= 0;
+                        destaque: root.destaque;
+                        cor_texto: root.texto;
+                        neutro: root.neutro;
+                        clicado => { root.aplicar(root.escolhido, false); }
+                    }
+                }
+            }
+
+            // ---------------------------------------------------------
+            // Aba inteira
+            // ---------------------------------------------------------
+            if root.guia == 1 : VerticalLayout {
+                spacing: 10px;
+                vertical-stretch: 1;
+
+                Text {
+                    text: I18n.batch_desc;
+                    color: root.suave;
+                    font-size: 13px;
+                    wrap: word-wrap;
+                }
+
+                HorizontalLayout {
+                    spacing: 10px;
+
+                    Botao {
+                        texto: root.lote_ativo ? I18n.batch_cancel : I18n.batch_start;
+                        principal: !root.lote_ativo;
+                        destaque: root.destaque;
+                        cor_texto: root.texto;
+                        neutro: root.neutro;
+                        clicado => {
+                            if (root.lote_ativo) {
+                                root.lote_cancelar();
+                            } else {
+                                root.lote_iniciar();
+                            }
+                        }
+                    }
+                    Text {
+                        text: root.lote_texto;
+                        color: root.suave;
+                        font-size: 12px;
+                        vertical-alignment: center;
+                        horizontal-stretch: 1;
+                        wrap: word-wrap;
+                    }
+                }
+
+                if root.lote_ativo : Rectangle {
+                    height: 6px;
+                    border-radius: 3px;
+                    background: root.neutro;
+
+                    Rectangle {
+                        x: 0px;
+                        width: parent.width * root.lote_progresso;
+                        border-radius: 3px;
+                        background: root.destaque;
+                        animate width { duration: 250ms; }
+                    }
+                }
+
+                if root.revisao.length > 0 : HorizontalLayout {
+                    Text {
+                        text: I18n.batch_review + " (" + root.revisao.length + ")";
+                        color: root.texto;
+                        font-size: 14px;
+                        font-weight: 700;
+                        vertical-alignment: center;
+                        horizontal-stretch: 1;
+                    }
+                    Botao {
+                        texto: I18n.batch_accept_all;
+                        destaque: root.destaque;
+                        cor_texto: root.texto;
+                        neutro: root.neutro;
+                        clicado => { root.revisao_decidir(-1, true); }
+                    }
+                }
+
+                Flickable {
+                    vertical-stretch: 1;
+                    min-height: 80px;
+                    content-height: lista_revisao.preferred-height;
+
+                    lista_revisao := VerticalLayout {
+                        alignment: start;
+                        spacing: 4px;
+
+                        for r[i] in root.revisao: Rectangle {
+                            height: 54px;
+                            border-radius: 8px;
+                            background: toque_r.has-hover ? root.hover : transparent;
+
+                            toque_r := TouchArea { }
+                            VerticalLayout {
+                                x: 12px;
+                                width: parent.width - 150px;
+                                alignment: center;
+                                spacing: 2px;
+
+                                Text {
+                                    text: r.original;
+                                    color: root.suave;
+                                    font-size: 12px;
+                                    overflow: elide;
+                                }
+                                Text {
+                                    text: "→ " + r.sugestao;
+                                    color: root.texto;
+                                    font-size: 13px;
+                                    font-weight: 600;
+                                    overflow: elide;
+                                }
+                            }
+                            HorizontalLayout {
+                                x: parent.width - self.width - 8px;
+                                width: self.preferred-width;
+                                spacing: 6px;
+                                alignment: end;
+
+                                Nota {
+                                    y: (parent.height - self.height) / 2;
+                                    valor: r.confianca;
+                                }
+                                for acao[k] in [true, false]: Rectangle {
+                                    width: 30px;
+                                    height: 30px;
+                                    y: (parent.height - self.height) / 2;
+                                    border-radius: 15px;
+                                    background: toque_acao.has-hover ? root.hover : transparent;
+
+                                    Image {
+                                        source: acao ? @image-url("icons/check.svg") : @image-url("icons/x.svg");
+                                        width: 12px;
+                                        height: 12px;
+                                        x: (parent.width - self.width) / 2;
+                                        y: (parent.height - self.height) / 2;
+                                        colorize: acao ? root.destaque : root.suave;
+                                    }
+                                    toque_acao := TouchArea {
+                                        clicked => { root.revisao_decidir(i, acao); }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Rectangle {
+                    height: 1px;
+                    background: root.borda;
+                }
+
+                HorizontalLayout {
+                    spacing: 10px;
+
+                    Botao {
+                        texto: root.confirmar_tags_aba ? I18n.info_confirm_button : I18n.tags_write_tab;
+                        destaque: root.destaque;
+                        cor_texto: root.texto;
+                        neutro: root.neutro;
+                        clicado => {
+                            if (root.confirmar_tags_aba) {
+                                root.confirmar_tags_aba = false;
+                                root.gravar_tags_aba();
+                            } else {
+                                root.confirmar_tags_aba = true;
+                            }
+                        }
+                    }
+                    Text {
+                        text: root.confirmar_tags_aba ? I18n.info_confirm_tags : root.tags_texto;
+                        color: root.confirmar_tags_aba ? #e3bd6a : root.suave;
+                        font-size: 12px;
+                        vertical-alignment: center;
+                        horizontal-stretch: 1;
+                        wrap: word-wrap;
+                    }
+                }
+            }
+        }
+    }
+}

@@ -53,6 +53,13 @@ pub struct AppConfig {
     /// Crossfade em segundos (0 = só gapless).
     #[serde(default)]
     pub crossfade: u8,
+    /// Buscar a letra na web (LRCLIB) quando a faixa não tem. Desligado
+    /// até o usuário ligar: manda título/artista a um serviço de fora.
+    #[serde(default)]
+    pub letras_web: bool,
+    /// Chave de aplicativo do AcoustID (impressão digital).
+    #[serde(default)]
+    pub chave_acoustid: String,
     #[serde(default = "verdadeiro")]
     pub replaygain: bool,
     /// Fundo do modo imersivo pulsando com os graves.
@@ -93,6 +100,8 @@ impl Default for AppConfig {
             fila_shuffle: Vec::new(),
             ordens: HashMap::new(),
             crossfade: 0,
+            letras_web: false,
+            chave_acoustid: String::new(),
             replaygain: true,
             fundo_reativo: true,
             escanear_subpastas: false,

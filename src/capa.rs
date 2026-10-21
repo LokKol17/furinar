@@ -45,11 +45,14 @@ pub struct Carregado {
 }
 
 /// Lê metadados e capa da faixa e prepara as imagens. Feito para rodar fora
-/// da thread da UI: decodificar uma capa grande leva dezenas de ms.
-pub fn carregar(caminho: &Path) -> Carregado {
+/// da thread da UI: decodificar uma capa grande leva dezenas de ms. `web` é a
+/// capa baixada (usada só quando a faixa e a pasta não têm uma).
+pub fn carregar(caminho: &Path, web: Option<&Path>) -> Carregado {
     let (detalhes, embutida) = ler_tags(caminho);
 
-    let bytes = embutida.or_else(|| capa_da_pasta(caminho));
+    let bytes = embutida
+        .or_else(|| capa_da_pasta(caminho))
+        .or_else(|| std::fs::read(web?).ok());
     let imagem = bytes
         .and_then(|b| image::load_from_memory(&b).ok())
         .map(|img| img.thumbnail(LADO_CAPA, LADO_CAPA).into_rgba8());
@@ -307,7 +310,7 @@ mod tests {
     fn carregar_faixa_sem_capa_nao_falha() {
         let caminho =
             std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/tone.mp3");
-        let c = carregar(&caminho);
+        let c = carregar(&caminho, None);
         assert_eq!(c.detalhes.formato, "MP3");
         assert!(c.detalhes.taxa_hz.is_some());
         assert!(c.capa.is_none());

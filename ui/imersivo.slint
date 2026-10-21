@@ -199,6 +199,8 @@ export component TelaImersiva inherits Rectangle {
     in-out property <bool> replaygain;
     in-out property <bool> fundo_reativo;
     in property <string> fundo_global_nome;
+    in-out property <bool> letras_web;
+    in-out property <string> chave_acoustid;
 
     callback sair();
     callback anterior();
@@ -228,6 +230,9 @@ export component TelaImersiva inherits Rectangle {
     callback alternar_fundo_reativo(bool);
     callback escolher_fundo();
     callback limpar_fundo();
+    callback abrir_info();
+    callback alternar_letras_web(bool);
+    callback chave_acoustid_mudou(string);
 
     background: #05080d;
 
@@ -612,6 +617,11 @@ export component TelaImersiva inherits Rectangle {
                 clicado => { root.sair(); }
             }
             BotaoImersivo {
+                icone: @image-url("icons/info.svg");
+                dica: I18n.tip_info;
+                clicado => { root.abrir_info(); }
+            }
+            BotaoImersivo {
                 icone: @image-url("icons/config.svg");
                 dica: I18n.tip_settings;
                 ativo: root.config_aberta;
@@ -794,6 +804,14 @@ export component TelaImersiva inherits Rectangle {
                     alternado(v) => { root.alternar_fundo_reativo(v); }
                 }
 
+                OpcaoImersiva {
+                    rotulo: I18n.lyrics_web;
+                    descricao: I18n.lyrics_web_desc;
+                    ligado <=> root.letras_web;
+                    cor: root.destaque;
+                    alternado(v) => { root.alternar_letras_web(v); }
+                }
+
                 // Crossfade: cada clique passa para a próxima duração
                 Rectangle {
                     height: 44px;
@@ -819,6 +837,44 @@ export component TelaImersiva inherits Rectangle {
                     }
                     crossfade_toque := TouchArea {
                         clicked => { root.alternar_crossfade(); }
+                    }
+                }
+
+                // Chave do AcoustID
+                VerticalLayout {
+                    padding-left: 12px;
+                    padding-right: 12px;
+                    spacing: 6px;
+
+                    Text {
+                        text: I18n.acoustid_key;
+                        color: #ffffff;
+                        font-size: 14px;
+                    }
+                    Rectangle {
+                        height: 34px;
+                        border-radius: 10px;
+                        background: #ffffff12;
+                        border-width: 1px;
+                        border-color: campo_chave.has-focus ? root.destaque : #ffffff1f;
+
+                        campo_chave := TextInput {
+                            x: 12px;
+                            width: parent.width - 24px;
+                            height: parent.height;
+                            color: #ffffff;
+                            font-size: 13px;
+                            vertical-alignment: center;
+                            single-line: true;
+                            text <=> root.chave_acoustid;
+                            edited => { root.chave_acoustid_mudou(self.text); }
+                        }
+                    }
+                    Text {
+                        text: I18n.acoustid_desc;
+                        color: #ffffff80;
+                        font-size: 12px;
+                        wrap: word-wrap;
                     }
                 }
 

@@ -23,6 +23,50 @@ pub fn pt_br() -> Translations {
     t.insert("tip_lyrics_only", "Só a letra (H)");
     t.insert("tip_sleep", "Temporizador de sono");
     t.insert("sleep_end", "Fim da faixa");
+    t.insert("tip_info", "Informações da faixa (I)");
+    t.insert("info_tab_track", "Faixa");
+    t.insert("info_tab_batch", "Aba inteira");
+    t.insert("info_corrected", "Corrigida pela web");
+    t.insert("info_restore", "Restaurar original");
+    t.insert("info_lyrics_label", "Letra");
+    t.insert("info_get_lyrics", "Baixar letra");
+    t.insert("info_search_web", "Buscar na web");
+    t.insert("info_apply", "Aplicar");
+    t.insert("info_apply_tags", "Aplicar e gravar nas tags");
+    t.insert(
+        "info_confirm_tags",
+        "Isso altera o arquivo de música. Clique de novo para confirmar.",
+    );
+    t.insert("info_confirm_button", "Confirmar");
+    t.insert("batch_desc", "Identifica todas as faixas desta aba no MusicBrainz e baixa as letras que faltam. Acertos com 90% ou mais entram sozinhos; o resto fica aqui para você revisar. Nada é gravado nos arquivos sem você pedir.");
+    t.insert("batch_start", "Indexar esta aba");
+    t.insert("batch_cancel", "Cancelar");
+    t.insert("batch_review", "Para revisar");
+    t.insert("batch_accept_all", "Aceitar todas");
+    t.insert("tags_write_tab", "Gravar correções desta aba nas tags");
+    t.insert("lyrics_web", "Buscar letras na internet");
+    t.insert(
+        "lyrics_web_desc",
+        "Faixa sem letra: procura no LRCLIB ao tocar (envia título e artista).",
+    );
+    t.insert("acoustid_key", "Chave do AcoustID (opcional)");
+    t.insert(
+        "acoustid_desc",
+        "Identifica pelo som faixas sem tag. Chave grátis em acoustid.org/new-application.",
+    );
+    t.insert("info_lyrics_ok", "tem");
+    t.insert("info_lyrics_missing_web", "a web não tem");
+    t.insert("info_lyrics_none", "nenhuma");
+    t.insert("batch_running", "Indexando…");
+    t.insert("batch_summary", "{auto} corrigidas sozinhas · {revisar} para revisar · {nada} sem resultado · {letras} letras baixadas");
+    t.insert("info_error", "Erro");
+    t.insert("info_by_sound", "identificada pelo som");
+    t.insert("info_nothing", "Nada encontrado.");
+    t.insert("info_results", "{n} resultados — escolha um");
+    t.insert("info_searching", "Buscando…");
+    t.insert("tags_written", "{n} arquivos atualizados");
+    t.insert("tags_none", "Nenhuma correção nesta aba.");
+    t.insert("tags_writing", "Gravando…");
     t.insert("tab_favorites", "Favoritas");
     t.insert("tab_most_played", "Mais tocadas");
     t.insert(
@@ -111,6 +155,50 @@ pub fn en() -> Translations {
     t.insert("tip_lyrics_only", "Lyrics only (H)");
     t.insert("tip_sleep", "Sleep timer");
     t.insert("sleep_end", "End of track");
+    t.insert("tip_info", "Track info (I)");
+    t.insert("info_tab_track", "Track");
+    t.insert("info_tab_batch", "Whole tab");
+    t.insert("info_corrected", "Fixed from the web");
+    t.insert("info_restore", "Restore original");
+    t.insert("info_lyrics_label", "Lyrics");
+    t.insert("info_get_lyrics", "Get lyrics");
+    t.insert("info_search_web", "Search the web");
+    t.insert("info_apply", "Apply");
+    t.insert("info_apply_tags", "Apply and write tags");
+    t.insert(
+        "info_confirm_tags",
+        "This changes the music file. Click again to confirm.",
+    );
+    t.insert("info_confirm_button", "Confirm");
+    t.insert("batch_desc", "Identifies every track in this tab on MusicBrainz and downloads missing lyrics. Matches of 90% or more are applied automatically; the rest waits here for review. Nothing is written to your files unless you ask.");
+    t.insert("batch_start", "Index this tab");
+    t.insert("batch_cancel", "Cancel");
+    t.insert("batch_review", "To review");
+    t.insert("batch_accept_all", "Accept all");
+    t.insert("tags_write_tab", "Write this tab's fixes to tags");
+    t.insert("lyrics_web", "Fetch lyrics from the internet");
+    t.insert(
+        "lyrics_web_desc",
+        "Tracks without lyrics: look them up on LRCLIB when played (sends title and artist).",
+    );
+    t.insert("acoustid_key", "AcoustID key (optional)");
+    t.insert(
+        "acoustid_desc",
+        "Identifies untagged tracks by their sound. Free key at acoustid.org/new-application.",
+    );
+    t.insert("info_lyrics_ok", "available");
+    t.insert("info_lyrics_missing_web", "not on the web");
+    t.insert("info_lyrics_none", "none");
+    t.insert("batch_running", "Indexing…");
+    t.insert("batch_summary", "{auto} fixed automatically · {revisar} to review · {nada} not found · {letras} lyrics downloaded");
+    t.insert("info_error", "Error");
+    t.insert("info_by_sound", "matched by sound");
+    t.insert("info_nothing", "Nothing found.");
+    t.insert("info_results", "{n} results — pick one");
+    t.insert("info_searching", "Searching…");
+    t.insert("tags_written", "{n} files updated");
+    t.insert("tags_none", "No fixes in this tab.");
+    t.insert("tags_writing", "Writing…");
     t.insert("tab_favorites", "Favorites");
     t.insert("tab_most_played", "Most played");
     t.insert(

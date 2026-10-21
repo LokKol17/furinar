@@ -2,6 +2,7 @@ import { Tema, BotaoIcone, BotaoTitulo, BarraDeslizante, CampoBusca, CaixaSeleca
 import { I18n } from "i18n.slint";
 import { TelaImersiva } from "imersivo.slint";
 import { LinhaPainel, CartaoAlbum } from "painel.slint";
+import { JanelaInfo, CandidatoInfo, ItemRevisao } from "info.slint";
 
 /// Linha da playlist do modo normal.
 export struct LinhaLista {
@@ -57,6 +58,37 @@ export component MainWindow inherits Window {
     callback alternar_crossfade();
     callback alternar_replaygain(bool);
     callback alternar_fundo_reativo(bool);
+
+    // Busca na web: tela de informações da faixa e lote da aba
+    in-out property <bool> info_aberta: false;
+    in-out property <bool> config_aberta: false;
+    in-out property <int> info_guia: 0;
+    in property <string> info_titulo;
+    in property <string> info_artista;
+    in property <string> info_album;
+    in property <bool> info_corrigida;
+    in property <string> info_letra;
+    in property <string> info_estado;
+    in property <bool> info_ocupado;
+    in property <[CandidatoInfo]> info_candidatos;
+    in property <bool> lote_ativo;
+    in property <float> lote_progresso;
+    in property <string> lote_texto;
+    in property <[ItemRevisao]> revisao;
+    in property <string> tags_texto;
+    in-out property <bool> letras_web: false;
+    in-out property <string> chave_acoustid: "";
+    callback abrir_info();
+    callback info_buscar();
+    callback info_aplicar(int, bool);
+    callback info_restaurar();
+    callback info_baixar_letra();
+    callback lote_iniciar();
+    callback lote_cancelar();
+    callback revisao_decidir(int, bool);
+    callback gravar_tags_aba();
+    callback alternar_letras_web(bool);
+    callback chave_acoustid_mudou(string);
     in-out property <int> indice_selecionado: -1;
     in property <[string]> abas: [];
     in-out property <int> aba_ativa: 0;
@@ -183,7 +215,16 @@ export component MainWindow inherits Window {
                 return reject;
             }
 
-            if (event.text == Key.F11) {
+            if (event.text == Key.Escape && info_aberta) {
+                info_aberta = false;
+                return accept;
+            } else if (event.text == Key.Escape && config_aberta) {
+                config_aberta = false;
+                return accept;
+            } else if (event.text == "i" || event.text == "I") {
+                abrir_info();
+                return accept;
+            } else if (event.text == Key.F11) {
                 alternar_imersivo();
                 return accept;
             } else if (event.text == Key.Escape && modo_imersivo) {
@@ -387,6 +428,11 @@ export component MainWindow inherits Window {
                         clicado => { mostrar_letra = !mostrar_letra; }
                     }
                     BotaoIcone {
+                        icone: @image-url("icons/info.svg");
+                        dica: I18n.tip_info;
+                        clicado => { abrir_info(); }
+                    }
+                    BotaoIcone {
                         icone: @image-url("icons/lua.svg");
                         dica: sono_texto != "" ? I18n.tip_sleep + " · " + sono_texto : I18n.tip_sleep;
                         ativo: sono_texto != "";
@@ -400,7 +446,7 @@ export component MainWindow inherits Window {
                     BotaoIcone {
                         icone: @image-url("icons/config.svg");
                         dica: I18n.tip_settings;
-                        clicado => { config_popup.show(); }
+                        clicado => { config_aberta = true; }
                     }
                 }
             }
@@ -931,6 +977,11 @@ export component MainWindow inherits Window {
         alternar_fundo_reativo(v) => { alternar_fundo_reativo(v); }
         escolher_fundo => { escolher_fundo(); }
         limpar_fundo => { limpar_fundo(); }
+        abrir_info => { abrir_info(); }
+        letras_web <=> letras_web;
+        chave_acoustid <=> chave_acoustid;
+        alternar_letras_web(v) => { alternar_letras_web(v); }
+        chave_acoustid_mudou(c) => { chave_acoustid_mudou(c); }
         painel_alternado(aberto) => { imv_painel_alternado(aberto); }
         aba_selecionada(i) => { aba_selecionada(i); }
         busca_mudou(t) => { busca_mudou(t); }
@@ -939,6 +990,41 @@ export component MainWindow inherits Window {
         fila_clicada(i) => { imv_fila_clicada(i); }
         devolver_foco => { atalhos.focus(); }
         alternar_sono => { alternar_sono(); }
+    }
+
+    JanelaInfo {
+        width: parent.width;
+        height: parent.height;
+        aberta <=> info_aberta;
+        guia <=> info_guia;
+        imersivo: modo_imersivo;
+        cor_imersivo: imv_tem_cor ? imv_cor : Tema.oceano;
+        titulo: info_titulo;
+        artista: info_artista;
+        album: info_album;
+        corrigida: info_corrigida;
+        letra: info_letra;
+        estado: info_estado;
+        ocupado: info_ocupado;
+        candidatos: info_candidatos;
+        lote_ativo: lote_ativo;
+        lote_progresso: lote_progresso;
+        lote_texto: lote_texto;
+        revisao: revisao;
+        tags_texto: tags_texto;
+        buscar => { info_buscar(); }
+        aplicar(i, gravar) => { info_aplicar(i, gravar); }
+        restaurar => { info_restaurar(); }
+        baixar_letra => { info_baixar_letra(); }
+        lote_iniciar => { lote_iniciar(); }
+        lote_cancelar => { lote_cancelar(); }
+        revisao_decidir(i, aceitar) => { revisao_decidir(i, aceitar); }
+        gravar_tags_aba => { gravar_tags_aba(); }
+        changed aberta => {
+            if (!self.aberta) {
+                atalhos.focus();
+            }
+        }
     }
 
     // -------------------------------------------------------------
@@ -1027,146 +1113,223 @@ export component MainWindow inherits Window {
         }
     }
 
-    config_popup := PopupWindow {
-        x: 170px;
-        y: 120px;
-        // Só fecha clicando fora: mexer numa opção não pode fechar o menu
-        close-policy: close-on-click-outside;
+    // Cartão sobre a janela (não PopupWindow): mexer numa opção não fecha,
+    // clique fora e Esc fecham, e rola quando não cabe
+    if config_aberta : Rectangle {
+        background: #00000060;
+
+        TouchArea {
+            clicked => {
+                config_aberta = false;
+                atalhos.focus();
+            }
+        }
 
         Rectangle {
+            width: 420px;
+            height: min(parent.height - 60px, conteudo_config.preferred-height);
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
             background: Tema.painel;
             border-radius: 12px;
             border-width: 1px;
             border-color: Tema.borda;
+            drop-shadow-blur: 24px;
+            drop-shadow-color: #00000060;
+            clip: true;
 
-            VerticalLayout {
-                padding: 16px;
-                spacing: 12px;
+            // Engole o clique para não fechar
+            TouchArea { }
 
-                Text {
-                    text: I18n.config_title;
-                    font-size: 16px;
-                    font-weight: 700;
-                    color: Tema.texto;
-                }
+            Flickable {
+                content-height: conteudo_config.preferred-height;
 
-                CaixaSelecao {
-                    rotulo: tema_escuro ? I18n.theme_dark : I18n.theme_light;
-                    marcado <=> tema_escuro;
-                    alternado(v) => { trocar_tema(v); }
-                }
+                conteudo_config := VerticalLayout {
+                    padding: 16px;
+                    spacing: 12px;
 
-                CaixaSelecao {
-                    rotulo: I18n.scan_subfolders;
-                    marcado <=> escanear_subpastas;
-                    alternado(v) => { alternar_escanear_subpastas(v); }
-                }
-
-                Text {
-                    text: I18n.scan_subfolders_desc;
-                    font-size: 12px;
-                    color: Tema.texto_suave;
-                    wrap: word-wrap;
-                }
-
-                CaixaSelecao {
-                    rotulo: I18n.replaygain;
-                    marcado <=> replaygain;
-                    alternado(v) => { alternar_replaygain(v); }
-                }
-                Text {
-                    text: I18n.replaygain_desc;
-                    font-size: 12px;
-                    color: Tema.texto_suave;
-                    wrap: word-wrap;
-                }
-
-                // Crossfade: cada clique passa para a próxima duração
-                Rectangle {
-                    height: 30px;
-                    border-radius: 8px;
-                    border-width: 1px;
-                    border-color: Tema.borda;
-                    background: ta_crossfade.has-hover ? Tema.neutro_hover : Tema.neutro;
-                    animate background { duration: 120ms; }
-
-                    ta_crossfade := TouchArea {
-                        clicked => { alternar_crossfade(); }
+                    HorizontalLayout {
+                        Text {
+                            text: I18n.config_title;
+                            font-size: 16px;
+                            font-weight: 700;
+                            color: Tema.texto;
+                            vertical-alignment: center;
+                        }
+                        Rectangle { horizontal-stretch: 1; }
+                        BotaoTitulo {
+                            icone: @image-url("icons/x.svg");
+                            dica: I18n.tip_close;
+                            clicado => {
+                                config_aberta = false;
+                                atalhos.focus();
+                            }
+                        }
                     }
-                    Text {
-                        text: crossfade_texto;
-                        color: Tema.texto;
-                        font-size: 13px;
-                        horizontal-alignment: center;
-                        vertical-alignment: center;
+
+                    CaixaSelecao {
+                        rotulo: tema_escuro ? I18n.theme_dark : I18n.theme_light;
+                        marcado <=> tema_escuro;
+                        alternado(v) => { trocar_tema(v); }
                     }
-                }
 
-                CaixaSelecao {
-                    rotulo: I18n.reactive_bg;
-                    marcado <=> fundo_reativo;
-                    alternado(v) => { alternar_fundo_reativo(v); }
-                }
-
-                Rectangle {
-                    width: 100%;
-                    height: 32px;
-                    border-radius: 8px;
-                    background: ta_lang.has-hover ? Tema.neutro_hover : transparent;
-                    animate background { duration: 120ms; }
-
-                    ta_lang := TouchArea {
-                        clicked => { trocar_idioma(I18n.idioma == "en" ? "pt-br" : "en"); }
+                    CaixaSelecao {
+                        rotulo: I18n.scan_subfolders;
+                        marcado <=> escanear_subpastas;
+                        alternado(v) => { alternar_escanear_subpastas(v); }
                     }
 
                     Text {
-                        text: I18n.idioma == "en" ? "Idioma: Português" : "Language: English";
-                        color: Tema.texto;
-                        font-size: 13px;
-                        horizontal-alignment: center;
-                        vertical-alignment: center;
+                        text: I18n.scan_subfolders_desc;
+                        font-size: 12px;
+                        color: Tema.texto_suave;
+                        wrap: word-wrap;
                     }
-                }
 
-                // Fundo do modo imersivo
-                Text {
-                    text: I18n.bg_label;
-                    color: Tema.texto;
-                    font-size: 14px;
-                }
-                Text {
-                    text: fundo_global_nome != "" ? fundo_global_nome : I18n.bg_none;
-                    color: Tema.texto_suave;
-                    font-size: 12px;
-                    overflow: elide;
-                }
-                HorizontalLayout {
-                    spacing: 8px;
+                    CaixaSelecao {
+                        rotulo: I18n.replaygain;
+                        marcado <=> replaygain;
+                        alternado(v) => { alternar_replaygain(v); }
+                    }
+                    Text {
+                        text: I18n.replaygain_desc;
+                        font-size: 12px;
+                        color: Tema.texto_suave;
+                        wrap: word-wrap;
+                    }
 
-                    for botao[i] in [I18n.bg_choose, I18n.bg_clear]: Rectangle {
-                        visible: i == 0 || fundo_global_nome != "";
+                    // Crossfade: cada clique passa para a próxima duração
+                    Rectangle {
                         height: 30px;
                         border-radius: 8px;
                         border-width: 1px;
                         border-color: Tema.borda;
-                        background: ta_fundo.has-hover ? Tema.neutro_hover : Tema.neutro;
+                        background: ta_crossfade.has-hover ? Tema.neutro_hover : Tema.neutro;
                         animate background { duration: 120ms; }
 
-                        ta_fundo := TouchArea {
-                            clicked => {
-                                if (i == 0) {
-                                    escolher_fundo();
-                                } else {
-                                    limpar_fundo();
-                                }
-                            }
+                        ta_crossfade := TouchArea {
+                            clicked => { alternar_crossfade(); }
                         }
                         Text {
-                            text: botao;
+                            text: crossfade_texto;
                             color: Tema.texto;
                             font-size: 13px;
                             horizontal-alignment: center;
                             vertical-alignment: center;
+                        }
+                    }
+
+                    CaixaSelecao {
+                        rotulo: I18n.reactive_bg;
+                        marcado <=> fundo_reativo;
+                        alternado(v) => { alternar_fundo_reativo(v); }
+                    }
+
+                    CaixaSelecao {
+                        rotulo: I18n.lyrics_web;
+                        marcado <=> letras_web;
+                        alternado(v) => { alternar_letras_web(v); }
+                    }
+                    Text {
+                        text: I18n.lyrics_web_desc;
+                        font-size: 12px;
+                        color: Tema.texto_suave;
+                        wrap: word-wrap;
+                    }
+
+                    // Chave do AcoustID (impressão digital)
+                    Text {
+                        text: I18n.acoustid_key;
+                        color: Tema.texto;
+                        font-size: 14px;
+                    }
+                    Rectangle {
+                        height: 30px;
+                        border-radius: 8px;
+                        background: Tema.neutro;
+                        border-width: 1px;
+                        border-color: campo_chave.has-focus ? Tema.foco : Tema.borda;
+
+                        campo_chave := TextInput {
+                            x: 10px;
+                            width: parent.width - 20px;
+                            height: parent.height;
+                            color: Tema.texto;
+                            font-size: 13px;
+                            vertical-alignment: center;
+                            single-line: true;
+                            text <=> chave_acoustid;
+                            edited => { chave_acoustid_mudou(self.text); }
+                            accepted => { atalhos.focus(); }
+                        }
+                    }
+                    Text {
+                        text: I18n.acoustid_desc;
+                        font-size: 12px;
+                        color: Tema.texto_suave;
+                        wrap: word-wrap;
+                    }
+
+                    Rectangle {
+                        width: 100%;
+                        height: 32px;
+                        border-radius: 8px;
+                        background: ta_lang.has-hover ? Tema.neutro_hover : transparent;
+                        animate background { duration: 120ms; }
+
+                        ta_lang := TouchArea {
+                            clicked => { trocar_idioma(I18n.idioma == "en" ? "pt-br" : "en"); }
+                        }
+
+                        Text {
+                            text: I18n.idioma == "en" ? "Idioma: Português" : "Language: English";
+                            color: Tema.texto;
+                            font-size: 13px;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                    }
+
+                    // Fundo do modo imersivo
+                    Text {
+                        text: I18n.bg_label;
+                        color: Tema.texto;
+                        font-size: 14px;
+                    }
+                    Text {
+                        text: fundo_global_nome != "" ? fundo_global_nome : I18n.bg_none;
+                        color: Tema.texto_suave;
+                        font-size: 12px;
+                        overflow: elide;
+                    }
+                    HorizontalLayout {
+                        spacing: 8px;
+
+                        for botao[i] in [I18n.bg_choose, I18n.bg_clear]: Rectangle {
+                            visible: i == 0 || fundo_global_nome != "";
+                            height: 30px;
+                            border-radius: 8px;
+                            border-width: 1px;
+                            border-color: Tema.borda;
+                            background: ta_fundo.has-hover ? Tema.neutro_hover : Tema.neutro;
+                            animate background { duration: 120ms; }
+
+                            ta_fundo := TouchArea {
+                                clicked => {
+                                    if (i == 0) {
+                                        escolher_fundo();
+                                    } else {
+                                        limpar_fundo();
+                                    }
+                                }
+                            }
+                            Text {
+                                text: botao;
+                                color: Tema.texto;
+                                font-size: 13px;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
                         }
                     }
                 }
@@ -1175,4 +1338,4 @@ export component MainWindow inherits Window {
     }
 }
 
-export { I18n, LinhaPainel, CartaoAlbum }
+export { I18n, LinhaPainel, CartaoAlbum, CandidatoInfo, ItemRevisao }

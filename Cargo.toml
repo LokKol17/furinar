@@ -74,6 +74,16 @@ image = { version = "0.25", default-features = false, features = [
 ] }
 # FFT do visualizador do modo imersivo
 rustfft = "6"
+# Busca na web (letras, metadados, capas). O reqwest já entra pelo
+# self_update com estas mesmas features: não soma nada ao binário.
+reqwest = { version = "0.12", default-features = false, features = [
+    "blocking",
+    "json",
+    "rustls-tls",
+] }
+base64 = "0.22"
+# Impressão digital do áudio (AcoustID), em Rust puro
+rusty-chromaprint = "0.3"
 # Relógio do modo imersivo (hora local). O Slint já compila o chrono com
 # "clock"; aqui só ganhamos acesso a ele.
 chrono = { version = "0.4", default-features = false, features = ["clock"] }

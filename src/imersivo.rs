@@ -27,6 +27,11 @@ pub struct Faixa {
     pub artista: Option<String>,
     /// Fundos escolhidos nas configurações (rodízio a cada faixa).
     pub fundos_globais: Vec<PathBuf>,
+    /// Capa baixada da web (só usada sem capa na faixa e na pasta).
+    pub capa_web: Option<PathBuf>,
+    /// Álbum e ano corrigidos pela web (por cima das tags).
+    pub album: Option<String>,
+    pub ano: Option<u16>,
 }
 
 pub struct EstadoImersivo {
@@ -37,6 +42,9 @@ pub struct EstadoImersivo {
     /// Faixa exibida (para não recarregar a mesma num seek).
     faixa: Option<PathBuf>,
     artista: Option<String>,
+    /// Álbum e ano corrigidos da faixa exibida.
+    album: Option<String>,
+    ano: Option<u16>,
     /// Qual camada de fundo está visível (crossfade A/B).
     mostra_a: bool,
     /// Fundo personalizado tocando. `None`: usa a capa desfocada.
@@ -78,6 +86,8 @@ impl EstadoImersivo {
             rx,
             faixa: None,
             artista: None,
+            album: None,
+            ano: None,
             mostra_a: true,
             fundo: None,
             fundo_novo: false,
@@ -100,15 +110,6 @@ impl EstadoImersivo {
             return;
         }
 
-        // Título na hora; o resto quando a thread terminar
-        ui.set_imv_titulo(faixa.titulo.as_str().into());
-        ui.set_imv_creditos(faixa.artista.as_deref().unwrap_or("").into());
-        ui.set_imv_tecnico(SharedString::new());
-
-        self.geracao += 1;
-        self.faixa = Some(faixa.caminho.clone());
-        self.artista = faixa.artista;
-
         // Mesmo fundo da faixa anterior (mesma pasta): continua tocando sem
         // reiniciar. Vídeo sem ffmpeg no PATH não abre e cai para a capa.
         let pasta_faixa = faixa.caminho.parent().unwrap_or(&faixa.pasta_raiz);
@@ -119,12 +120,36 @@ impl EstadoImersivo {
             self.fundo = alvo.as_deref().and_then(Reprodutor::abrir);
             self.fundo_novo = self.fundo.is_some();
         }
+        self.mostrar_dados(ui, faixa);
+    }
+
+    /// Os dados da mesma faixa mudaram (correção da web): título, créditos e
+    /// capa de novo, sem mexer no fundo.
+    pub fn atualizar_dados(&mut self, ui: &MainWindow, faixa: Option<Faixa>) {
+        match faixa {
+            Some(f) if self.faixa.as_ref() == Some(&f.caminho) => self.mostrar_dados(ui, f),
+            outra => self.trocar_faixa(ui, outra),
+        }
+    }
+
+    fn mostrar_dados(&mut self, ui: &MainWindow, faixa: Faixa) {
+        // Título na hora; o resto quando a thread terminar
+        ui.set_imv_titulo(faixa.titulo.as_str().into());
+        ui.set_imv_creditos(faixa.artista.as_deref().unwrap_or("").into());
+        ui.set_imv_tecnico(SharedString::new());
+
+        self.geracao += 1;
+        self.faixa = Some(faixa.caminho.clone());
+        self.artista = faixa.artista;
+        self.album = faixa.album;
+        self.ano = faixa.ano;
 
         let geracao = self.geracao;
         let tx = self.tx.clone();
         let caminho = faixa.caminho;
+        let web = faixa.capa_web;
         std::thread::spawn(move || {
-            let _ = tx.send((geracao, capa::carregar(&caminho)));
+            let _ = tx.send((geracao, capa::carregar(&caminho, web.as_deref())));
         });
     }
 
@@ -180,8 +205,14 @@ impl EstadoImersivo {
         }
     }
 
-    fn aplicar(&mut self, ui: &MainWindow, c: Carregado, idioma: &str) {
+    fn aplicar(&mut self, ui: &MainWindow, mut c: Carregado, idioma: &str) {
         let lang = translations::get_translations(idioma);
+        if self.album.is_some() {
+            c.detalhes.album = self.album.clone();
+        }
+        if self.ano.is_some() {
+            c.detalhes.ano = self.ano;
+        }
         ui.set_imv_creditos(capa::linha_creditos(self.artista.as_deref(), &c.detalhes).into());
         ui.set_imv_tecnico(capa::linha_tecnica(&c.detalhes, &lang).into());
 

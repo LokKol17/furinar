@@ -34,8 +34,11 @@ const BLOCO: u64 = 4096;
 /// Miniatura pronta para virar `slint::Image` (`None`: a faixa não tem capa).
 pub type Capa = Option<SharedPixelBuffer<Rgba8Pixel>>;
 
+/// Faixa e, se houver, a capa baixada da web (a última opção).
+pub type Pedido = (PathBuf, Option<PathBuf>);
+
 struct Fila {
-    pendentes: VecDeque<PathBuf>,
+    pendentes: VecDeque<Pedido>,
     fim: bool,
 }
 
@@ -78,7 +81,7 @@ impl Carregador {
 
     /// Troca a fila pelos caminhos dados, na ordem: o pedido anterior que
     /// ainda não começou é esquecido.
-    pub fn pedir(&self, caminhos: Vec<PathBuf>) {
+    pub fn pedir(&self, caminhos: Vec<Pedido>) {
         let (fila, sinal) = &*self.fila;
         if let Ok(mut f) = fila.lock() {
             f.pendentes = caminhos.into();
@@ -105,7 +108,7 @@ impl Drop for Carregador {
 fn trabalhar(fila: &Compartilhada, tx: &Sender<(PathBuf, Capa)>, cache: Option<&Path>) {
     let (trava, sinal) = &**fila;
     loop {
-        let caminho = {
+        let (caminho, web) = {
             let Ok(mut f) = trava.lock() else {
                 return;
             };
@@ -122,7 +125,7 @@ fn trabalhar(fila: &Compartilhada, tx: &Sender<(PathBuf, Capa)>, cache: Option<&
                 };
             }
         };
-        let capa = carregar(&caminho, cache);
+        let capa = carregar(&caminho, web.as_deref(), cache);
         if tx.send((caminho, capa)).is_err() {
             return;
         }
@@ -130,10 +133,10 @@ fn trabalhar(fila: &Compartilhada, tx: &Sender<(PathBuf, Capa)>, cache: Option<&
 }
 
 /// Acha a miniatura: do cache (sem nem abrir a faixa), ou da capa embutida /
-/// `cover.jpg` (e então grava no cache). Arquivo de cache vazio quer dizer
-/// "essa faixa não tem capa", para não procurar de novo.
-pub fn carregar(caminho: &Path, cache: Option<&Path>) -> Capa {
-    let arquivo_cache = cache.and_then(|pasta| chave(caminho).map(|k| pasta.join(k)));
+/// `cover.jpg` / capa baixada `web` (e então grava no cache). Arquivo de cache
+/// vazio quer dizer "essa faixa não tem capa", para não procurar de novo.
+pub fn carregar(caminho: &Path, web: Option<&Path>, cache: Option<&Path>) -> Capa {
+    let arquivo_cache = cache.and_then(|pasta| chave(caminho, web).map(|k| pasta.join(k)));
     if let Some(arquivo) = &arquivo_cache
         && let Ok(bytes) = std::fs::read(arquivo)
     {
@@ -156,6 +159,7 @@ pub fn carregar(caminho: &Path, cache: Option<&Path>) -> Capa {
         });
     let reduzida = embutida
         .or_else(|| capa::capa_da_pasta(caminho))
+        .or_else(|| std::fs::read(web?).ok())
         .and_then(|b| image::load_from_memory(&b).ok())
         .map(|img| img.resize_to_fill(LADO, LADO, image::imageops::FilterType::Triangle));
     if let Some(arquivo) = &arquivo_cache {
@@ -231,9 +235,17 @@ fn aparar_cache(pasta: &Path, limite: u64) {
     }
 }
 
+/// Hash curto de um texto (nomes de arquivo de cache).
+pub fn hash_texto(texto: &str) -> String {
+    let mut h = Fnv::default();
+    h.escrever(texto.as_bytes());
+    format!("{:016x}", h.0)
+}
+
 /// Nome do arquivo de cache: hash do caminho + data de modificação +
-/// tamanho. Trocou a capa (ou o arquivo), muda a chave.
-pub fn chave(caminho: &Path) -> Option<String> {
+/// tamanho (+ a capa da web, quando ela existe). Trocou a capa (ou o
+/// arquivo), muda a chave.
+pub fn chave(caminho: &Path, web: Option<&Path>) -> Option<String> {
     let meta = std::fs::metadata(caminho).ok()?;
     let mtime = meta
         .modified()
@@ -245,6 +257,9 @@ pub fn chave(caminho: &Path) -> Option<String> {
     h.escrever(caminho.to_string_lossy().as_bytes());
     h.escrever(&mtime.to_le_bytes());
     h.escrever(&meta.len().to_le_bytes());
+    if let Some(web) = web.filter(|w| w.is_file()) {
+        h.escrever(web.to_string_lossy().as_bytes());
+    }
     Some(format!("{:016x}.jpg", h.0))
 }
 
@@ -312,11 +327,11 @@ mod tests {
         let tmp = TempDir::novo("chave");
         let a = tmp.0.join("a.mp3");
         std::fs::write(&a, b"um").unwrap();
-        let antes = chave(&a).unwrap();
-        assert_eq!(chave(&a).unwrap(), antes);
+        let antes = chave(&a, None).unwrap();
+        assert_eq!(chave(&a, None).unwrap(), antes);
         std::fs::write(&a, b"outro conteudo").unwrap();
-        assert_ne!(chave(&a).unwrap(), antes);
-        assert!(chave(&tmp.0.join("nao-existe.mp3")).is_none());
+        assert_ne!(chave(&a, None).unwrap(), antes);
+        assert!(chave(&tmp.0.join("nao-existe.mp3"), None).is_none());
     }
 
     #[test]
@@ -331,12 +346,12 @@ mod tests {
             .save(musicas.join("cover.png"))
             .unwrap();
 
-        let capa = carregar(&faixa, Some(&cache)).expect("capa da pasta");
+        let capa = carregar(&faixa, None, Some(&cache)).expect("capa da pasta");
         assert_eq!((capa.width(), capa.height()), (LADO, LADO));
 
         // Sem o cover.png, a miniatura sai do cache
         std::fs::remove_file(musicas.join("cover.png")).unwrap();
-        let de_novo = carregar(&faixa, Some(&cache)).expect("capa do cache");
+        let de_novo = carregar(&faixa, None, Some(&cache)).expect("capa do cache");
         let px = de_novo.as_slice()[(LADO * LADO / 2) as usize];
         assert!(px.r > 150 && px.g < 80, "cor do cache: {px:?}");
     }
@@ -348,8 +363,8 @@ mod tests {
         std::fs::copy(fixture("tone.mp3"), &faixa).unwrap();
         let cache = tmp.0.join("cache");
 
-        assert!(carregar(&faixa, Some(&cache)).is_none());
-        let marcador = cache.join(chave(&faixa).unwrap());
+        assert!(carregar(&faixa, None, Some(&cache)).is_none());
+        let marcador = cache.join(chave(&faixa, None).unwrap());
         assert_eq!(std::fs::metadata(marcador).unwrap().len(), 0);
     }
 
@@ -359,8 +374,8 @@ mod tests {
         let faixa = tmp.0.join("tone.mp3");
         std::fs::copy(fixture("tone.mp3"), &faixa).unwrap();
         let cache = tmp.0.join("cache");
-        carregar(&faixa, Some(&cache));
-        let marcador = cache.join(chave(&faixa).unwrap());
+        carregar(&faixa, None, Some(&cache));
+        let marcador = cache.join(chave(&faixa, None).unwrap());
         let antiga = UNIX_EPOCH + std::time::Duration::from_secs(1_000_000);
         std::fs::File::options()
             .write(true)
@@ -369,7 +384,7 @@ mod tests {
             .set_modified(antiga)
             .unwrap();
 
-        carregar(&faixa, Some(&cache));
+        carregar(&faixa, None, Some(&cache));
         let agora = std::fs::metadata(&marcador).unwrap().modified().unwrap();
         assert!(agora > antiga);
     }
@@ -406,7 +421,7 @@ mod tests {
     fn carregador_entrega_e_encerra() {
         // Sem cache: o teste não escreve no ~/.cache de quem roda
         let carregador = Carregador::com_cache(None);
-        carregador.pedir(vec![fixture("tone.mp3")]);
+        carregador.pedir(vec![(fixture("tone.mp3"), None)]);
         let inicio = std::time::Instant::now();
         loop {
             if let Some((caminho, capa)) = carregador.recebidos().next() {
