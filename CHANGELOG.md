@@ -14,6 +14,7 @@ e o projeto adere ao [Semantic Versioning](https://semver.org/).
 - O resultado da checagem de update chega direto no event loop; sai o timer que acordava a cada 250 ms durante toda a execução
 - O volume não é mais gravado no config a cada evento do slider; é salvo ao fechar
 - Linux (glibc): no máximo 2 arenas de malloc e `malloc_trim` depois da checagem de update
+- Linux: páginas limpas de código e fontes são devolvidas ao sistema (`madvise`) 5 s após abrir, depois da checagem de update e ao minimizar — RSS cai de ~52 MB para ~29 MB
 
 ### Corrigido
 - O estado "baixando" da atualização nunca era limpo: a thread de download chamava `upgrade()` fora da thread da UI

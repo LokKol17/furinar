@@ -27,6 +27,7 @@ Linux build deps: `libasound2-dev libgtk-3-dev pkg-config`.
   - `track.rs` — folder scanning, tag reading (lofty), accent/case-insensitive search (`normalizar_busca`, `ordem_filtrada`).
   - `lrc.rs` — `.lrc` synced-lyrics parsing and the visible window of lines.
   - `translations.rs` — `HashMap<&str, &str>` per language (`pt_br`, `en`); unknown language falls back to pt-br.
+  - `memoria.rs` — `aparar()` (Linux): `madvise(MADV_DONTNEED)` on clean read-only file mappings from `/proc/self/smaps` + `malloc_trim`, to cut RSS. Called 5 s after startup, after the update check, and on minimize.
   - `updates.rs` — self-update from GitHub Releases (`self_update` with rustls). Disabled when the binary lives under `/usr/bin`, `/usr/local/bin`, snap or flatpak paths.
 - **State model**: a single `EstadoAudio` in `Rc<RefCell<…>>`, cloned into every `ui.on_*` closure alongside `ui.as_weak()`. All UI/audio work runs on the Slint event-loop thread. Free functions take `(&mut EstadoAudio, &MainWindow)`.
 - **Tabs vs. playback**: `aba_visivel` (folder shown) is independent of `pasta_reproducao` (folder playing). Folders are scanned lazily (`PastaMusical.carregada`, `garantir_pasta_carregada`). `indices_visiveis` maps visible list rows → track indices after filtering.

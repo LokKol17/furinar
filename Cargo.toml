@@ -77,8 +77,8 @@ windows = { version = "0.62", features = [
     "Win32_UI_WindowsAndMessaging",
 ] }
 
-[target.'cfg(all(target_os = "linux", target_env = "gnu"))'.dependencies]
-# mallopt/malloc_trim: segura o número de arenas e devolve heap livre ao SO
+[target.'cfg(target_os = "linux")'.dependencies]
+# madvise (memoria::aparar) e, na glibc, mallopt/malloc_trim
 libc = "0.2"
 
 [build-dependencies]

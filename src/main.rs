@@ -5,6 +5,7 @@ slint::include_modules!();
 
 mod config;
 mod lrc;
+mod memoria;
 mod track;
 mod translations;
 mod updates;
@@ -1828,6 +1829,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ui.on_minimizar(move || {
             if let Some(ui) = ui_fraca.upgrade() {
                 ui.window().set_minimized(true);
+                // Minimizada não pinta nada; o que ela precisar volta sob demanda
+                memoria::aparar();
             }
         });
     }
@@ -1862,12 +1865,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::thread::spawn(move || {
             let atualizacao = updates::check_for_update();
             // A checagem desserializa a lista inteira de releases e sobe um
-            // runtime HTTP; devolve ao SO o heap que sobrou livre disso.
-            #[cfg(all(target_os = "linux", target_env = "gnu"))]
-            // SAFETY: malloc_trim só libera páginas livres do alocador
-            unsafe {
-                libc::malloc_trim(0);
-            }
+            // runtime HTTP: código e heap que não voltam a ser usados.
+            memoria::aparar();
             if let Some(info) = atualizacao {
                 let _ = ui_fraca.upgrade_in_event_loop(move |ui| {
                     ui.set_update_versao(info.version.into());
@@ -1903,6 +1902,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         });
     }
+
+    // Passado o startup (restauração da faixa, primeiro paint), boa parte do
+    // código e das fontes mapeados não é mais tocada.
+    Timer::single_shot(Duration::from_secs(5), memoria::aparar);
 
     ui.run()?;
 
