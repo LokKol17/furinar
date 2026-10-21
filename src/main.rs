@@ -3,7 +3,9 @@
 
 slint::include_modules!();
 
+mod capa;
 mod config;
+mod imersivo;
 mod lrc;
 mod memoria;
 mod track;
@@ -119,6 +121,8 @@ fn aplicar_idioma(idioma: &str, ui: &MainWindow) {
     i18n.set_tip_next(g("tip_next"));
     i18n.set_tip_lyrics(g("tip_lyrics"));
     i18n.set_tip_settings(g("tip_settings"));
+    i18n.set_tip_immersive(g("tip_immersive"));
+    i18n.set_tip_exit_immersive(g("tip_exit_immersive"));
     i18n.set_search_placeholder(g("search_placeholder"));
     i18n.set_no_lyrics(g("no_lyrics"));
     i18n.set_config_title(g("config_title"));
@@ -202,6 +206,8 @@ struct EstadoAudio {
     /// Índice absoluto da primeira linha do recorte que está na UI. Serve para
     /// traduzir o clique numa linha do painel de volta para o timestamp.
     letra_janela_inicio: usize,
+    /// Modo imersivo (tela cheia). `None` = desligado, nada alocado.
+    imersivo: Option<imersivo::EstadoImersivo>,
     #[cfg(feature = "mpris")]
     faixa_controles: Option<String>,
     #[cfg(feature = "mpris")]
@@ -234,6 +240,7 @@ impl Default for EstadoAudio {
             letra_atual: Vec::new(),
             letra_indice: -1,
             letra_janela_inicio: 0,
+            imersivo: None,
             #[cfg(feature = "mpris")]
             faixa_controles: None,
             #[cfg(feature = "mpris")]
@@ -394,6 +401,7 @@ fn fechar_pasta(estado: &mut EstadoAudio, ui: &MainWindow, idx: usize) {
 
     atualizar_abas(estado, ui);
     atualizar_lista(estado, ui);
+    atualizar_imersivo(estado, ui);
 }
 
 /// Reescaneia todas as pastas (a opção de subpastas é global) e reposiciona a
@@ -436,6 +444,7 @@ fn reescaneiar_pastas(estado: &mut EstadoAudio, ui: &MainWindow) {
 
     atualizar_abas(estado, ui);
     atualizar_lista(estado, ui);
+    atualizar_imersivo(estado, ui);
 }
 
 // ---------------------------------------------------------------------
@@ -454,6 +463,13 @@ fn carregar_letra(
         .map(|conteudo| parse_lrc(&conteudo))
         .unwrap_or_default();
     estado.letra_indice = indice_letra(&estado.letra_atual, tempo);
+    // O modo imersivo rola a letra inteira; o painel normal usa só o recorte
+    let completa: Vec<SharedString> = estado
+        .letra_atual
+        .iter()
+        .map(|(_, t)| t.as_str().into())
+        .collect();
+    ui.set_letra_completa(ModelRc::new(VecModel::from(completa)));
     publicar_letra(estado, ui);
 }
 
@@ -473,6 +489,33 @@ fn publicar_letra(estado: &mut EstadoAudio, ui: &MainWindow) {
     estado.letra_janela_inicio = inicio;
     ui.set_letra(ModelRc::new(VecModel::from(janela)));
     ui.set_letra_destaque(destaque);
+    ui.set_letra_indice(estado.letra_indice);
+}
+
+// ---------------------------------------------------------------------
+// Modo imersivo
+// ---------------------------------------------------------------------
+
+/// Faixa atual no formato que o modo imersivo usa.
+fn faixa_imersiva(estado: &EstadoAudio) -> Option<imersivo::Faixa> {
+    let pasta = estado.pastas.get(estado.pasta_reproducao?)?;
+    let track = pasta.tracks.get(estado.indice_atual?)?;
+    Some(imersivo::Faixa {
+        caminho: pasta.caminho.join(&track.path),
+        titulo: track.titulo.clone(),
+        artista: track.artista.clone(),
+    })
+}
+
+/// Avisa o modo imersivo (se ligado) que a faixa atual pode ter mudado.
+fn atualizar_imersivo(estado: &mut EstadoAudio, ui: &MainWindow) {
+    if estado.imersivo.is_none() {
+        return;
+    }
+    let faixa = faixa_imersiva(estado);
+    if let Some(imv) = estado.imersivo.as_mut() {
+        imv.trocar_faixa(ui, faixa);
+    }
 }
 
 /// Abre o decodificador certo para a extensão do arquivo.
@@ -629,6 +672,7 @@ fn iniciar_faixa(
 
     atualizar_selecao_visivel(estado, ui);
     executar_seek(estado, ui, alvo_secs);
+    atualizar_imersivo(estado, ui);
 }
 
 fn tocar_faixa(estado: &mut EstadoAudio, ui: &MainWindow, pasta_idx: usize, track_idx: usize) {
@@ -1767,6 +1811,68 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
     }
 
+    // Modo imersivo: o timer de ~30 fps só roda enquanto o modo está ligado
+    let timer_imersivo = Rc::new(Timer::default());
+    {
+        let estado = estado.clone();
+        let ui_fraca = ui.as_weak();
+        let timer_imersivo = timer_imersivo.clone();
+        ui.on_alternar_imersivo(move || {
+            let Some(ui) = ui_fraca.upgrade() else {
+                return;
+            };
+            let mut e = estado.borrow_mut();
+
+            if e.imersivo.take().is_some() {
+                // Sair: o Drop do estado derruba threads e imagens pendentes
+                timer_imersivo.stop();
+                imersivo::limpar_ui(&ui);
+                ui.set_modo_imersivo(false);
+                ui.window().set_fullscreen(false);
+                // Depois que a janela repintar sem as imagens
+                Timer::single_shot(Duration::from_millis(500), memoria::aparar);
+                return;
+            }
+
+            e.imersivo = Some(imersivo::EstadoImersivo::novo());
+            ui.set_modo_imersivo(true);
+            ui.window().set_fullscreen(true);
+            atualizar_imersivo(&mut e, &ui);
+
+            let estado = estado.clone();
+            let ui_fraca = ui.as_weak();
+            timer_imersivo.start(TimerMode::Repeated, Duration::from_millis(33), move || {
+                let Some(ui) = ui_fraca.upgrade() else {
+                    return;
+                };
+                let mut e = estado.borrow_mut();
+                let e = &mut *e;
+                if let Some(imv) = e.imersivo.as_mut() {
+                    imv.tick(&ui, &e.idioma);
+                }
+            });
+        });
+    }
+
+    {
+        let estado = estado.clone();
+        let ui_fraca = ui.as_weak();
+        ui.on_letra_completa_clicada(move |indice| {
+            if let Some(ui) = ui_fraca.upgrade() {
+                let mut e = estado.borrow_mut();
+                let Some((tempo, _)) = usize::try_from(indice)
+                    .ok()
+                    .and_then(|i| e.letra_atual.get(i))
+                else {
+                    return;
+                };
+                let alvo = tempo.max(0.0) as u64;
+                seek_mantendo_pausa(&mut e, &ui, alvo);
+                sincronizar_letra(&mut e, &ui);
+            }
+        });
+    }
+
     // Timer de progresso
     let timer = Timer::default();
     {
@@ -1907,6 +2013,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // código e das fontes mapeados não é mais tocada.
     Timer::single_shot(Duration::from_secs(5), memoria::aparar);
 
+    // `furinar --imersivo` já abre em tela cheia (atalho de desktop, kiosk)
+    if std::env::args().any(|a| a == "--imersivo") {
+        let ui_fraca = ui.as_weak();
+        Timer::single_shot(Duration::ZERO, move || {
+            if let Some(ui) = ui_fraca.upgrade() {
+                ui.invoke_alternar_imersivo();
+            }
+        });
+    }
+
     ui.run()?;
 
     // Salva novamente ao encerrar (fallback)
@@ -2027,5 +2143,91 @@ mod tests {
     fn seek_sem_player_só_recarrega_com_faixa_selecionada() {
         assert_eq!(efeito_seek(false, true), EfeitoSeek::Recarregar);
         assert_eq!(efeito_seek(false, false), EfeitoSeek::Nada);
+    }
+
+    /// Renderiza o modo imersivo num PNG, sem abrir janela, para inspeção
+    /// visual. Manual:
+    ///
+    /// `FURINAR_CAPTURA_FAIXA=/musica.mp3 cargo test captura_modo_imersivo -- --ignored`
+    ///
+    /// A imagem sai em `target/captura-imersivo.png`.
+    #[test]
+    #[ignore = "gera PNG para inspeção visual"]
+    fn captura_modo_imersivo() {
+        use slint::platform::software_renderer::{
+            MinimalSoftwareWindow, PremultipliedRgbaColor, RepaintBufferType,
+        };
+        use slint::platform::{Platform, WindowAdapter};
+
+        struct Plataforma(Rc<MinimalSoftwareWindow>);
+        impl Platform for Plataforma {
+            fn create_window_adapter(&self) -> Result<Rc<dyn WindowAdapter>, slint::PlatformError> {
+                Ok(self.0.clone())
+            }
+        }
+
+        let (largura, altura) = (1600u32, 900u32);
+        let janela = MinimalSoftwareWindow::new(RepaintBufferType::NewBuffer);
+        slint::platform::set_platform(Box::new(Plataforma(janela.clone())))
+            .expect("plataforma de teste");
+        janela.set_size(slint::PhysicalSize::new(largura, altura));
+
+        let ui = MainWindow::new().expect("MainWindow");
+        ui.show().expect("show");
+        aplicar_idioma("pt-br", &ui);
+
+        let caminho = std::env::var_os("FURINAR_CAPTURA_FAIXA")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| fixture("tone.mp3"));
+        let mut imv = imersivo::EstadoImersivo::novo();
+        ui.set_modo_imersivo(true);
+        imv.trocar_faixa(
+            &ui,
+            Some(imersivo::Faixa {
+                titulo: track::ler_tags(&caminho).0,
+                artista: track::ler_tags(&caminho).1,
+                caminho: caminho.clone(),
+            }),
+        );
+
+        let letra = fs::read_to_string(caminho_lrc(&caminho))
+            .map(|c| parse_lrc(&c))
+            .unwrap_or_default();
+        let linhas: Vec<SharedString> = letra.iter().map(|(_, t)| t.as_str().into()).collect();
+        ui.set_letra_indice(if linhas.is_empty() {
+            -1
+        } else {
+            4.min(linhas.len() as i32 - 1)
+        });
+        ui.set_letra_completa(ModelRc::new(VecModel::from(linhas)));
+        ui.set_progresso(0.35);
+        ui.set_texto_tempo("01:14 / 03:31".into());
+        let barras: Vec<f32> = (0..48)
+            .map(|i| (i as f32 * 0.7).sin().abs() * 0.8)
+            .collect();
+        ui.set_imv_barras(ModelRc::new(VecModel::from(barras)));
+
+        // Espera a thread da capa e deixa as animações chegarem ao fim
+        for _ in 0..40 {
+            imv.tick(&ui, "pt-br");
+            slint::platform::update_timers_and_animations();
+            std::thread::sleep(Duration::from_millis(50));
+        }
+
+        let mut pixels = vec![PremultipliedRgbaColor::default(); (largura * altura) as usize];
+        janela.request_redraw();
+        janela.draw_if_needed(|r| {
+            r.render(&mut pixels, largura as usize);
+        });
+        let bytes: Vec<u8> = pixels
+            .iter()
+            .flat_map(|p| [p.red, p.green, p.blue, 255])
+            .collect();
+        let saida = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target/captura-imersivo.png");
+        image::RgbaImage::from_raw(largura, altura, bytes)
+            .expect("buffer")
+            .save(&saida)
+            .expect("salvar png");
+        println!("captura em {}", saida.display());
     }
 }

@@ -1,10 +1,16 @@
 import { Tema, BotaoIcone, BotaoTitulo, BarraDeslizante, CampoBusca, CaixaSelecao } from "theme.slint";
 import { I18n } from "i18n.slint";
+import { TelaImersiva } from "imersivo.slint";
 
 export component MainWindow inherits Window {
     title: "Furinar Audio Player";
-    width: 660px;
-    height: 734px;
+    // Tamanho fixo no modo normal; o imersivo libera para a tela cheia crescer
+    preferred-width: 660px;
+    preferred-height: 734px;
+    min-width: 660px;
+    min-height: 734px;
+    max-width: modo_imersivo ? 16384px : 660px;
+    max-height: modo_imersivo ? 16384px : 734px;
     background: Tema.fundo_janela;
 
     // Sem moldura nativa: a barra de título é nossa. O Slint (winit) ainda
@@ -40,6 +46,29 @@ export component MainWindow inherits Window {
     in-out property <bool> escanear_subpastas: false;
     /// Espelha `Tema.escuro` para o Rust conseguir ler e gravar o tema
     in-out property <bool> tema_escuro <=> Tema.escuro;
+
+    // Modo imersivo (tela cheia). Tudo abaixo só é preenchido pelo Rust
+    // enquanto o modo está ligado.
+    in property <bool> modo_imersivo: false;
+    in property <image> imv_fundo_a;
+    in property <image> imv_fundo_b;
+    in property <bool> imv_mostra_a: true;
+    in property <bool> imv_tem_fundo: false;
+    in property <bool> imv_fundo_pixelado: false;
+    in property <image> imv_capa;
+    in property <bool> imv_tem_capa: false;
+    in property <string> imv_titulo: "";
+    in property <string> imv_creditos: "";
+    in property <string> imv_tecnico: "";
+    in property <color> imv_cor: Tema.oceano;
+    in property <bool> imv_tem_cor: false;
+    in property <[float]> imv_barras: [];
+    /// Letra inteira e índice absoluto da linha atual (o painel normal usa só
+    /// um recorte; o imersivo rola o texto todo).
+    in property <[string]> letra_completa: [];
+    in property <int> letra_indice: -1;
+    callback alternar_imersivo();
+    callback letra_completa_clicada(int);
 
     callback abrir_pasta();
     callback anterior();
@@ -96,7 +125,13 @@ export component MainWindow inherits Window {
                 return reject;
             }
 
-            if (event.text == Key.Space) {
+            if (event.text == Key.F11) {
+                alternar_imersivo();
+                return accept;
+            } else if (event.text == Key.Escape && modo_imersivo) {
+                alternar_imersivo();
+                return accept;
+            } else if (event.text == Key.Space) {
                 play_pause();
                 return accept;
             } else if (event.text == Key.LeftArrow) {
@@ -139,443 +174,487 @@ export component MainWindow inherits Window {
         }
     }
 
-    // -------------------------------------------------------------
-    // Barra de título customizada
-    // -------------------------------------------------------------
+    // Interface normal: some no modo imersivo (não pinta nem por baixo)
     Rectangle {
-        x: 0px;
-        y: 0px;
-        width: parent.width;
-        height: altura_barra;
-        background: Tema.barra;
+        visible: !modo_imersivo;
 
-        // O Windows faz o arraste (com Aero Snap de graça)
-        WindowMoveArea {
-            HorizontalLayout {
-                padding-left: 10px;
-                padding-right: 4px;
-                spacing: 8px;
-                cross-axis-alignment: center;
+        // -------------------------------------------------------------
+        // Barra de título customizada
+        // -------------------------------------------------------------
+        Rectangle {
+            x: 0px;
+            y: 0px;
+            width: parent.width;
+            height: altura_barra;
+            background: Tema.barra;
 
-                Image {
-                    source: @image-url("assets/furinar_icon_quadrado.png");
-                    // A fonte pode não ser quadrada: recorta mantendo a proporção
-                    image-fit: contain;
-                    width: 20px;
-                    height: 20px;
-                }
-                Text {
-                    text: I18n.app_name;
-                    color: Tema.texto;
-                    font-size: 13px;
-                    font-weight: 600;
-                    vertical-alignment: center;
-                }
+            // O Windows faz o arraste (com Aero Snap de graça)
+            WindowMoveArea {
+                HorizontalLayout {
+                    padding-left: 10px;
+                    padding-right: 4px;
+                    spacing: 8px;
+                    cross-axis-alignment: center;
 
-                Rectangle { horizontal-stretch: 1; }
+                    Image {
+                        source: @image-url("assets/furinar_icon_quadrado.png");
+                        // A fonte pode não ser quadrada: recorta mantendo a proporção
+                        image-fit: contain;
+                        width: 20px;
+                        height: 20px;
+                    }
+                    Text {
+                        text: I18n.app_name;
+                        color: Tema.texto;
+                        font-size: 13px;
+                        font-weight: 600;
+                        vertical-alignment: center;
+                    }
 
-                BotaoTitulo {
-                    icone: @image-url("icons/minimizar.svg");
-                    dica: I18n.tip_minimize;
-                    clicado => { minimizar(); }
-                }
-                BotaoTitulo {
-                    icone: @image-url("icons/x.svg");
-                    dica: I18n.tip_close;
-                    perigo: true;
-                    clicado => { fecha_janela(); }
+                    Rectangle { horizontal-stretch: 1; }
+
+                    BotaoTitulo {
+                        icone: @image-url("icons/minimizar.svg");
+                        dica: I18n.tip_minimize;
+                        clicado => { minimizar(); }
+                    }
+                    BotaoTitulo {
+                        icone: @image-url("icons/x.svg");
+                        dica: I18n.tip_close;
+                        perigo: true;
+                        clicado => { fecha_janela(); }
+                    }
                 }
             }
         }
-    }
 
-    VerticalLayout {
-        // Abaixo da barra de título
-        y: altura_barra;
-        height: parent.height - altura_barra;
-        padding: 18px;
-        spacing: 14px;
+        VerticalLayout {
+            // Abaixo da barra de título
+            y: altura_barra;
+            height: parent.height - altura_barra;
+            padding: 18px;
+            spacing: 14px;
 
-        // -------------------------------------------------------------
-        // Controles: transportes à esquerda, modos à direita
-        // -------------------------------------------------------------
-        HorizontalLayout {
-            spacing: 8px;
-            height: 52px;
-            cross-axis-alignment: center;
-
-            HorizontalLayout {
-                spacing: 8px;
-                cross-axis-alignment: center;
-
-                BotaoIcone {
-                    icone: @image-url("icons/abrir.svg");
-                    dica: I18n.tip_open_folder;
-                    clicado => { abrir_pasta(); }
-                }
-                BotaoIcone {
-                    icone: @image-url("icons/anterior.svg");
-                    dica: I18n.tip_previous;
-                    clicado => { anterior(); }
-                }
-                BotaoIcone {
-                    icone: tocando ? @image-url("icons/pause.svg") : @image-url("icons/play.svg");
-                    dica: texto_play_pause;
-                    destaque: true;
-                    clicado => { play_pause(); }
-                }
-                BotaoIcone {
-                    icone: @image-url("icons/stop.svg");
-                    dica: I18n.tip_stop;
-                    clicado => { parar(); }
-                }
-                BotaoIcone {
-                    icone: @image-url("icons/proxima.svg");
-                    dica: I18n.tip_next;
-                    clicado => { proxima(); }
-                }
-            }
-
-            // Espaçador: empurra os modos para a direita
-            Rectangle { horizontal-stretch: 1; }
-
+            // -------------------------------------------------------------
+            // Controles: transportes à esquerda, modos à direita
+            // -------------------------------------------------------------
             HorizontalLayout {
                 spacing: 8px;
+                height: 52px;
                 cross-axis-alignment: center;
-
-                BotaoIcone {
-                    icone: @image-url("icons/loop.svg");
-                    dica: texto_loop;
-                    ativo: loop_ativo;
-                    clicado => { alternar_loop(); }
-                }
-                BotaoIcone {
-                    icone: @image-url("icons/shuffle.svg");
-                    dica: texto_shuffle;
-                    ativo: shuffle_modo != 0;
-                    intenso: shuffle_modo == 2;
-                    clicado => { alternar_shuffle(); }
-                }
-                BotaoIcone {
-                    icone: @image-url("icons/letra.svg");
-                    dica: I18n.tip_lyrics;
-                    ativo: mostrar_letra;
-                    clicado => { mostrar_letra = !mostrar_letra; }
-                }
-                BotaoIcone {
-                    icone: @image-url("icons/config.svg");
-                    dica: I18n.tip_settings;
-                    clicado => { config_popup.show(); }
-                }
-            }
-        }
-
-        // -------------------------------------------------------------
-        // Sliders: volume, progresso e tempo
-        // -------------------------------------------------------------
-        HorizontalLayout {
-            spacing: 12px;
-            height: 26px;
-            cross-axis-alignment: center;
-
-            BarraDeslizante {
-                width: 110px;
-                valor <=> volume;
-                mudou(v) => { volume_mudou(v); }
-            }
-            BarraDeslizante {
-                width: 340px;
-                valor <=> progresso;
-                ao_vivo: false;
-                mudou(v) => { progresso_mudou(v); }
-            }
-            Text {
-                text: texto_tempo;
-                color: Tema.texto_suave;
-                font-size: 13px;
-                vertical-alignment: center;
-            }
-        }
-
-        // -------------------------------------------------------------
-        // Busca
-        // -------------------------------------------------------------
-        busca := CampoBusca {
-            texto <=> texto_busca;
-            placeholder: I18n.search_placeholder;
-            editado(t) => { busca_mudou(t); }
-            // Enter na busca devolve o foco aos atalhos
-            aceito(t) => { atalhos.focus(); }
-        }
-
-        // -------------------------------------------------------------
-        // Abas das pastas. Trocar de aba só muda o que a lista exibe:
-        // a reprodução continua na pasta de onde a faixa veio.
-        // -------------------------------------------------------------
-        HorizontalLayout {
-            height: 34px;
-            spacing: 8px;
-            cross-axis-alignment: center;
-
-            Flickable {
-                horizontal-stretch: 1;
-                height: 32px;
-                content-width: abas.length * (largura_aba + 6px);
-                content-height: 32px;
 
                 HorizontalLayout {
-                    alignment: start;
-                    spacing: 6px;
+                    spacing: 8px;
+                    cross-axis-alignment: center;
 
-                    for nome[i] in abas: Rectangle {
-                        width: largura_aba;
-                        height: 32px;
-                        border-radius: 8px;
-                        background: i == aba_ativa ? Tema.oceano.with-alpha(0.16) : Tema.neutro;
-                        border-width: 1px;
-                        border-color: i == aba_ativa ? Tema.oceano.with-alpha(0.45) : Tema.borda;
-                        clip: true;
-                        animate background, border-color { duration: 130ms; }
+                    BotaoIcone {
+                        icone: @image-url("icons/abrir.svg");
+                        dica: I18n.tip_open_folder;
+                        clicado => { abrir_pasta(); }
+                    }
+                    BotaoIcone {
+                        icone: @image-url("icons/anterior.svg");
+                        dica: I18n.tip_previous;
+                        clicado => { anterior(); }
+                    }
+                    BotaoIcone {
+                        icone: tocando ? @image-url("icons/pause.svg") : @image-url("icons/play.svg");
+                        dica: texto_play_pause;
+                        destaque: true;
+                        clicado => { play_pause(); }
+                    }
+                    BotaoIcone {
+                        icone: @image-url("icons/stop.svg");
+                        dica: I18n.tip_stop;
+                        clicado => { parar(); }
+                    }
+                    BotaoIcone {
+                        icone: @image-url("icons/proxima.svg");
+                        dica: I18n.tip_next;
+                        clicado => { proxima(); }
+                    }
+                }
 
-                        TouchArea {
-                            clicked => {
-                                aba_selecionada(i);
-                                atalhos.focus();
+                // Espaçador: empurra os modos para a direita
+                Rectangle { horizontal-stretch: 1; }
+
+                HorizontalLayout {
+                    spacing: 8px;
+                    cross-axis-alignment: center;
+
+                    BotaoIcone {
+                        icone: @image-url("icons/loop.svg");
+                        dica: texto_loop;
+                        ativo: loop_ativo;
+                        clicado => { alternar_loop(); }
+                    }
+                    BotaoIcone {
+                        icone: @image-url("icons/shuffle.svg");
+                        dica: texto_shuffle;
+                        ativo: shuffle_modo != 0;
+                        intenso: shuffle_modo == 2;
+                        clicado => { alternar_shuffle(); }
+                    }
+                    BotaoIcone {
+                        icone: @image-url("icons/letra.svg");
+                        dica: I18n.tip_lyrics;
+                        ativo: mostrar_letra;
+                        clicado => { mostrar_letra = !mostrar_letra; }
+                    }
+                    BotaoIcone {
+                        icone: @image-url("icons/tela_cheia.svg");
+                        dica: I18n.tip_immersive;
+                        clicado => { alternar_imersivo(); }
+                    }
+                    BotaoIcone {
+                        icone: @image-url("icons/config.svg");
+                        dica: I18n.tip_settings;
+                        clicado => { config_popup.show(); }
+                    }
+                }
+            }
+
+            // -------------------------------------------------------------
+            // Sliders: volume, progresso e tempo
+            // -------------------------------------------------------------
+            HorizontalLayout {
+                spacing: 12px;
+                height: 26px;
+                cross-axis-alignment: center;
+
+                BarraDeslizante {
+                    width: 110px;
+                    valor <=> volume;
+                    mudou(v) => { volume_mudou(v); }
+                }
+                BarraDeslizante {
+                    width: 340px;
+                    valor <=> progresso;
+                    ao_vivo: false;
+                    mudou(v) => { progresso_mudou(v); }
+                }
+                Text {
+                    text: texto_tempo;
+                    color: Tema.texto_suave;
+                    font-size: 13px;
+                    vertical-alignment: center;
+                }
+            }
+
+            // -------------------------------------------------------------
+            // Busca
+            // -------------------------------------------------------------
+            busca := CampoBusca {
+                texto <=> texto_busca;
+                placeholder: I18n.search_placeholder;
+                editado(t) => { busca_mudou(t); }
+                // Enter na busca devolve o foco aos atalhos
+                aceito(t) => { atalhos.focus(); }
+            }
+
+            // -------------------------------------------------------------
+            // Abas das pastas. Trocar de aba só muda o que a lista exibe:
+            // a reprodução continua na pasta de onde a faixa veio.
+            // -------------------------------------------------------------
+            HorizontalLayout {
+                height: 34px;
+                spacing: 8px;
+                cross-axis-alignment: center;
+
+                Flickable {
+                    horizontal-stretch: 1;
+                    height: 32px;
+                    content-width: abas.length * (largura_aba + 6px);
+                    content-height: 32px;
+
+                    HorizontalLayout {
+                        alignment: start;
+                        spacing: 6px;
+
+                        for nome[i] in abas: Rectangle {
+                            width: largura_aba;
+                            height: 32px;
+                            border-radius: 8px;
+                            background: i == aba_ativa ? Tema.oceano.with-alpha(0.16) : Tema.neutro;
+                            border-width: 1px;
+                            border-color: i == aba_ativa ? Tema.oceano.with-alpha(0.45) : Tema.borda;
+                            clip: true;
+                            animate background, border-color { duration: 130ms; }
+
+                            TouchArea {
+                                clicked => {
+                                    aba_selecionada(i);
+                                    atalhos.focus();
+                                }
+                            }
+
+                            // Sublinhado da aba ativa
+                            Rectangle {
+                                visible: i == aba_ativa;
+                                x: 10px;
+                                y: parent.height - 4px;
+                                width: parent.width - 20px;
+                                height: 2px;
+                                border-radius: 1px;
+                                background: Tema.oceano;
+                            }
+
+                            Text {
+                                x: 12px;
+                                y: 0px;
+                                width: parent.width - 50px;
+                                height: parent.height - 4px;
+                                text: nome;
+                                color: i == aba_ativa ? Tema.texto : Tema.texto_suave;
+                                font-size: 13px;
+                                vertical-alignment: center;
+                                wrap: no-wrap;
+                                overflow: elide;
+                            }
+
+                            // Pontinho dourado: de onde vem o som agora
+                            Rectangle {
+                                visible: i == aba_tocando;
+                                x: parent.width - 32px;
+                                y: (parent.height - self.height) / 2;
+                                width: 6px;
+                                height: 6px;
+                                border-radius: 3px;
+                                background: Tema.dourado;
+                            }
+
+                            // Fechar: só na aba ativa, para não poluir
+                            Rectangle {
+                                visible: i == aba_ativa;
+                                x: parent.width - 22px;
+                                y: 8px;
+                                width: 16px;
+                                height: 16px;
+                                border-radius: 4px;
+                                background: transparent;
+                                animate background { duration: 120ms; }
+
+                                Image {
+                                    source: @image-url("icons/x.svg");
+                                    width: 10px;
+                                    height: 10px;
+                                    x: (parent.width - self.width) / 2;
+                                    y: (parent.height - self.height) / 2;
+                                    colorize: Tema.texto_suave;
+                                }
+
+                                fechar_touch := TouchArea {
+                                    clicked => { fechar_aba(i); }
+                                }
+
+                                states [
+                                    hover when fechar_touch.has-hover : {
+                                        background: Tema.neutro_hover;
+                                    }
+                                ]
                             }
                         }
+                    }
+                }
 
-                        // Sublinhado da aba ativa
-                        Rectangle {
-                            visible: i == aba_ativa;
-                            x: 10px;
-                            y: parent.height - 4px;
-                            width: parent.width - 20px;
-                            height: 2px;
-                            border-radius: 1px;
-                            background: Tema.oceano;
+                // Abrir mais uma pasta
+                Rectangle {
+                    width: 32px;
+                    height: 32px;
+                    border-radius: 8px;
+                    background: Tema.neutro;
+                    border-width: 1px;
+                    border-color: Tema.borda;
+                    animate background, border-color { duration: 130ms; }
+
+                    Image {
+                        source: @image-url("icons/mais.svg");
+                        width: 14px;
+                        height: 14px;
+                        x: (parent.width - self.width) / 2;
+                        y: (parent.height - self.height) / 2;
+                        colorize: Tema.texto;
+                    }
+
+                    mais_touch := TouchArea {
+                        clicked => {
+                            abrir_pasta();
+                            atalhos.focus();
                         }
+                    }
+
+                    states [
+                        hover when mais_touch.has-hover : {
+                            background: Tema.neutro_hover;
+                            border-color: Tema.oceano.with-alpha(0.42);
+                        }
+                    ]
+                }
+            }
+
+            // -------------------------------------------------------------
+            // Conteúdo: playlist ou painel de letra, no mesmo espaço
+            // -------------------------------------------------------------
+            conteudo := Rectangle {
+                // Absorve o espaço restante: sem isso o Flickable propaga o tamanho
+                // do conteúdo como preferred e o layout estoura a janela.
+                vertical-stretch: 1;
+                preferred-height: 0px;
+                background: Tema.painel_fosco;
+                border-radius: 12px;
+                border-width: 1px;
+                border-color: Tema.borda;
+                clip: true;
+
+                lista := Flickable {
+                    visible: !mostrar_letra;
+                    x: 0px;
+                    y: 0px;
+                    width: parent.width;
+                    height: parent.height;
+                    content-height: musicas.length * altura_linha;
+
+                    VerticalLayout {
+                        alignment: start;
+
+                        for musica[i] in musicas: Rectangle {
+                            height: altura_linha;
+                            background: i == indice_selecionado ? Tema.selecao : transparent;
+
+                            // Barrinha dourada marcando a linha selecionada
+                            Rectangle {
+                                visible: i == indice_selecionado;
+                                x: 0px;
+                                y: 5px;
+                                width: 3px;
+                                height: parent.height - 10px;
+                                border-radius: 2px;
+                                background: Tema.dourado;
+                            }
+
+                            Text {
+                                text: musica;
+                                color: Tema.texto;
+                                font-size: 13px;
+                                vertical-alignment: center;
+                                x: 14px;
+                            }
+
+                            TouchArea {
+                                clicked => {
+                                    musica_selecionada(i);
+                                    // Devolve o foco para os atalhos de teclado
+                                    atalhos.focus();
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Painel de letra: sobrepõe exatamente a área da lista
+                painel_letra := Rectangle {
+                    visible: mostrar_letra;
+                    x: 0px;
+                    y: 0px;
+                    width: parent.width;
+                    height: parent.height;
+                    background: transparent;
+
+                    if letra.length == 0 : VerticalLayout {
+                        x: 0px;
+                        y: 0px;
+                        width: painel_letra.width;
+                        height: painel_letra.height;
+                        alignment: center;
+                        padding: 20px;
 
                         Text {
-                            x: 12px;
-                            y: 0px;
-                            width: parent.width - 50px;
-                            height: parent.height - 4px;
-                            text: nome;
-                            color: i == aba_ativa ? Tema.texto : Tema.texto_suave;
+                            text: I18n.no_lyrics;
+                            color: Tema.texto_suave;
                             font-size: 13px;
-                            vertical-alignment: center;
-                            wrap: no-wrap;
-                            overflow: elide;
+                            horizontal-alignment: center;
+                            wrap: word-wrap;
                         }
+                    }
 
-                        // Pontinho dourado: de onde vem o som agora
-                        Rectangle {
-                            visible: i == aba_tocando;
-                            x: parent.width - 32px;
-                            y: (parent.height - self.height) / 2;
-                            width: 6px;
-                            height: 6px;
-                            border-radius: 3px;
-                            background: Tema.dourado;
-                        }
+                    if letra.length > 0 : VerticalLayout {
+                        x: 0px;
+                        y: 0px;
+                        width: painel_letra.width;
+                        height: painel_letra.height;
+                        alignment: center;
+                        padding: 14px;
+                        spacing: 2px;
 
-                        // Fechar: só na aba ativa, para não poluir
-                        Rectangle {
-                            visible: i == aba_ativa;
-                            x: parent.width - 22px;
-                            y: 8px;
-                            width: 16px;
-                            height: 16px;
-                            border-radius: 4px;
+                        for linha[i] in letra: Rectangle {
+                            height: altura_letra_linha;
                             background: transparent;
                             animate background { duration: 120ms; }
 
-                            Image {
-                                source: @image-url("icons/x.svg");
-                                width: 10px;
-                                height: 10px;
-                                x: (parent.width - self.width) / 2;
-                                y: (parent.height - self.height) / 2;
-                                colorize: Tema.texto_suave;
+                            Text {
+                                x: 12px;
+                                y: 0px;
+                                width: parent.width - 24px;
+                                height: parent.height;
+                                text: linha;
+                                color: i == letra_destaque ? Tema.dourado : Tema.texto.with-alpha(0.62);
+                                font-size: i == letra_destaque ? 19px : 15px;
+                                font-weight: i == letra_destaque ? 700 : 400;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                                wrap: no-wrap;
+                                overflow: elide;
                             }
 
-                            fechar_touch := TouchArea {
-                                clicked => { fechar_aba(i); }
+                            // Clicar numa linha pula a música para aquele trecho
+                            letra_touch := TouchArea {
+                                clicked => { letra_linha_clicada(i); }
                             }
 
                             states [
-                                hover when fechar_touch.has-hover : {
-                                    background: Tema.neutro_hover;
+                                hover when letra_touch.has-hover : {
+                                    background: Tema.oceano.with-alpha(0.10);
                                 }
                             ]
                         }
                     }
                 }
             }
-
-            // Abrir mais uma pasta
-            Rectangle {
-                width: 32px;
-                height: 32px;
-                border-radius: 8px;
-                background: Tema.neutro;
-                border-width: 1px;
-                border-color: Tema.borda;
-                animate background, border-color { duration: 130ms; }
-
-                Image {
-                    source: @image-url("icons/mais.svg");
-                    width: 14px;
-                    height: 14px;
-                    x: (parent.width - self.width) / 2;
-                    y: (parent.height - self.height) / 2;
-                    colorize: Tema.texto;
-                }
-
-                mais_touch := TouchArea {
-                    clicked => {
-                        abrir_pasta();
-                        atalhos.focus();
-                    }
-                }
-
-                states [
-                    hover when mais_touch.has-hover : {
-                        background: Tema.neutro_hover;
-                        border-color: Tema.oceano.with-alpha(0.42);
-                    }
-                ]
-            }
         }
+    }
 
-        // -------------------------------------------------------------
-        // Conteúdo: playlist ou painel de letra, no mesmo espaço
-        // -------------------------------------------------------------
-        conteudo := Rectangle {
-            // Absorve o espaço restante: sem isso o Flickable propaga o tamanho
-            // do conteúdo como preferred e o layout estoura a janela.
-            vertical-stretch: 1;
-            preferred-height: 0px;
-            background: Tema.painel_fosco;
-            border-radius: 12px;
-            border-width: 1px;
-            border-color: Tema.borda;
-            clip: true;
-
-            lista := Flickable {
-                visible: !mostrar_letra;
-                x: 0px;
-                y: 0px;
-                width: parent.width;
-                height: parent.height;
-                content-height: musicas.length * altura_linha;
-
-                VerticalLayout {
-                    alignment: start;
-
-                    for musica[i] in musicas: Rectangle {
-                        height: altura_linha;
-                        background: i == indice_selecionado ? Tema.selecao : transparent;
-
-                        // Barrinha dourada marcando a linha selecionada
-                        Rectangle {
-                            visible: i == indice_selecionado;
-                            x: 0px;
-                            y: 5px;
-                            width: 3px;
-                            height: parent.height - 10px;
-                            border-radius: 2px;
-                            background: Tema.dourado;
-                        }
-
-                        Text {
-                            text: musica;
-                            color: Tema.texto;
-                            font-size: 13px;
-                            vertical-alignment: center;
-                            x: 14px;
-                        }
-
-                        TouchArea {
-                            clicked => {
-                                musica_selecionada(i);
-                                // Devolve o foco para os atalhos de teclado
-                                atalhos.focus();
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Painel de letra: sobrepõe exatamente a área da lista
-            painel_letra := Rectangle {
-                visible: mostrar_letra;
-                x: 0px;
-                y: 0px;
-                width: parent.width;
-                height: parent.height;
-                background: transparent;
-
-                if letra.length == 0 : VerticalLayout {
-                    x: 0px;
-                    y: 0px;
-                    width: painel_letra.width;
-                    height: painel_letra.height;
-                    alignment: center;
-                    padding: 20px;
-
-                    Text {
-                        text: I18n.no_lyrics;
-                        color: Tema.texto_suave;
-                        font-size: 13px;
-                        horizontal-alignment: center;
-                        wrap: word-wrap;
-                    }
-                }
-
-                if letra.length > 0 : VerticalLayout {
-                    x: 0px;
-                    y: 0px;
-                    width: painel_letra.width;
-                    height: painel_letra.height;
-                    alignment: center;
-                    padding: 14px;
-                    spacing: 2px;
-
-                    for linha[i] in letra: Rectangle {
-                        height: altura_letra_linha;
-                        background: transparent;
-                        animate background { duration: 120ms; }
-
-                        Text {
-                            x: 12px;
-                            y: 0px;
-                            width: parent.width - 24px;
-                            height: parent.height;
-                            text: linha;
-                            color: i == letra_destaque ? Tema.dourado : Tema.texto.with-alpha(0.62);
-                            font-size: i == letra_destaque ? 19px : 15px;
-                            font-weight: i == letra_destaque ? 700 : 400;
-                            horizontal-alignment: center;
-                            vertical-alignment: center;
-                            wrap: no-wrap;
-                            overflow: elide;
-                        }
-
-                        // Clicar numa linha pula a música para aquele trecho
-                        letra_touch := TouchArea {
-                            clicked => { letra_linha_clicada(i); }
-                        }
-
-                        states [
-                            hover when letra_touch.has-hover : {
-                                background: Tema.oceano.with-alpha(0.10);
-                            }
-                        ]
-                    }
-                }
-            }
-        }
+    if modo_imersivo : TelaImersiva {
+        width: parent.width;
+        height: parent.height;
+        fundo_a: imv_fundo_a;
+        fundo_b: imv_fundo_b;
+        mostra_a: imv_mostra_a;
+        tem_fundo: imv_tem_fundo;
+        fundo_pixelado: imv_fundo_pixelado;
+        capa: imv_capa;
+        tem_capa: imv_tem_capa;
+        titulo: imv_titulo;
+        creditos: imv_creditos;
+        tecnico: imv_tecnico;
+        cor: imv_tem_cor ? imv_cor : Tema.oceano;
+        letra: letra_completa;
+        letra_indice: letra_indice;
+        barras: imv_barras;
+        tocando: tocando;
+        loop_ativo: loop_ativo;
+        shuffle_modo: shuffle_modo;
+        texto_tempo: texto_tempo;
+        volume <=> volume;
+        progresso <=> progresso;
+        sair => { alternar_imersivo(); }
+        anterior => { anterior(); }
+        play_pause => { play_pause(); }
+        proxima => { proxima(); }
+        alternar_loop => { alternar_loop(); }
+        alternar_shuffle => { alternar_shuffle(); }
+        volume_mudou(v) => { volume_mudou(v); }
+        progresso_mudou(v) => { progresso_mudou(v); }
+        letra_clicada(i) => { letra_completa_clicada(i); }
     }
 
     // -------------------------------------------------------------

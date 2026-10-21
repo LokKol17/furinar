@@ -124,6 +124,9 @@ export component BarraDeslizante inherits Rectangle {
     // (reabre arquivo, recria o Sink) — caro o bastante pra travar o app
     // se disparado dezenas de vezes por segundo durante o arrasto.
     in property <bool> ao_vivo: true;
+    /// Cor do preenchimento (o modo imersivo usa a cor da capa)
+    in property <color> cor: Tema.oceano;
+    in property <color> cor_trilha: Tema.neutro;
     callback mudou(float);
 
     height: 22px;
@@ -138,7 +141,7 @@ export component BarraDeslizante inherits Rectangle {
         height: 6px;
         y: (parent.height - self.height) / 2;
         border-radius: 3px;
-        background: Tema.neutro;
+        background: root.cor_trilha;
         border-width: 1px;
         border-color: Tema.borda;
     }
@@ -151,7 +154,7 @@ export component BarraDeslizante inherits Rectangle {
         height: 6px;
         y: (parent.height - self.height) / 2;
         border-radius: 3px;
-        background: @linear-gradient(90deg, Tema.oceano, Tema.oceano.brighter(0.18));
+        background: @linear-gradient(90deg, root.cor, root.cor.brighter(0.18));
     }
 
     polegar := Rectangle {
@@ -196,7 +199,7 @@ export component BarraDeslizante inherits Rectangle {
 
     states [
         hover when touch.has-hover : {
-            polegar.drop-shadow-color: Tema.oceano.with-alpha(0.70);
+            polegar.drop-shadow-color: root.cor.with-alpha(0.70);
             polegar.drop-shadow-blur: 6px;
         }
     ]

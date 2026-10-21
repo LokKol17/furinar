@@ -1,0 +1,415 @@
+// ---------------------------------------------------------------------
+// Modo imersivo: tela cheia focada no visual
+//
+// Só existe enquanto o modo está ligado (`if` no MainWindow), então nada
+// daqui pesa no modo normal. As imagens e a cor chegam prontas do Rust.
+// ---------------------------------------------------------------------
+
+import { Tema, BarraDeslizante } from "theme.slint";
+import { I18n } from "i18n.slint";
+
+// Botão redondo e translúcido, para ficar sobre qualquer fundo
+component BotaoImersivo inherits Rectangle {
+    in property <image> icone;
+    in property <string> dica: "";
+    in property <bool> ativo: false;
+    in property <bool> grande: false;
+    in property <color> cor: Tema.oceano;
+    callback clicado();
+
+    width: grande ? 48px : 36px;
+    height: self.width;
+    border-radius: self.width / 2;
+    background: grande ? #ffffff : (touch.has-hover ? #ffffff26 : transparent);
+    accessible-role: button;
+    accessible-label: root.dica;
+    animate background { duration: 120ms; }
+
+    Image {
+        source: root.icone;
+        width: grande ? 22px : 18px;
+        height: self.width;
+        x: (root.width - self.width) / 2;
+        y: (root.height - self.height) / 2;
+        colorize: grande ? #0b1a2b : (root.ativo ? root.cor : #ffffffdd);
+        animate colorize { duration: 200ms; }
+    }
+
+    touch := TouchArea {
+        clicked => { root.clicado(); }
+    }
+
+    states [
+        pressionado when touch.pressed : {
+            opacity: 0.7;
+        }
+    ]
+}
+
+export component TelaImersiva inherits Rectangle {
+    // Fundo: duas camadas para o crossfade. O Rust escreve na camada oculta e
+    // inverte `mostra_a`; quadros de animação vão direto na camada visível.
+    in property <image> fundo_a;
+    in property <image> fundo_b;
+    in property <bool> mostra_a: true;
+    in property <bool> tem_fundo: false;
+    in property <bool> fundo_pixelado: false;
+
+    in property <image> capa;
+    in property <bool> tem_capa: false;
+    in property <string> titulo: "";
+    in property <string> creditos: "";
+    in property <string> tecnico: "";
+    in property <color> cor: Tema.oceano;
+
+    in property <[string]> letra: [];
+    in property <int> letra_indice: -1;
+    in property <[float]> barras: [];
+
+    in property <bool> tocando: false;
+    in property <bool> loop_ativo: false;
+    in property <int> shuffle_modo: 0;
+    in property <string> texto_tempo: "";
+    in-out property <float> volume: 0;
+    in-out property <float> progresso: 0;
+
+    callback sair();
+    callback anterior();
+    callback play_pause();
+    callback proxima();
+    callback alternar_loop();
+    callback alternar_shuffle();
+    callback volume_mudou(float);
+    callback progresso_mudou(float);
+    callback letra_clicada(int);
+
+    background: #05080d;
+
+    /// Controles escondidos depois de alguns segundos sem mexer o mouse
+    property <bool> ocioso: false;
+    property <color> destaque: root.cor;
+    animate destaque { duration: 700ms; easing: ease-in-out; }
+
+    property <length> altura_linha: 46px;
+    property <length> margem: 28px;
+    property <length> lado_capa: min(190px, root.height * 0.2);
+    // Rodapé, de baixo para cima: controles, progresso, visualizador, cartão
+    property <length> y_progresso: root.height - 96px;
+    property <length> altura_visualizador: 56px;
+    property <length> y_visualizador: root.y_progresso - 10px - root.altura_visualizador;
+    property <length> y_cartao: root.y_visualizador - 18px - root.lado_capa;
+
+    function acordar() {
+        root.ocioso = false;
+        auto_hide.restart();
+    }
+
+    // Sem imagem: gradiente tingido pela cor da capa
+    Rectangle {
+        background: @linear-gradient(160deg, root.destaque.darker(0.75), #05080d 70%);
+    }
+
+    // Fundo (capa desfocada, imagem, GIF ou vídeo)
+    Image {
+        visible: root.tem_fundo;
+        width: 100%;
+        height: 100%;
+        source: root.fundo_a;
+        image-fit: cover;
+        image-rendering: root.fundo_pixelado ? ImageRendering.pixelated : ImageRendering.smooth;
+        opacity: root.mostra_a ? 1 : 0;
+        animate opacity { duration: 600ms; easing: ease-in-out; }
+    }
+    Image {
+        visible: root.tem_fundo;
+        width: 100%;
+        height: 100%;
+        source: root.fundo_b;
+        image-fit: cover;
+        image-rendering: root.fundo_pixelado ? ImageRendering.pixelated : ImageRendering.smooth;
+        opacity: root.mostra_a ? 0 : 1;
+        animate opacity { duration: 600ms; easing: ease-in-out; }
+    }
+
+    // Véu: escurece mais no rodapé, para o texto ler. Duas paradas só: com
+    // uma parada no meio o renderer de software deixa uma linha na emenda.
+    Rectangle {
+        background: @linear-gradient(180deg, #00000030 0%, #000000c8 100%);
+    }
+
+    // Área inteira: mouse se mexendo acorda os controles. Fica embaixo dos
+    // botões, que continuam recebendo o clique.
+    area := TouchArea {
+        mouse-cursor: root.ocioso ? MouseCursor.none : MouseCursor.default;
+        changed mouse-x => { root.acordar(); }
+        changed mouse-y => { root.acordar(); }
+    }
+
+    auto_hide := Timer {
+        interval: 3s;
+        running: !root.ocioso;
+        triggered => { root.ocioso = true; }
+    }
+
+    // -------------------------------------------------------------
+    // Letra (ou título, quando não há letra)
+    // -------------------------------------------------------------
+    letra_area := Rectangle {
+        x: root.width * 0.12;
+        y: root.height * 0.06;
+        width: root.width * 0.76;
+        height: root.y_cartao - 24px - self.y;
+        clip: true;
+
+        // Desloca o bloco para a linha atual ficar no centro
+        property <length> desloc: self.height / 2 - (max(0, root.letra_indice) + 0.5) * root.altura_linha;
+        animate desloc { duration: 450ms; easing: ease-out; }
+
+        for linha[i] in root.letra: Rectangle {
+            x: 0px;
+            y: letra_area.desloc + i * root.altura_linha;
+            width: letra_area.width;
+            height: root.altura_linha;
+
+            property <int> distancia: abs(i - root.letra_indice);
+
+            Text {
+                width: parent.width;
+                height: parent.height;
+                text: linha;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+                wrap: no-wrap;
+                overflow: elide;
+                color: i == root.letra_indice ? #ffffff : #ffffff.with-alpha(max(0.18, 0.75 - parent.distancia * 0.14));
+                font-size: i == root.letra_indice ? 32px : 20px;
+                font-weight: i == root.letra_indice ? 800 : 500;
+                animate font-size, color { duration: 300ms; easing: ease-out; }
+            }
+
+            TouchArea {
+                mouse-cursor: root.ocioso ? MouseCursor.none : MouseCursor.pointer;
+                clicked => { root.letra_clicada(i); }
+            }
+        }
+
+        // Sem letra: o título ocupa o centro
+        if root.letra.length == 0 : VerticalLayout {
+            alignment: center;
+            spacing: 10px;
+
+            Text {
+                text: root.titulo;
+                color: #ffffff;
+                font-size: 40px;
+                font-weight: 800;
+                horizontal-alignment: center;
+                wrap: word-wrap;
+            }
+            Text {
+                text: root.creditos;
+                color: #ffffffb0;
+                font-size: 18px;
+                horizontal-alignment: center;
+                wrap: word-wrap;
+            }
+        }
+    }
+
+    // -------------------------------------------------------------
+    // Cartão da capa + informações
+    // -------------------------------------------------------------
+    cartao := Rectangle {
+        x: root.margem;
+        y: root.y_cartao;
+        width: root.lado_capa;
+        height: root.lado_capa;
+        border-radius: 6px;
+        background: #ffffff;
+        drop-shadow-blur: 24px;
+        drop-shadow-color: #00000090;
+        drop-shadow-offset-y: 6px;
+
+        Rectangle {
+            x: 6px;
+            y: 6px;
+            width: parent.width - 12px;
+            height: parent.height - 12px;
+            border-radius: 3px;
+            clip: true;
+            background: @linear-gradient(135deg, root.destaque, root.destaque.darker(0.6));
+
+            if root.tem_capa : Image {
+                width: parent.width;
+                height: parent.height;
+                source: root.capa;
+                image-fit: cover;
+            }
+            if !root.tem_capa : Image {
+                source: @image-url("icons/letra.svg");
+                width: parent.width * 0.35;
+                height: self.width;
+                x: (parent.width - self.width) / 2;
+                y: (parent.height - self.height) / 2;
+                colorize: #ffffffcc;
+            }
+        }
+    }
+
+    VerticalLayout {
+        x: cartao.x + cartao.width + 24px;
+        y: cartao.y;
+        width: root.width - self.x - root.margem;
+        height: cartao.height;
+        alignment: end;
+        spacing: 4px;
+
+        Text {
+            text: root.titulo;
+            color: #ffffff;
+            font-size: 28px;
+            font-weight: 800;
+            overflow: elide;
+        }
+        Text {
+            visible: root.creditos != "";
+            text: root.creditos;
+            color: #ffffffd0;
+            font-size: 15px;
+            overflow: elide;
+        }
+        Text {
+            visible: root.tecnico != "";
+            text: root.tecnico;
+            color: #ffffff90;
+            font-size: 13px;
+            overflow: elide;
+        }
+    }
+
+    // -------------------------------------------------------------
+    // Visualizador
+    // -------------------------------------------------------------
+    visualizador := Rectangle {
+        x: root.margem;
+        width: root.width - 2 * root.margem;
+        height: root.altura_visualizador;
+        y: root.y_visualizador;
+        visible: root.barras.length > 0;
+
+        property <length> passo: self.width / max(1, root.barras.length);
+
+        for b[i] in root.barras: Rectangle {
+            x: i * visualizador.passo + 1px;
+            width: visualizador.passo - 2px;
+            height: max(2px, b * visualizador.height);
+            y: visualizador.height - self.height;
+            border-radius: 2px;
+            background: root.destaque.with-alpha(0.55);
+        }
+    }
+
+    // -------------------------------------------------------------
+    // Controles (somem quando ocioso)
+    // -------------------------------------------------------------
+    controles := Rectangle {
+        opacity: root.ocioso ? 0 : 1;
+        animate opacity { duration: 450ms; easing: ease-in-out; }
+
+        BotaoImersivo {
+            x: 18px;
+            y: 18px;
+            icone: @image-url("icons/voltar.svg");
+            dica: I18n.tip_exit_immersive;
+            clicado => { root.sair(); }
+        }
+
+        HorizontalLayout {
+            x: root.margem;
+            y: root.y_progresso;
+            width: root.width - 2 * root.margem;
+            height: 26px;
+            spacing: 14px;
+
+            Text {
+                text: root.texto_tempo;
+                color: #ffffffd0;
+                font-size: 13px;
+                vertical-alignment: center;
+            }
+            BarraDeslizante {
+                horizontal-stretch: 1;
+                valor <=> root.progresso;
+                ao_vivo: false;
+                cor: root.destaque;
+                cor_trilha: #ffffff2e;
+                mudou(v) => { root.progresso_mudou(v); }
+            }
+        }
+
+        HorizontalLayout {
+            x: root.margem - 6px;
+            y: root.height - 64px;
+            width: root.width - 2 * root.margem + 12px;
+            height: 52px;
+            spacing: 8px;
+
+            BotaoImersivo {
+                y: (parent.height - self.height) / 2;
+                icone: @image-url("icons/anterior.svg");
+                dica: I18n.tip_previous;
+                clicado => { root.anterior(); }
+            }
+            BotaoImersivo {
+                y: (parent.height - self.height) / 2;
+                grande: true;
+                icone: root.tocando ? @image-url("icons/pause.svg") : @image-url("icons/play.svg");
+                clicado => { root.play_pause(); }
+            }
+            BotaoImersivo {
+                y: (parent.height - self.height) / 2;
+                icone: @image-url("icons/proxima.svg");
+                dica: I18n.tip_next;
+                clicado => { root.proxima(); }
+            }
+            BotaoImersivo {
+                y: (parent.height - self.height) / 2;
+                icone: @image-url("icons/shuffle.svg");
+                ativo: root.shuffle_modo != 0;
+                cor: root.destaque;
+                clicado => { root.alternar_shuffle(); }
+            }
+            BotaoImersivo {
+                y: (parent.height - self.height) / 2;
+                icone: @image-url("icons/loop.svg");
+                ativo: root.loop_ativo;
+                cor: root.destaque;
+                clicado => { root.alternar_loop(); }
+            }
+            Image {
+                y: (parent.height - self.height) / 2;
+                source: @image-url("icons/volume.svg");
+                width: 18px;
+                height: 18px;
+                colorize: #ffffffdd;
+            }
+            BarraDeslizante {
+                y: (parent.height - self.height) / 2;
+                width: 120px;
+                valor <=> root.volume;
+                cor: root.destaque;
+                cor_trilha: #ffffff2e;
+                mudou(v) => { root.volume_mudou(v); }
+            }
+
+            Rectangle { horizontal-stretch: 1; }
+
+            BotaoImersivo {
+                y: (parent.height - self.height) / 2;
+                icone: @image-url("icons/sair_tela_cheia.svg");
+                dica: I18n.tip_exit_immersive;
+                clicado => { root.sair(); }
+            }
+        }
+    }
+}

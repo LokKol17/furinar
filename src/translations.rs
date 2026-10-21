@@ -13,6 +13,11 @@ pub fn pt_br() -> Translations {
     t.insert("tip_next", "Próxima");
     t.insert("tip_lyrics", "Letra");
     t.insert("tip_settings", "Configurações");
+    t.insert("tip_immersive", "Modo imersivo (F11)");
+    t.insert("tip_exit_immersive", "Sair do modo imersivo (Esc)");
+    t.insert("stereo", "Estéreo");
+    t.insert("mono", "Mono");
+    t.insert("decimal_sep", ",");
     t.insert("search_placeholder", "Buscar por título ou artista...");
     t.insert("no_lyrics", "Sem letra disponível para esta faixa.");
     t.insert("config_title", "Configurações");
@@ -49,6 +54,11 @@ pub fn en() -> Translations {
     t.insert("tip_next", "Next");
     t.insert("tip_lyrics", "Lyrics");
     t.insert("tip_settings", "Settings");
+    t.insert("tip_immersive", "Immersive mode (F11)");
+    t.insert("tip_exit_immersive", "Exit immersive mode (Esc)");
+    t.insert("stereo", "Stereo");
+    t.insert("mono", "Mono");
+    t.insert("decimal_sep", ".");
     t.insert("search_placeholder", "Search by title or artist...");
     t.insert("no_lyrics", "No lyrics available for this track.");
     t.insert("config_title", "Settings");

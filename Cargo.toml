@@ -64,6 +64,14 @@ self_update = { version = "0.41", default-features = false, features = [
     "rustls",
 ] }
 semver = "1"
+# Capa e fundos do modo imersivo. Já entra no build via Slint; aqui só somam
+# os decodificadores de GIF/WebP.
+image = { version = "0.25", default-features = false, features = [
+    "png",
+    "jpeg",
+    "gif",
+    "webp",
+] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows = { version = "0.62", features = [
