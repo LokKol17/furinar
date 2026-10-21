@@ -388,6 +388,11 @@ struct EstadoAudio {
     sorteio: Vec<usize>,
     /// Temporizador de sono ligado.
     sono: Option<sono::Sono>,
+    /// O que tocou antes (lista, chave da faixa), para o "anterior" do
+    /// shuffle voltar ao que tocou de verdade e não à vizinha na lista.
+    historico: Vec<(usize, String)>,
+    /// Voltando pelo histórico: a troca não entra nele de novo.
+    voltando: bool,
     /// Favoritas e contagem de reproduções.
     biblioteca: Biblioteca,
     /// A faixa atual já contou uma reprodução.
@@ -465,6 +470,8 @@ impl Default for EstadoAudio {
             sacola_shuffle: Vec::new(),
             sorteio: Vec::new(),
             sono: None,
+            historico: Vec::new(),
+            voltando: false,
             biblioteca: Biblioteca::default(),
             contada: false,
             engatilhada: None,
@@ -1393,6 +1400,18 @@ fn marcar_faixa(
         estado.sorteio.clear();
     }
 
+    let anterior = estado.pasta_reproducao.zip(estado.indice_atual);
+    if !estado.voltando
+        && anterior != Some((pasta_idx, track_idx))
+        && let Some((p, i)) = anterior
+        && let Some(chave) = estado.pastas.get(p).and_then(|pasta| pasta.chave_faixa(i))
+    {
+        estado.historico.push((p, chave));
+        if estado.historico.len() > TAMANHO_HISTORICO {
+            estado.historico.remove(0);
+        }
+    }
+
     estado.pasta_reproducao = Some(pasta_idx);
     estado.indice_atual = Some(track_idx);
     estado.arquivo_atual = Some(caminho);
@@ -1518,8 +1537,52 @@ fn devolver_a_fila(estado: &mut EstadoAudio, indice: usize) {
     }
 }
 
+/// Quantas faixas o histórico do "anterior" guarda.
+const TAMANHO_HISTORICO: usize = 200;
+
+/// Shuffle: a faixa que tocou antes da atual, tirada do histórico. A atual
+/// volta para a frente da fila, para "próxima" voltar a ela. `None` com o
+/// histórico vazio (ou só com faixas que sumiram).
+fn voltar_no_historico(estado: &mut EstadoAudio) -> Option<(usize, usize)> {
+    while let Some((p, chave)) = estado.historico.pop() {
+        let Some(pasta) = estado.pastas.get(p) else {
+            continue;
+        };
+        let Some(i) = (0..pasta.tracks.len())
+            .find(|&i| pasta.chave_faixa(i).as_deref() == Some(chave.as_str()))
+        else {
+            continue;
+        };
+        // A engatilhada volta primeiro, para a atual ficar na frente dela
+        if let Some(e) = estado.engatilhada.take() {
+            devolver_a_fila(estado, e.indice);
+        }
+        if estado.pasta_reproducao == Some(p)
+            && let Some(atual) = estado.indice_atual
+        {
+            match estado.modo_shuffle {
+                2 => estado.sacola_shuffle.push(atual),
+                1 => estado.sorteio.insert(0, atual),
+                _ => {}
+            }
+        }
+        return Some((p, i));
+    }
+    None
+}
+
 fn tocar_anterior(estado: &mut EstadoAudio, ui: &MainWindow) {
-    // Navega na pasta de onde vem a faixa atual, nunca na aba visível.
+    // Shuffle: volta ao que tocou de verdade
+    if estado.modo_shuffle != 0
+        && let Some((p, i)) = voltar_no_historico(estado)
+    {
+        estado.voltando = true;
+        tocar_faixa(estado, ui, p, i);
+        estado.voltando = false;
+        return;
+    }
+    // Em ordem: a vizinha na pasta de onde vem a faixa atual, nunca na aba
+    // visível
     let Some((pasta_idx, ordem)) = ordem_reproducao(estado) else {
         return;
     };
@@ -2901,7 +2964,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ui.set_volume(config.volume);
         let lang = translations::get_translations(&config.idioma);
         ui.set_texto_loop(texto_loop(config.modo_loop, &lang).into());
-        ui.set_loop_ativo(config.modo_loop != 0);
+        ui.set_loop_modo(config.modo_loop as i32);
         ui.set_texto_shuffle(texto_shuffle(config.modo_shuffle, &lang).into());
         ui.set_shuffle_modo(config.modo_shuffle as i32);
         ui.set_escanear_subpastas(config.escanear_subpastas);
@@ -3080,7 +3143,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 e.modo_loop = (e.modo_loop + 1) % 3;
                 let lang = translations::get_translations(&e.idioma);
                 ui.set_texto_loop(texto_loop(e.modo_loop, &lang).into());
-                ui.set_loop_ativo(e.modo_loop != 0);
+                ui.set_loop_modo(e.modo_loop as i32);
                 desengatilhar(&mut e, &ui);
                 atualizar_fila(&mut e);
                 salvar_configuracao(&e);
@@ -3094,7 +3157,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ui.on_alternar_shuffle(move || {
             if let Some(ui) = ui_fraca.upgrade() {
                 let mut e = estado.borrow_mut();
-                e.modo_shuffle = (e.modo_shuffle + 1) % 3;
+                // Desligado → inteligente → aleatório → desligado
+                e.modo_shuffle = match e.modo_shuffle {
+                    0 => 2,
+                    2 => 1,
+                    _ => 0,
+                };
                 // A engatilhada foi escolhida no modo antigo
                 desengatilhar(&mut e, &ui);
                 // Sacola da pasta antiga não serve pro modo novo.
@@ -4119,6 +4187,52 @@ mod tests {
         }
     }
 
+    /// Lista em memória com `n` faixas ("/m/0.mp3"...).
+    fn estado_com_faixas(n: usize) -> EstadoAudio {
+        let mut e = EstadoAudio::default();
+        let mut pasta = PastaMusical::pasta(PathBuf::from("/m"));
+        pasta.tracks = (0..n)
+            .map(|i| TrackInfo {
+                path: format!("{i}.mp3"),
+                titulo: i.to_string(),
+                ..Default::default()
+            })
+            .collect();
+        pasta.carregada = true;
+        e.pastas.push(pasta);
+        e.pasta_reproducao = Some(0);
+        e
+    }
+
+    #[test]
+    fn anterior_no_shuffle_volta_pelo_historico() {
+        let mut e = estado_com_faixas(10);
+        e.modo_shuffle = 2;
+        // Tocou 7, depois 2, e agora toca 5
+        e.historico = vec![(0, "/m/7.mp3".into()), (0, "/m/2.mp3".into())];
+        e.indice_atual = Some(5);
+        e.sacola_shuffle = vec![9, 4];
+
+        assert_eq!(voltar_no_historico(&mut e), Some((0, 2)));
+        // A atual (5) é a próxima a sair da sacola (pop pelo fim)
+        assert_eq!(e.sacola_shuffle.last(), Some(&5));
+        e.indice_atual = Some(2);
+        assert_eq!(voltar_no_historico(&mut e), Some((0, 7)));
+        assert_eq!(voltar_no_historico(&mut e), None);
+    }
+
+    #[test]
+    fn anterior_no_aleatorio_poe_a_atual_na_frente_do_sorteio() {
+        let mut e = estado_com_faixas(10);
+        e.modo_shuffle = 1;
+        e.historico = vec![(0, "/m/3.mp3".into()), (0, "/m/sumiu.mp3".into())];
+        e.indice_atual = Some(8);
+        e.sorteio = vec![1, 6];
+        // A que sumiu da pasta é pulada
+        assert_eq!(voltar_no_historico(&mut e), Some((0, 3)));
+        assert_eq!(e.sorteio, [8, 1, 6]);
+    }
+
     #[test]
     fn seek_com_player_preserva_tocando_ou_pausado() {
         assert_eq!(efeito_seek(true, true), EfeitoSeek::ManterEstado);
@@ -4184,6 +4298,15 @@ mod tests {
         ui.set_texto_tempo("01:14 / 03:31".into());
         ui.set_progresso(0.35);
         publicar_crossfade(&e, &ui);
+        // FURINAR_CAPTURA_LOOP / _SHUFFLE: modo dos botões (0, 1, 2)
+        let modo = |v: &str| {
+            std::env::var(v)
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(0)
+        };
+        ui.set_loop_modo(modo("FURINAR_CAPTURA_LOOP"));
+        ui.set_shuffle_modo(modo("FURINAR_CAPTURA_SHUFFLE"));
         // FURINAR_CAPTURA_CONFIG=1: configurações abertas
         if std::env::var_os("FURINAR_CAPTURA_CONFIG").is_some() {
             ui.set_config_aberta(true);
@@ -4397,7 +4520,11 @@ mod tests {
             imv.painel = Some(p);
         }
 
-        // Espera a thread da capa e deixa as animações chegarem ao fim
+        // Espera a thread da capa e deixa as animações chegarem ao fim.
+        // FURINAR_CAPTURA_OCIOSO=1: espera os controles sumirem (3 s)
+        if std::env::var_os("FURINAR_CAPTURA_OCIOSO").is_some() {
+            ui.set_imv_ocioso(true);
+        }
         for _ in 0..40 {
             imv.tick(&ui, "pt-br", &captura, true, true);
             slint::platform::update_timers_and_animations();

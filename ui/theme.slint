@@ -57,10 +57,9 @@ export component BotaoIcone inherits Rectangle {
     in property <bool> destaque: false;
     /// Modo ligado (loop/shuffle).
     in property <bool> ativo: false;
-    /// Nível extra acima de `ativo` (ex: shuffle inteligente) — mesmo
-    /// ícone/posição, fundo com um toque mais quente pra se diferenciar do
-    /// "ativo" simples sem precisar de um ícone novo.
-    in property <bool> intenso: false;
+    /// Modo desligado (loop/shuffle): ícone apagado, para o estado se ler
+    /// de longe
+    in property <bool> apagado: false;
     callback clicado();
 
     width: destaque ? 50px : 40px;
@@ -71,9 +70,7 @@ export component BotaoIcone inherits Rectangle {
 
     background: destaque
         ? Tema.oceano
-        : (intenso
-            ? Tema.dourado.with-alpha(0.28)
-            : (ativo ? Tema.oceano.with-alpha(0.20) : Tema.neutro));
+        : (ativo ? Tema.oceano.with-alpha(0.20) : Tema.neutro);
 
     accessible-role: button;
     accessible-label: root.dica;
@@ -86,7 +83,7 @@ export component BotaoIcone inherits Rectangle {
         height: destaque ? 22px : 18px;
         x: (root.width - self.width) / 2;
         y: (root.height - self.height) / 2;
-        colorize: destaque ? Tema.sobre_acento : (ativo ? Tema.dourado : Tema.texto);
+        colorize: destaque ? Tema.sobre_acento : (ativo ? Tema.dourado : (apagado ? Tema.texto.with-alpha(0.35) : Tema.texto));
         animate colorize { duration: 130ms; }
     }
 

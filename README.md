@@ -35,7 +35,7 @@ The visual palette — deep navy, cyan, and gold (or baby blue and pearl white i
 **Playback**
 - MP3, WAV, FLAC, OGG/Vorbis, and M4A support
 - Play/Pause, Stop, Previous, Next, seeking, and volume control
-- Loop (off / track / playlist) and Shuffle
+- Loop (off / track / playlist) and Shuffle (smart, no repeats until everything played, or random); "previous" in shuffle goes back to what actually played
 - **Gapless playback** and optional **crossfade** of 3, 6 or 10 s — consecutive tracks from the same album always join without crossfading
 - **ReplayGain**: uses the gain stored in the tags so every track plays at the same loudness
 - Sleep timer (15/30/60 min or end of track), fading the volume out

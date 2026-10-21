@@ -35,7 +35,7 @@ A paleta visual — azul-marinho profundo, ciano e dourado (ou azul-bebê e bran
 **Reprodução**
 - Suporte a MP3, WAV, FLAC, OGG/Vorbis e M4A
 - Play/Pause, Stop, Anterior, Próxima, Seek e controle de volume
-- Loop (desligado / faixa / playlist) e Shuffle
+- Loop (desligado / faixa / playlist) e Shuffle (inteligente, sem repetir até tocar todas, ou aleatório); "anterior" no shuffle volta ao que tocou de verdade
 - **Sem silêncio entre faixas** (gapless) e **crossfade** opcional de 3, 6 ou 10 s — faixas seguidas do mesmo álbum sempre emendam sem crossfade
 - **ReplayGain**: usa o ganho gravado nas tags para todas as faixas tocarem no mesmo volume
 - Temporizador de sono (15/30/60 min ou fim da faixa), com o volume baixando aos poucos

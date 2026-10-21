@@ -129,8 +129,8 @@ pub fn pt_br() -> Translations {
     t.insert("loop_track", "Loop: Faixa");
     t.insert("loop_list", "Loop: Lista");
     t.insert("shuffle_off", "Shuffle: Desl");
-    t.insert("shuffle_on", "Shuffle: On");
-    t.insert("shuffle_smart", "Shuffle: Inteligente");
+    t.insert("shuffle_on", "Shuffle: Aleatório (pode repetir)");
+    t.insert("shuffle_smart", "Shuffle: Inteligente (sem repetir)");
     t
 }
 
@@ -261,8 +261,8 @@ pub fn en() -> Translations {
     t.insert("loop_track", "Loop: Track");
     t.insert("loop_list", "Loop: List");
     t.insert("shuffle_off", "Shuffle: Off");
-    t.insert("shuffle_on", "Shuffle: On");
-    t.insert("shuffle_smart", "Shuffle: Smart");
+    t.insert("shuffle_on", "Shuffle: Random (may repeat)");
+    t.insert("shuffle_smart", "Shuffle: Smart (no repeats)");
     t
 }
 

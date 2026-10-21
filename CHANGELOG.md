@@ -43,6 +43,8 @@ e o projeto adere ao [Semantic Versioning](https://semver.org/).
   - a thread e o cliente HTTP só existem enquanto há trabalho.
 
 ### Alterado
+- Ícones de loop e shuffle mostram o modo: desligado fica apagado; loop da faixa tem um "1"; shuffle inteligente (cada faixa uma vez) usa as setas e o aleatório (pode repetir) um dado. O ciclo do shuffle passa a ser desligado → inteligente → aleatório.
+- Modo imersivo: com os controles escondidos, o visualizador desce até o pé da tela e a capa vem junto.
 - Ao reabrir, o app volta **pausado** na última faixa (antes começava a tocar), e o dispositivo de áudio só abre no Play. A faixa é lembrada pelo caminho, não pela posição na lista (uma faixa nova na pasta não troca mais a música retomada), junto com a fila do shuffle.
 - O scan lê também álbum, número da faixa, duração e ReplayGain (para ordenar e agrupar sem abrir o arquivo de novo).
 - A miniatura em cache não abre mais a faixa: álbum e duração já vêm do scan.
@@ -56,6 +58,7 @@ e o projeto adere ao [Semantic Versioning](https://semver.org/).
 - Linux: páginas limpas de código e fontes são devolvidas ao sistema (`madvise`) 5 s após abrir, depois da checagem de update e ao minimizar — RSS cai de ~52 MB para ~29 MB
 
 ### Corrigido
+- "Anterior" com shuffle voltava à vizinha na lista; agora volta à faixa que tocou antes (histórico), e "próxima" retorna à de onde se voltou
 - Clicar numa opção das configurações fechava o menu (agora é um cartão sobre a janela, com rolagem, fechado com Esc ou clique fora)
 - O estado "baixando" da atualização nunca era limpo: a thread de download chamava `upgrade()` fora da thread da UI
 

@@ -31,7 +31,8 @@ export component MainWindow inherits Window {
     forward-focus: atalhos;
 
     in-out property <bool> tocando: false;
-    in-out property <bool> loop_ativo: false;
+    /// 0 = desligado, 1 = faixa, 2 = lista
+    in-out property <int> loop_modo: 0;
     in-out property <int> shuffle_modo: 0;
     in-out property <string> texto_play_pause: "Play";
     in-out property <string> texto_busca: "";
@@ -140,6 +141,8 @@ export component MainWindow inherits Window {
     private property <int> imv_pedido_busca: 0;
     in-out property <bool> imv_so_letra: false;
     in-out property <bool> imv_config_aberta: false;
+    /// Controles escondidos por inatividade
+    in-out property <bool> imv_ocioso: false;
     in property <string> imv_relogio: "";
     /// Prévia da próxima nos últimos segundos ("" = escondida)
     in property <string> imv_proxima: "";
@@ -409,16 +412,19 @@ export component MainWindow inherits Window {
                     cross-axis-alignment: center;
 
                     BotaoIcone {
-                        icone: @image-url("icons/loop.svg");
+                        icone: loop_modo == 1 ? @image-url("icons/loop_faixa.svg") : @image-url("icons/loop.svg");
                         dica: texto_loop;
-                        ativo: loop_ativo;
+                        ativo: loop_modo != 0;
+                        apagado: loop_modo == 0;
                         clicado => { alternar_loop(); }
                     }
                     BotaoIcone {
-                        icone: @image-url("icons/shuffle.svg");
+                        // Inteligente = baralho embaralhado (cada uma uma
+                        // vez); aleatório = dado (pode repetir)
+                        icone: shuffle_modo == 1 ? @image-url("icons/dado.svg") : @image-url("icons/shuffle.svg");
                         dica: texto_shuffle;
                         ativo: shuffle_modo != 0;
-                        intenso: shuffle_modo == 2;
+                        apagado: shuffle_modo == 0;
                         clicado => { alternar_shuffle(); }
                     }
                     BotaoIcone {
@@ -922,7 +928,9 @@ export component MainWindow inherits Window {
         letra_indice: letra_indice;
         barras: imv_barras;
         tocando: tocando;
-        loop_ativo: loop_ativo;
+        loop_modo: loop_modo;
+        texto_loop: texto_loop;
+        texto_shuffle: texto_shuffle;
         shuffle_modo: shuffle_modo;
         texto_tempo: texto_tempo;
         volume <=> volume;
@@ -968,6 +976,7 @@ export component MainWindow inherits Window {
         album_clicado(i) => { imv_album_clicado(i); }
         ordem_escolhida(i) => { ordem_escolhida(i); }
         config_aberta <=> imv_config_aberta;
+        ocioso <=> imv_ocioso;
         crossfade_texto: crossfade_texto;
         replaygain <=> replaygain;
         fundo_reativo <=> fundo_reativo;

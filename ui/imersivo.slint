@@ -14,6 +14,8 @@ component BotaoImersivo inherits Rectangle {
     in property <image> icone;
     in property <string> dica: "";
     in property <bool> ativo: false;
+    /// Modo desligado: ícone apagado
+    in property <bool> apagado: false;
     in property <bool> grande: false;
     in property <color> cor: Tema.oceano;
     callback clicado();
@@ -32,7 +34,7 @@ component BotaoImersivo inherits Rectangle {
         height: self.width;
         x: (root.width - self.width) / 2;
         y: (root.height - self.height) / 2;
-        colorize: grande ? #0b1a2b : (root.ativo ? root.cor : #ffffffdd);
+        colorize: grande ? #0b1a2b : (root.ativo ? root.cor : (root.apagado ? #ffffff59 : #ffffffdd));
         animate colorize { duration: 200ms; }
     }
 
@@ -155,8 +157,11 @@ export component TelaImersiva inherits Rectangle {
     in property <[float]> barras: [];
 
     in property <bool> tocando: false;
-    in property <bool> loop_ativo: false;
+    /// 0 = desligado, 1 = faixa, 2 = lista
+    in property <int> loop_modo: 0;
     in property <int> shuffle_modo: 0;
+    in property <string> texto_loop;
+    in property <string> texto_shuffle;
     in property <string> texto_tempo: "";
     in-out property <float> volume: 0;
     in-out property <float> progresso: 0;
@@ -237,7 +242,7 @@ export component TelaImersiva inherits Rectangle {
     background: #05080d;
 
     /// Controles escondidos depois de alguns segundos sem mexer o mouse
-    property <bool> ocioso: false;
+    in-out property <bool> ocioso: false;
     property <color> destaque: root.cor;
     animate destaque { duration: 700ms; easing: ease-in-out; }
 
@@ -247,7 +252,12 @@ export component TelaImersiva inherits Rectangle {
     // Rodapé, de baixo para cima: controles, progresso, visualizador, cartão
     property <length> y_progresso: root.height - 96px;
     property <length> altura_visualizador: 56px;
-    property <length> y_visualizador: root.y_progresso - 10px - root.altura_visualizador;
+    // Base do visualizador: logo acima da barra de progresso; com os
+    // controles escondidos, desce até o pé da tela (e o cartão vem junto),
+    // em vez de ficar boiando sobre o espaço vazio
+    property <length> base_rodape: root.ocioso ? root.height - 20px : root.y_progresso - 10px;
+    animate base_rodape { duration: 450ms; easing: ease-in-out; }
+    property <length> y_visualizador: root.base_rodape - root.altura_visualizador;
     property <length> y_cartao: root.y_visualizador - 18px - root.lado_capa;
     // Largura que sobra à esquerda do painel; segue a gaveta enquanto ela anima
     property <length> largura_util: painel.x;
@@ -683,15 +693,21 @@ export component TelaImersiva inherits Rectangle {
             }
             BotaoImersivo {
                 y: (parent.height - self.height) / 2;
-                icone: @image-url("icons/shuffle.svg");
+                // Inteligente = baralho embaralhado (cada uma uma vez);
+                // aleatório = dado (pode repetir)
+                icone: root.shuffle_modo == 1 ? @image-url("icons/dado.svg") : @image-url("icons/shuffle.svg");
+                dica: root.texto_shuffle;
                 ativo: root.shuffle_modo != 0;
+                apagado: root.shuffle_modo == 0;
                 cor: root.destaque;
                 clicado => { root.alternar_shuffle(); }
             }
             BotaoImersivo {
                 y: (parent.height - self.height) / 2;
-                icone: @image-url("icons/loop.svg");
-                ativo: root.loop_ativo;
+                icone: root.loop_modo == 1 ? @image-url("icons/loop_faixa.svg") : @image-url("icons/loop.svg");
+                dica: root.texto_loop;
+                ativo: root.loop_modo != 0;
+                apagado: root.loop_modo == 0;
                 cor: root.destaque;
                 clicado => { root.alternar_loop(); }
             }
