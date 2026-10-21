@@ -33,6 +33,14 @@ e o projeto adere ao [Semantic Versioning](https://semver.org/).
 - Ordenação por aba (padrão, título, artista, álbum, duração, adicionadas recentemente, mais tocadas), lembrada por pasta.
 - Letra embutida nas tags quando não há `.lrc`: SYLT (MP3) e USLT/LYRICS/©lyr; texto em LRC sincroniza, texto puro aparece inteiro, sem destaque.
 - Temporizador de sono também no modo normal (botão da lua), com o restante ao lado do tempo.
+- **Metadados e letras da web** (botão de informações ou tecla `I`, nos dois modos):
+  - identificação pelo MusicBrainz (título, artista, álbum, ano, número da faixa) com nota de confiança; sem tags, tenta o nome do arquivo ("Artista - Título", "Artista 'Título'");
+  - com chave do AcoustID nas configurações, identifica também pelo som (impressão digital Chromaprint em Rust puro) quando o texto não basta;
+  - capa do Cover Art Archive, usada quando a faixa e a pasta não têm capa;
+  - as correções ficam num banco local (`furinar_metadados.json`) e são aplicadas por cima das tags; "Restaurar original" desfaz. Gravar nas tags dos arquivos só com confirmação (a faixa tocando fica de fora);
+  - lote da aba inteira: acertos com 90% ou mais entram sozinhos, o resto vai para revisão; baixa também as letras que faltam;
+  - letras do LRCLIB: sincronizada vira `.lrc` ao lado da faixa (ou no cache, se a pasta não aceitar escrita); só texto vai para o cache. Busca automática ao tocar é opcional e vem desligada.
+  - a thread e o cliente HTTP só existem enquanto há trabalho.
 
 ### Alterado
 - Ao reabrir, o app volta **pausado** na última faixa (antes começava a tocar), e o dispositivo de áudio só abre no Play. A faixa é lembrada pelo caminho, não pela posição na lista (uma faixa nova na pasta não troca mais a música retomada), junto com a fila do shuffle.
@@ -48,7 +56,7 @@ e o projeto adere ao [Semantic Versioning](https://semver.org/).
 - Linux: páginas limpas de código e fontes são devolvidas ao sistema (`madvise`) 5 s após abrir, depois da checagem de update e ao minimizar — RSS cai de ~52 MB para ~29 MB
 
 ### Corrigido
-- Clicar numa opção das configurações fechava o menu
+- Clicar numa opção das configurações fechava o menu (agora é um cartão sobre a janela, com rolagem, fechado com Esc ou clique fora)
 - O estado "baixando" da atualização nunca era limpo: a thread de download chamava `upgrade()` fora da thread da UI
 
 ## [1.5.3] — 2026-09-23

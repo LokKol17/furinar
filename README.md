@@ -50,6 +50,7 @@ The visual palette — deep navy, cyan, and gold (or baby blue and pearl white i
 - **Favorites** (star on the row, or `F`) and **Most played**, as fixed tabs gathering tracks from every folder
 
 **Extras**
+- **Web metadata and lyrics** (`I` key): identifies the track on MusicBrainz — or by sound, with a free AcoustID key —, downloads cover art and synced lyrics (LRCLIB), and indexes a whole tab with review. Fixes stay in Furinar until you ask to write them to the tags
 - **Synced lyrics** via `.lrc` files, scrolling along with the track — or the lyrics embedded in the tags (SYLT/USLT/LYRICS), synced or not
 - **Light/dark theme**, switched instantly, no restart needed
 - Frameless window with a custom title bar (drag-to-move, Aero Snap, rounded corners on Windows 11)
@@ -76,7 +77,7 @@ The visual palette — deep navy, cyan, and gold (or baby blue and pearl white i
 **Windows integration**
 - **Play/Pause, Previous, and Next** buttons right on the taskbar thumbnail preview
 - System media controls (keyboard media keys, action center) via SMTC
-- Keyboard shortcuts: `Space` play/pause, `←`/`→` seek ±5s, `↑`/`↓` navigate the list, `Enter` plays the selected track, `F` favorites the current track, `F11` immersive mode, `Esc` leaves it (in immersive mode: `L` library, `/` search, `H` lyrics only)
+- Keyboard shortcuts: `Space` play/pause, `←`/`→` seek ±5s, `↑`/`↓` navigate the list, `Enter` plays the selected track, `F` favorites the current track, `I` track info, `F11` immersive mode, `Esc` leaves it (in immersive mode: `L` library, `/` search, `H` lyrics only)
 
 <div align="center">
   <table>

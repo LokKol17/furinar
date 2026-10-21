@@ -50,6 +50,7 @@ A paleta visual — azul-marinho profundo, ciano e dourado (ou azul-bebê e bran
 - **Favoritas** (estrela na linha ou `F`) e **Mais tocadas**, como abas fixas que juntam faixas de todas as pastas
 
 **Extras**
+- **Metadados e letras da web** (tecla `I`): identifica a faixa no MusicBrainz — ou pelo som, com uma chave grátis do AcoustID —, baixa capa e letra sincronizada (LRCLIB), e indexa a aba inteira com revisão. As correções ficam no Furinar até você pedir para gravar nas tags
 - **Letras sincronizadas** via arquivos `.lrc`, rolando junto com a música — ou a letra embutida nas tags (SYLT/USLT/LYRICS), sincronizada ou não
 - **Tema claro/escuro**, trocado na hora, sem reiniciar o app
 - Janela sem moldura nativa, com barra de título própria (arraste, Aero Snap, cantos arredondados no Windows 11)
@@ -76,7 +77,7 @@ A paleta visual — azul-marinho profundo, ciano e dourado (ou azul-bebê e bran
 **Integração com o Windows**
 - Botões de **Play/Pause, Anterior e Próxima** direto na miniatura da barra de tarefas
 - Controles multimídia do sistema (teclas de mídia do teclado, central de ações) via SMTC
-- Atalhos de teclado: `Espaço` pausa/retoma, `←`/`→` pulam 5s, `↑`/`↓` navegam a lista, `Enter` toca a faixa selecionada, `F` favorita a faixa atual, `F11` modo imersivo, `Esc` sai dele (no modo imersivo: `L` biblioteca, `/` busca, `H` só a letra)
+- Atalhos de teclado: `Espaço` pausa/retoma, `←`/`→` pulam 5s, `↑`/`↓` navegam a lista, `Enter` toca a faixa selecionada, `F` favorita a faixa atual, `I` informações da faixa, `F11` modo imersivo, `Esc` sai dele (no modo imersivo: `L` biblioteca, `/` busca, `H` só a letra)
 
 <div align="center">
   <table>
