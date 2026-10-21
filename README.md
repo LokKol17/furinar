@@ -36,16 +36,21 @@ The visual palette — deep navy, cyan, and gold (or baby blue and pearl white i
 - MP3, WAV, FLAC, OGG/Vorbis, and M4A support
 - Play/Pause, Stop, Previous, Next, seeking, and volume control
 - Loop (off / track / playlist) and Shuffle
-- Automatically resumes the last track and position on reopen
+- **Gapless playback** and optional **crossfade** of 3, 6 or 10 s — consecutive tracks from the same album always join without crossfading
+- **ReplayGain**: uses the gain stored in the tags so every track plays at the same loudness
+- Sleep timer (15/30/60 min or end of track), fading the volume out
+- On reopen, comes back paused on the last track, position and shuffle queue
 
 **Organization**
 - **Multiple folders as tabs** — open as many libraries as you want; switching tabs never interrupts what's currently playing
 - Optional recursive subfolder scanning
-- **ID3/Vorbis tag reading** (title and artist, falling back to the filename)
+- **ID3/Vorbis/MP4 tag reading** (title, artist, album, track number, duration)
 - Search/filter by title or artist, accent- and case-insensitive
+- **Per-tab sorting**: default, title, artist, album, duration, recently added or most played
+- **Favorites** (star on the row, or `F`) and **Most played**, as fixed tabs gathering tracks from every folder
 
 **Extras**
-- **Synced lyrics** via `.lrc` files, scrolling along with the track
+- **Synced lyrics** via `.lrc` files, scrolling along with the track — or the lyrics embedded in the tags (SYLT/USLT/LYRICS), synced or not
 - **Light/dark theme**, switched instantly, no restart needed
 - Frameless window with a custom title bar (drag-to-move, Aero Snap, rounded corners on Windows 11)
 
@@ -55,8 +60,9 @@ The visual palette — deep navy, cyan, and gold (or baby blue and pearl white i
 - Custom backgrounds: drop a `background.*` (or `furinar-bg.*`) into the music folder, or pick a global one in Settings. Images, animated GIF/WebP, and videos (mp4/webm/mkv/mov/avi — played through your system `ffmpeg`, if installed). Small pixel-art backgrounds stay crisp. No background? The blurred cover takes its place
 - Accent color taken from the cover, crossfade between tracks, controls that hide after 3 s of stillness
 - Spectrum visualizer reacting to the music
-- Library drawer (`L`, or `/` to search): folder tabs, search, and a list with cover thumbnails, artist • album and duration; plus an "Up next" queue that respects shuffle and loop
-- Lyrics-only view (`H`), a clock, and a sleep timer (15/30/60 min or end of track) that fades the volume out
+- Library drawer (`L`, or `/` to search): folder tabs, search, and a list with cover thumbnails, artist • album and duration; an "Up next" queue that respects shuffle and loop; and an **albums** grid — clicking an album opens it in a tab and starts playing
+- "Up next" notice in the last 10 s of a track, and a background that pulses with the bass (can be turned off in Settings)
+- Lyrics-only view (`H`), a clock, and the sleep timer
 - Everything in this mode is only allocated while it's on — back in normal mode, Furinar is as light as before
 
 <div align="center">
@@ -69,7 +75,7 @@ The visual palette — deep navy, cyan, and gold (or baby blue and pearl white i
 **Windows integration**
 - **Play/Pause, Previous, and Next** buttons right on the taskbar thumbnail preview
 - System media controls (keyboard media keys, action center) via SMTC
-- Keyboard shortcuts: `Space` play/pause, `←`/`→` seek ±5s, `↑`/`↓` navigate the list, `Enter` plays the selected track, `F11` immersive mode, `Esc` leaves it (in immersive mode: `L` library, `/` search, `H` lyrics only)
+- Keyboard shortcuts: `Space` play/pause, `←`/`→` seek ±5s, `↑`/`↓` navigate the list, `Enter` plays the selected track, `F` favorites the current track, `F11` immersive mode, `Esc` leaves it (in immersive mode: `L` library, `/` search, `H` lyrics only)
 
 <div align="center">
   <table>

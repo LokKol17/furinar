@@ -36,16 +36,21 @@ A paleta visual — azul-marinho profundo, ciano e dourado (ou azul-bebê e bran
 - Suporte a MP3, WAV, FLAC, OGG/Vorbis e M4A
 - Play/Pause, Stop, Anterior, Próxima, Seek e controle de volume
 - Loop (desligado / faixa / playlist) e Shuffle
-- Retoma automaticamente a última faixa e posição ao reabrir o app
+- **Sem silêncio entre faixas** (gapless) e **crossfade** opcional de 3, 6 ou 10 s — faixas seguidas do mesmo álbum sempre emendam sem crossfade
+- **ReplayGain**: usa o ganho gravado nas tags para todas as faixas tocarem no mesmo volume
+- Temporizador de sono (15/30/60 min ou fim da faixa), com o volume baixando aos poucos
+- Ao reabrir, volta pausado na última faixa, posição e fila do shuffle
 
 **Organização**
 - **Múltiplas pastas em abas** — abra quantas bibliotecas quiser; navegar entre abas nunca interrompe o que está tocando
 - Escaneamento opcional de subpastas
-- Leitura de tags **ID3/Vorbis** (título e artista, com fallback pro nome do arquivo)
+- Leitura de tags **ID3/Vorbis/MP4** (título, artista, álbum, número da faixa, duração)
 - Busca com filtro por título/artista, ignorando acentos e maiúsculas
+- **Ordenação por aba**: padrão, título, artista, álbum, duração, adicionadas recentemente ou mais tocadas
+- **Favoritas** (estrela na linha ou `F`) e **Mais tocadas**, como abas fixas que juntam faixas de todas as pastas
 
 **Extras**
-- **Letras sincronizadas** via arquivos `.lrc`, rolando junto com a música
+- **Letras sincronizadas** via arquivos `.lrc`, rolando junto com a música — ou a letra embutida nas tags (SYLT/USLT/LYRICS), sincronizada ou não
 - **Tema claro/escuro**, trocado na hora, sem reiniciar o app
 - Janela sem moldura nativa, com barra de título própria (arraste, Aero Snap, cantos arredondados no Windows 11)
 
@@ -55,8 +60,9 @@ A paleta visual — azul-marinho profundo, ciano e dourado (ou azul-bebê e bran
 - Fundos personalizados: coloque um `background.*` (ou `furinar-bg.*`) na pasta da música, ou escolha um fundo global nas Configurações. Imagens, GIF/WebP animado e vídeos (mp4/webm/mkv/mov/avi — tocados pelo `ffmpeg` do sistema, se instalado). Fundos pequenos em pixel art ficam nítidos. Sem fundo? A capa desfocada assume
 - Cor de destaque tirada da capa, crossfade entre faixas, controles que somem após 3 s parado
 - Visualizador de espectro reagindo à música
-- Painel da biblioteca (`L`, ou `/` para buscar): abas das pastas, busca e lista com miniatura da capa, artista • álbum e duração; mais a fila "a seguir", que respeita shuffle e loop
-- Modo só letra (`H`), relógio e temporizador de sono (15/30/60 min ou fim da faixa) que baixa o volume aos poucos
+- Painel da biblioteca (`L`, ou `/` para buscar): abas das pastas, busca e lista com miniatura da capa, artista • álbum e duração; a fila "a seguir", que respeita shuffle e loop; e a grade de **álbuns** — clicar num álbum abre uma aba com ele e começa a tocar
+- Aviso "a seguir" nos últimos 10 s da faixa e fundo que pulsa com os graves (desligável nas Configurações)
+- Modo só letra (`H`), relógio e temporizador de sono
 - Nada desse modo fica alocado fora dele — de volta ao modo normal, o Furinar é tão leve quanto antes
 
 <div align="center">
@@ -69,7 +75,7 @@ A paleta visual — azul-marinho profundo, ciano e dourado (ou azul-bebê e bran
 **Integração com o Windows**
 - Botões de **Play/Pause, Anterior e Próxima** direto na miniatura da barra de tarefas
 - Controles multimídia do sistema (teclas de mídia do teclado, central de ações) via SMTC
-- Atalhos de teclado: `Espaço` pausa/retoma, `←`/`→` pulam 5s, `↑`/`↓` navegam a lista, `Enter` toca a faixa selecionada, `F11` modo imersivo, `Esc` sai dele (no modo imersivo: `L` biblioteca, `/` busca, `H` só a letra)
+- Atalhos de teclado: `Espaço` pausa/retoma, `←`/`→` pulam 5s, `↑`/`↓` navegam a lista, `Enter` toca a faixa selecionada, `F` favorita a faixa atual, `F11` modo imersivo, `Esc` sai dele (no modo imersivo: `L` biblioteca, `/` busca, `H` só a letra)
 
 <div align="center">
   <table>

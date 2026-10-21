@@ -19,9 +19,23 @@ e o projeto adere ao [Semantic Versioning](https://semver.org/).
   - modo só letra (`H`): esconde capa, visualizador e controles;
   - relógio e temporizador de sono (15/30/60 min ou fim da faixa), com o volume baixando nos últimos 30 s;
   - `Esc` em camadas: fecha o painel, depois o modo só letra, depois sai.
+  - grade de álbuns no painel: clicar num álbum abre uma aba temporária com ele, na ordem do disco, e toca;
+  - aviso "a seguir" nos últimos 10 s da faixa;
+  - fundo que pulsa com os graves (opção nas configurações).
 - Nada do modo imersivo fica alocado fora dele; ao sair, a memória é devolvida.
+- Reprodução sem silêncio entre faixas (gapless): a próxima entra na fila do player 2 s antes do fim.
+- Crossfade opcional de 3, 6 ou 10 s (configurações). Faixas seguidas do mesmo álbum, em ordem, emendam sem crossfade.
+- ReplayGain (ganho da faixa, ou do álbum na falta; limitado pelo pico). Ligado por padrão.
+- Favoritas (estrela na linha, no painel, no modo imersivo ou tecla `F`) e Mais tocadas (contada depois de metade da faixa ou 4 min), como abas fixas antes das pastas. Guardadas em `furinar_biblioteca.json`, ao lado da configuração.
+- Ordenação por aba (padrão, título, artista, álbum, duração, adicionadas recentemente, mais tocadas), lembrada por pasta.
+- Letra embutida nas tags quando não há `.lrc`: SYLT (MP3) e USLT/LYRICS/©lyr; texto em LRC sincroniza, texto puro aparece inteiro, sem destaque.
+- Temporizador de sono também no modo normal (botão da lua), com o restante ao lado do tempo.
 
 ### Alterado
+- Ao reabrir, o app volta **pausado** na última faixa (antes começava a tocar), e o dispositivo de áudio só abre no Play. A faixa é lembrada pelo caminho, não pela posição na lista (uma faixa nova na pasta não troca mais a música retomada), junto com a fila do shuffle.
+- O scan lê também álbum, número da faixa, duração e ReplayGain (para ordenar e agrupar sem abrir o arquivo de novo).
+- A miniatura em cache não abre mais a faixa: álbum e duração já vêm do scan.
+- A posição da música vem do player, não de um contador somado a cada 250 ms.
 - Perfil de release com LTO, `codegen-units = 1` e `strip`: ~2 MB a menos de RSS
 - A saída de áudio é aberta uma vez e reaproveitada entre seeks e trocas de faixa (antes era reaberta a cada seek)
 - A duração do MP3 é calculada uma vez por faixa, não a cada seek (o cálculo varre o arquivo inteiro)
