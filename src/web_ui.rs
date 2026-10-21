@@ -1,0 +1,594 @@
+//! Tela de informações da faixa e lote da aba: pedidos ao buscador da web
+//! e o que volta dele.
+
+use crate::*;
+
+/// Como mostrar um candidato na tela de informações.
+pub(crate) fn linha_candidato(c: &metadados::Candidato, pelo_som: &str) -> CandidatoInfo {
+    let mut detalhe = c.artista.clone();
+    if let Some(album) = &c.album {
+        detalhe.push_str(" · ");
+        detalhe.push_str(album);
+        if let Some(ano) = c.ano {
+            detalhe.push_str(&format!(" ({ano})"));
+        }
+    }
+    if c.duracao > 0 {
+        detalhe.push_str(" · ");
+        detalhe.push_str(&formatar_tempo(c.duracao as u64, c.duracao >= 3600));
+    }
+    if c.fonte == metadados::Fonte::ImpressaoDigital {
+        detalhe.push_str(" · ");
+        detalhe.push_str(pelo_som);
+    }
+    CandidatoInfo {
+        titulo: c.titulo.as_str().into(),
+        detalhe: detalhe.into(),
+        confianca: c.confianca as i32,
+        digital: c.fonte == metadados::Fonte::ImpressaoDigital,
+    }
+}
+
+/// Manda um pedido ao buscador, criando-o se for o primeiro.
+pub(crate) fn pedir_web(estado: &mut EstadoAudio, pedido: buscador::Pedido) {
+    let chave = Some(estado.chave_acoustid.trim().to_string()).filter(|c| !c.is_empty());
+    estado
+        .buscador
+        .get_or_insert_with(|| buscador::Buscador::novo(chave))
+        .pedir(pedido);
+}
+
+pub(crate) fn consulta_de(
+    estado: &EstadoAudio,
+    pasta_idx: usize,
+    indice: usize,
+) -> Option<metadados::Consulta> {
+    let pasta = estado.pastas.get(pasta_idx)?;
+    let t = pasta.tracks.get(indice)?;
+    Some(metadados::Consulta {
+        chave: chave_faixa(&pasta.caminho, &t.path),
+        caminho: pasta.caminho.join(&t.path),
+        titulo: t.titulo.clone(),
+        artista: t.artista.clone(),
+        album: t.album.clone(),
+        duracao: t.duracao,
+    })
+}
+
+/// Faixa (lista, posição) com esta chave, de preferência a que toca.
+pub(crate) fn achar_faixa(estado: &EstadoAudio, chave: &str) -> Option<(usize, usize)> {
+    if chave_atual(estado).as_deref() == Some(chave) {
+        return estado.pasta_reproducao.zip(estado.indice_atual);
+    }
+    estado.pastas.iter().enumerate().find_map(|(p, pasta)| {
+        let i =
+            (0..pasta.tracks.len()).find(|&i| pasta.chave_faixa(i).as_deref() == Some(chave))?;
+        Some((p, i))
+    })
+}
+
+/// Letra da faixa atual na web. `forcar`: mesmo que ela já tenha falhado
+/// antes (botão da tela de informações).
+pub(crate) fn pedir_letra(estado: &mut EstadoAudio, forcar: bool) {
+    let Some(consulta) = estado
+        .pasta_reproducao
+        .zip(estado.indice_atual)
+        .and_then(|(p, i)| consulta_de(estado, p, i))
+    else {
+        return;
+    };
+    if forcar {
+        estado.metadados.esquecer_sem_letra(&consulta.chave);
+    } else if !estado.metadados.buscar_letra(&consulta.chave) {
+        return;
+    }
+    pedir_web(estado, buscador::Pedido::Letra(consulta));
+}
+
+/// Põe a correção no banco e nas listas carregadas, e pede a capa.
+pub(crate) fn aplicar_correcao(
+    estado: &mut EstadoAudio,
+    chave: &str,
+    correcao: metadados::Correcao,
+) {
+    for pasta in &mut estado.pastas {
+        let raiz = pasta.caminho.clone();
+        for t in &mut pasta.tracks {
+            if chave_faixa(&raiz, &t.path) == chave {
+                correcao.aplicar(t);
+            }
+        }
+    }
+    if let Some(lancamento) = correcao.lancamento.clone() {
+        pedir_web(
+            estado,
+            buscador::Pedido::Capa {
+                chave: chave.to_string(),
+                lancamento,
+            },
+        );
+    }
+    estado.metadados.corrigir(chave, correcao);
+}
+
+/// Depois de mexer nos metadados: lista, painel e tela cheia de novo.
+pub(crate) fn renovar_vistas(estado: &mut EstadoAudio, ui: &MainWindow) {
+    atualizar_lista(estado, ui);
+    let faixa = faixa_imersiva(estado);
+    if let Some(imv) = estado.imersivo.as_mut() {
+        imv.atualizar_dados(ui, faixa);
+    }
+    atualizar_fila(estado);
+    publicar_info(estado, ui);
+}
+
+/// Volta a faixa ao que as tags dizem.
+pub(crate) fn restaurar_original(estado: &mut EstadoAudio, chave: &str) {
+    if !estado.metadados.restaurar(chave) {
+        return;
+    }
+    for pasta in &mut estado.pastas {
+        let raiz = pasta.caminho.clone();
+        for t in &mut pasta.tracks {
+            if chave_faixa(&raiz, &t.path) == chave {
+                *t = track::ler_faixa(&raiz.join(&t.path), t.path.clone());
+            }
+        }
+    }
+}
+
+/// Preenche a tela de informações com a faixa `info_chave`.
+pub(crate) fn publicar_info(estado: &EstadoAudio, ui: &MainWindow) {
+    let lang = translations::get_translations(&estado.idioma);
+    let t = |k: &str| lang.get(k).copied().unwrap_or("").to_string();
+    let Some(chave) = estado.info_chave.as_deref() else {
+        return;
+    };
+    let Some((p, i)) = achar_faixa(estado, chave) else {
+        return;
+    };
+    let pasta = &estado.pastas[p];
+    let faixa = &pasta.tracks[i];
+    ui.set_info_titulo(faixa.titulo.as_str().into());
+    ui.set_info_artista(faixa.artista.as_deref().unwrap_or("").into());
+    let correcao = estado.metadados.correcao(chave);
+    let mut album = faixa.album.clone().unwrap_or_default();
+    if let Some(ano) = correcao.and_then(|c| c.ano) {
+        album.push_str(&format!(" ({ano})"));
+    }
+    ui.set_info_album(album.into());
+    ui.set_info_corrigida(correcao.is_some());
+    let caminho = pasta.caminho.join(&faixa.path);
+    let letra = if letras_web::tem_letra_local(&caminho, chave) {
+        t("info_lyrics_ok")
+    } else if !estado.metadados.buscar_letra(chave) {
+        t("info_lyrics_missing_web")
+    } else {
+        t("info_lyrics_none")
+    };
+    ui.set_info_letra(letra.into());
+    let pelo_som = t("info_by_sound");
+    let linhas: Vec<CandidatoInfo> = estado
+        .info_candidatos
+        .iter()
+        .map(|c| linha_candidato(c, &pelo_som))
+        .collect();
+    ui.set_info_candidatos(ModelRc::new(VecModel::from(linhas)));
+}
+
+/// Revisão do lote e resumo na tela.
+pub(crate) fn publicar_lote(estado: &EstadoAudio, ui: &MainWindow) {
+    let lang = translations::get_translations(&estado.idioma);
+    let t = |k: &str| lang.get(k).copied().unwrap_or("").to_string();
+    let l = &estado.lote;
+    ui.set_lote_ativo(l.ativo);
+    ui.set_lote_progresso(if l.total > 0 {
+        l.feitas as f32 / l.total as f32
+    } else {
+        0.0
+    });
+    let texto = if l.ativo {
+        format!("{} {}/{}", t("batch_running"), l.feitas, l.total)
+    } else if l.total > 0 {
+        t("batch_summary")
+            .replace("{auto}", &l.automaticas.to_string())
+            .replace("{revisar}", &estado.revisao.len().to_string())
+            .replace("{nada}", &l.sem_resultado.to_string())
+            .replace("{letras}", &l.letras.to_string())
+    } else {
+        String::new()
+    };
+    ui.set_lote_texto(texto.into());
+    let itens: Vec<ItemRevisao> = estado
+        .revisao
+        .iter()
+        .map(|(consulta, c)| {
+            let original = match &consulta.artista {
+                Some(a) => format!("{a} - {}", consulta.titulo),
+                None => consulta.titulo.clone(),
+            };
+            let mut sugestao = format!("{} - {}", c.artista, c.titulo);
+            if let Some(album) = &c.album {
+                sugestao.push_str(&format!(" · {album}"));
+            }
+            ItemRevisao {
+                original: original.into(),
+                sugestao: sugestao.into(),
+                confianca: c.confianca as i32,
+            }
+        })
+        .collect();
+    ui.set_revisao(ModelRc::new(VecModel::from(itens)));
+}
+
+/// Respostas do buscador (timer de 250 ms).
+pub(crate) fn processar_web(estado: &mut EstadoAudio, ui: &MainWindow) {
+    let Some(b) = estado.buscador.as_mut() else {
+        return;
+    };
+    let respostas = b.respostas();
+    let lang = translations::get_translations(&estado.idioma);
+    let t = |k: &str| lang.get(k).copied().unwrap_or("").to_string();
+    let mut renovar = false;
+    for resposta in respostas {
+        match resposta {
+            buscador::Resposta::Letra { chave, resultado } => {
+                match resultado {
+                    Ok(letras_web::Resultado::Salva { .. }) => {
+                        estado.metadados.esquecer_sem_letra(&chave);
+                        if chave_atual(estado).as_deref() == Some(chave.as_str())
+                            && let Some(caminho) = caminho_atual(estado)
+                        {
+                            let tempo = estado.tempo_decorrido;
+                            carregar_letra(estado, ui, &caminho, tempo);
+                        }
+                    }
+                    Ok(_) => estado.metadados.marcar_sem_letra(&chave),
+                    Err(e) => {
+                        if estado.info_chave.as_deref() == Some(chave.as_str()) {
+                            ui.set_info_estado(format!("{}: {e}", t("info_error")).into());
+                        }
+                    }
+                }
+                estado.metadados.salvar();
+                if estado.info_chave.as_deref() == Some(chave.as_str()) {
+                    ui.set_info_ocupado(false);
+                    publicar_info(estado, ui);
+                }
+            }
+            buscador::Resposta::Candidatos { chave, lista, erro } => {
+                if estado.info_chave.as_deref() != Some(chave.as_str()) {
+                    continue;
+                }
+                let texto = match (&erro, lista.len()) {
+                    (Some(e), 0) => format!("{}: {e}", t("info_error")),
+                    (_, 0) => t("info_nothing"),
+                    (_, n) => t("info_results").replace("{n}", &n.to_string()),
+                };
+                estado.info_candidatos = lista;
+                ui.set_info_estado(texto.into());
+                ui.set_info_ocupado(false);
+                publicar_info(estado, ui);
+            }
+            buscador::Resposta::LoteProgresso { feitas, total } => {
+                estado.lote.feitas = feitas;
+                estado.lote.total = total;
+                publicar_lote(estado, ui);
+            }
+            buscador::Resposta::LoteItem {
+                consulta,
+                candidatos,
+                letra,
+            } => {
+                match candidatos.first() {
+                    Some(c) if c.confianca >= metadados::CONFIANCA_AUTOMATICA => {
+                        aplicar_correcao(estado, &consulta.chave, metadados::Correcao::from(c));
+                        estado.lote.automaticas += 1;
+                        renovar = true;
+                    }
+                    Some(c) => estado.revisao.push((consulta.clone(), c.clone())),
+                    None => estado.lote.sem_resultado += 1,
+                }
+                match letra {
+                    Some(letras_web::Resultado::Salva { .. }) => estado.lote.letras += 1,
+                    Some(_) => estado.metadados.marcar_sem_letra(&consulta.chave),
+                    None => {}
+                }
+                estado.lote.feitas += 1;
+            }
+            buscador::Resposta::LoteFim { cancelado, erro } => {
+                estado.lote.ativo = false;
+                estado.metadados.salvar();
+                renovar = true;
+                if let Some(e) = erro.filter(|_| !cancelado && estado.lote.automaticas == 0) {
+                    ui.set_info_estado(format!("{}: {e}", t("info_error")).into());
+                }
+                // A letra da faixa atual pode ter chegado no lote
+                if let Some(caminho) = caminho_atual(estado)
+                    && estado.letra_atual.is_empty()
+                {
+                    let tempo = estado.tempo_decorrido;
+                    carregar_letra(estado, ui, &caminho, tempo);
+                }
+            }
+            buscador::Resposta::Capa { chave, ok } => {
+                if ok {
+                    // A miniatura "sem capa" dessa faixa não vale mais
+                    let caminho = achar_faixa(estado, &chave)
+                        .and_then(|(l, i)| estado.pastas[l].caminho_faixa(i));
+                    if let Some(p) = estado.imersivo.as_mut().and_then(|i| i.painel.as_mut())
+                        && let Some(c) = caminho
+                    {
+                        p.esquecer(&c);
+                    }
+                    renovar = true;
+                }
+            }
+            buscador::Resposta::Gravadas { ok, falhas } => {
+                let mut texto = t("tags_written").replace("{n}", &ok.to_string());
+                if let Some(f) = falhas.first() {
+                    texto.push_str(&format!(" · {}: {f}", t("info_error")));
+                }
+                ui.set_tags_texto(texto.into());
+            }
+        }
+    }
+    if renovar {
+        renovar_vistas(estado, ui);
+        atualizar_painel(estado, ui);
+    }
+    publicar_lote(estado, ui);
+    if estado.buscador.as_ref().is_some_and(|b| b.dispensavel()) {
+        // Sem trabalho há um minuto: solta o cliente HTTP e a thread
+        estado.buscador = None;
+        Timer::single_shot(Duration::from_millis(500), memoria::aparar);
+    }
+}
+
+/// Liga os callbacks da UI desta área.
+pub(crate) fn ligar(ui: &MainWindow, estado: &Rc<RefCell<EstadoAudio>>) {
+    {
+        let estado = estado.clone();
+        let ui_fraca = ui.as_weak();
+        ui.on_abrir_info(move || {
+            let Some(ui) = ui_fraca.upgrade() else {
+                return;
+            };
+            let mut e = estado.borrow_mut();
+            let Some(chave) = chave_atual(&e) else {
+                return;
+            };
+            if e.info_chave.as_deref() != Some(chave.as_str()) {
+                e.info_candidatos.clear();
+                ui.set_info_estado(SharedString::new());
+            }
+            e.info_chave = Some(chave);
+            ui.set_tags_texto(SharedString::new());
+            publicar_info(&e, &ui);
+            publicar_lote(&e, &ui);
+            ui.set_info_aberta(true);
+        });
+    }
+
+    {
+        let estado = estado.clone();
+        let ui_fraca = ui.as_weak();
+        ui.on_info_buscar(move || {
+            let Some(ui) = ui_fraca.upgrade() else {
+                return;
+            };
+            let mut e = estado.borrow_mut();
+            let Some(consulta) = e
+                .info_chave
+                .clone()
+                .and_then(|k| achar_faixa(&e, &k))
+                .and_then(|(p, i)| consulta_de(&e, p, i))
+            else {
+                return;
+            };
+            let lang = translations::get_translations(&e.idioma);
+            ui.set_info_estado(lang.get("info_searching").copied().unwrap_or("").into());
+            ui.set_info_ocupado(true);
+            e.info_candidatos.clear();
+            publicar_info(&e, &ui);
+            pedir_web(&mut e, buscador::Pedido::Identificar(consulta));
+        });
+    }
+
+    {
+        let estado = estado.clone();
+        let ui_fraca = ui.as_weak();
+        ui.on_info_aplicar(move |posicao, gravar| {
+            let Some(ui) = ui_fraca.upgrade() else {
+                return;
+            };
+            let mut e = estado.borrow_mut();
+            let (Some(chave), Some(c)) = (
+                e.info_chave.clone(),
+                e.info_candidatos.get(posicao.max(0) as usize).cloned(),
+            ) else {
+                return;
+            };
+            let correcao = metadados::Correcao::from(&c);
+            aplicar_correcao(&mut e, &chave, correcao.clone());
+            e.metadados.salvar();
+            if gravar
+                && let Some((p, i)) = achar_faixa(&e, &chave)
+                && let Some(caminho) = e.pastas[p].caminho_faixa(i)
+            {
+                pedir_web(
+                    &mut e,
+                    buscador::Pedido::GravarTags(vec![(caminho, correcao)]),
+                );
+            }
+            e.info_candidatos.clear();
+            ui.set_info_estado(SharedString::new());
+            renovar_vistas(&mut e, &ui);
+            atualizar_painel(&mut e, &ui);
+            // Com os nomes certos, a letra pode aparecer
+            if e.letra_atual.is_empty() && chave_atual(&e).as_deref() == Some(chave.as_str()) {
+                pedir_letra(&mut e, true);
+            }
+        });
+    }
+
+    {
+        let estado = estado.clone();
+        let ui_fraca = ui.as_weak();
+        ui.on_info_restaurar(move || {
+            let Some(ui) = ui_fraca.upgrade() else {
+                return;
+            };
+            let mut e = estado.borrow_mut();
+            if let Some(chave) = e.info_chave.clone() {
+                restaurar_original(&mut e, &chave);
+                e.metadados.salvar();
+                renovar_vistas(&mut e, &ui);
+                atualizar_painel(&mut e, &ui);
+            }
+        });
+    }
+
+    {
+        let estado = estado.clone();
+        let ui_fraca = ui.as_weak();
+        ui.on_info_baixar_letra(move || {
+            let Some(ui) = ui_fraca.upgrade() else {
+                return;
+            };
+            let mut e = estado.borrow_mut();
+            // A tela é sempre da faixa atual
+            if e.info_chave.is_some() && e.info_chave == chave_atual(&e) {
+                let lang = translations::get_translations(&e.idioma);
+                ui.set_info_estado(lang.get("info_searching").copied().unwrap_or("").into());
+                ui.set_info_ocupado(true);
+                pedir_letra(&mut e, true);
+            }
+        });
+    }
+
+    {
+        let estado = estado.clone();
+        let ui_fraca = ui.as_weak();
+        ui.on_lote_iniciar(move || {
+            let Some(ui) = ui_fraca.upgrade() else {
+                return;
+            };
+            let mut e = estado.borrow_mut();
+            let aba = e.aba_visivel;
+            let n = e.pastas.get(aba).map_or(0, |p| p.tracks.len());
+            // Quem já tem correção fica de fora
+            let consultas: Vec<metadados::Consulta> = (0..n)
+                .filter_map(|i| consulta_de(&e, aba, i))
+                .filter(|c| e.metadados.correcao(&c.chave).is_none())
+                .collect();
+            e.revisao.clear();
+            e.lote = Lote {
+                ativo: !consultas.is_empty(),
+                total: consultas.len(),
+                ..Default::default()
+            };
+            if !consultas.is_empty() {
+                pedir_web(
+                    &mut e,
+                    buscador::Pedido::Lote {
+                        consultas,
+                        letras: true,
+                    },
+                );
+            }
+            publicar_lote(&e, &ui);
+        });
+    }
+
+    {
+        let estado = estado.clone();
+        ui.on_lote_cancelar(move || {
+            if let Some(b) = estado.borrow().buscador.as_ref() {
+                b.cancelar_lote();
+            }
+        });
+    }
+
+    {
+        let estado = estado.clone();
+        let ui_fraca = ui.as_weak();
+        ui.on_revisao_decidir(move |posicao, aceitar| {
+            let Some(ui) = ui_fraca.upgrade() else {
+                return;
+            };
+            let mut e = estado.borrow_mut();
+            let todas = posicao < 0;
+            let escolhidas: Vec<(metadados::Consulta, metadados::Candidato)> = if todas {
+                std::mem::take(&mut e.revisao)
+            } else if (posicao as usize) < e.revisao.len() {
+                vec![e.revisao.remove(posicao as usize)]
+            } else {
+                return;
+            };
+            if aceitar {
+                for (consulta, c) in escolhidas {
+                    aplicar_correcao(&mut e, &consulta.chave, metadados::Correcao::from(&c));
+                }
+                e.metadados.salvar();
+                renovar_vistas(&mut e, &ui);
+                atualizar_painel(&mut e, &ui);
+            }
+            publicar_lote(&e, &ui);
+        });
+    }
+
+    {
+        let estado = estado.clone();
+        let ui_fraca = ui.as_weak();
+        ui.on_gravar_tags_aba(move || {
+            let Some(ui) = ui_fraca.upgrade() else {
+                return;
+            };
+            let mut e = estado.borrow_mut();
+            let aba = e.aba_visivel;
+            let atual = caminho_atual(&e);
+            let Some(pasta) = e.pastas.get(aba) else {
+                return;
+            };
+            // A faixa tocando fica de fora: o decodificador está lendo o
+            // arquivo, e reescrever as tags no começo dele estragaria o som
+            let itens: Vec<(PathBuf, metadados::Correcao)> = (0..pasta.tracks.len())
+                .filter_map(|i| {
+                    let caminho = pasta.caminho_faixa(i)?;
+                    let correcao = e.metadados.correcao(&pasta.chave_faixa(i)?)?;
+                    (Some(&caminho) != atual.as_ref()).then(|| (caminho, correcao.clone()))
+                })
+                .collect();
+            let lang = translations::get_translations(&e.idioma);
+            if itens.is_empty() {
+                ui.set_tags_texto(lang.get("tags_none").copied().unwrap_or("").into());
+                return;
+            }
+            ui.set_tags_texto(lang.get("tags_writing").copied().unwrap_or("").into());
+            pedir_web(&mut e, buscador::Pedido::GravarTags(itens));
+        });
+    }
+
+    {
+        let estado = estado.clone();
+        ui.on_alternar_letras_web(move |ligado| {
+            let mut e = estado.borrow_mut();
+            e.letras_web = ligado;
+            salvar_configuracao(&e);
+        });
+    }
+
+    {
+        let estado = estado.clone();
+        ui.on_chave_acoustid_mudou(move |chave| {
+            let mut e = estado.borrow_mut();
+            e.chave_acoustid = chave.trim().to_string();
+            // O buscador leva a chave de quando nasceu
+            if e.buscador.as_ref().is_some_and(|b| b.dispensavel_ja()) {
+                e.buscador = None;
+            }
+            salvar_configuracao(&e);
+        });
+    }
+}

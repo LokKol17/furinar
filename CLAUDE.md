@@ -22,7 +22,15 @@ Linux build deps: `libasound2-dev libgtk-3-dev pkg-config`.
 
 ## Architecture
 
-- `src/main.rs` holds almost everything: app state, playback logic, Slint callback wiring, OS integration. The other modules are small, mostly pure helpers:
+- `src/main.rs` is setup only: module list, `aplicar_idioma`, loading the config into `EstadoAudio`, the 250 ms timer and window/update callbacks. App logic lives in modules that `use crate::*` (root re-imports them with `use <mod>::*`, so items are shared crate-wide as `pub(crate)`); each area has a `ligar(ui, estado)` that registers its Slint callbacks:
+  - `estado.rs` — `EstadoAudio`, `PastaMusical`/`Tipo`, tab constants, `salvar_configuracao`.
+  - `listas.rs` — tabs, scanning, ordering, special lists, favorites/play counts, album tab.
+  - `reproducao.rs` — sources/player, seek, next/previous (shuffle, history), gapless/crossfade, lyrics sync, volume, sleep timer.
+  - `ponte_imersivo.rs` — bridge to the immersive mode (track shown, library drawer, up-next, preview, clock).
+  - `web_ui.rs` — track info screen and tab batch (talks to `buscador`).
+  - `plataforma.rs` — MPRIS/SMTC, Windows taskbar buttons, rounded corners.
+  - `captura.rs` (tests only) — window-less screenshots.
+  Mostly pure helpers:
   - `config.rs` — `AppConfig`, serde JSON `furinar_config.json` (XDG `~/.config/furinar/` on Linux, next to the exe on Windows). Legacy singular `pasta` field is migrated into `pastas`.
   - `track.rs` — folder scanning, tag reading (lofty: title, artist, album, number, duration, ReplayGain factor, date added), accent/case-insensitive search (`normalizar_busca`, `ordem_filtrada`), sorting (`Ordem`, `ordenar`) and album grouping (`agrupar_albuns`).
   - `lrc.rs` — `.lrc` synced-lyrics parsing, embedded lyrics fallback (`letra_embutida`: SYLT, then USLT/LYRICS tried as LRC; plain text = `Letra::Livre`, shown whole without highlight) and the visible window of lines.
