@@ -1,0 +1,440 @@
+// ---------------------------------------------------------------------
+// Painel da biblioteca do modo imersivo
+//
+// Gaveta à direita com as abas das pastas, a busca, a lista da aba visível e
+// a fila "a seguir". A lista é virtualizada pelo Rust: chegam só as linhas
+// ao redor do trecho visível (`linhas`, começando em `primeira`), e o painel
+// avisa quando rola (`rolou`).
+// ---------------------------------------------------------------------
+
+import { I18n } from "i18n.slint";
+
+export struct LinhaPainel {
+    titulo: string,
+    detalhe: string,
+    duracao: string,
+    capa: image,
+    tem_capa: bool,
+    tocando: bool,
+}
+
+component Linha inherits Rectangle {
+    in property <LinhaPainel> dados;
+    in property <bool> selecionada: false;
+    in property <color> cor;
+    in property <[float]> barras: [];
+    callback clicado();
+
+    height: 56px;
+    border-radius: 8px;
+    background: root.dados.tocando ? root.cor.with-alpha(0.20) : (root.selecionada ? #ffffff1f : (toque.has-hover ? #ffffff12 : transparent));
+    animate background { duration: 120ms; }
+
+    toque := TouchArea {
+        clicked => { root.clicado(); }
+    }
+
+    Rectangle {
+        x: 8px;
+        y: 8px;
+        width: 40px;
+        height: 40px;
+        border-radius: 5px;
+        clip: true;
+        background: root.cor.with-alpha(0.30);
+
+        if root.dados.tem_capa : Image {
+            width: parent.width;
+            height: parent.height;
+            source: root.dados.capa;
+            image-fit: cover;
+        }
+        if !root.dados.tem_capa : Image {
+            source: @image-url("icons/letra.svg");
+            width: 16px;
+            height: 16px;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            colorize: #ffffff80;
+        }
+
+        // Tocando: mini equalizador sobre a capa, puxado do visualizador
+        if root.dados.tocando : Rectangle {
+            background: #00000088;
+
+            for k in 3 : Rectangle {
+                x: 9px + k * 8px;
+                width: 5px;
+                height: max(3px, root.barras[4 + k * 9] * 24px);
+                y: parent.height - 8px - self.height;
+                border-radius: 1px;
+                background: #ffffff;
+            }
+        }
+    }
+
+    VerticalLayout {
+        x: 60px;
+        width: root.width - self.x - 62px;
+        alignment: center;
+        spacing: 2px;
+
+        Text {
+            text: root.dados.titulo;
+            color: root.dados.tocando ? root.cor : #ffffff;
+            font-size: 14px;
+            font-weight: 600;
+            overflow: elide;
+        }
+        // `if`, não `visible`: escondido ainda ocuparia espaço no layout
+        if root.dados.detalhe != "" : Text {
+            text: root.dados.detalhe;
+            color: #ffffff8c;
+            font-size: 12px;
+            overflow: elide;
+        }
+    }
+
+    Text {
+        x: root.width - 56px;
+        width: 46px;
+        height: root.height;
+        text: root.dados.duracao;
+        color: #ffffff80;
+        font-size: 12px;
+        horizontal-alignment: right;
+        vertical-alignment: center;
+    }
+}
+
+// Botão de texto do cabeçalho (guias "Biblioteca" / "A seguir")
+component Guia inherits Rectangle {
+    in property <string> texto;
+    in property <bool> ativa;
+    in property <color> cor;
+    callback clicado();
+
+    height: 32px;
+    width: rotulo.preferred-width + 24px;
+    border-radius: 16px;
+    background: root.ativa ? #ffffff24 : (toque.has-hover ? #ffffff12 : transparent);
+    animate background { duration: 120ms; }
+
+    rotulo := Text {
+        text: root.texto;
+        color: root.ativa ? #ffffff : #ffffffa0;
+        font-size: 14px;
+        font-weight: root.ativa ? 700 : 500;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+    toque := TouchArea {
+        clicked => { root.clicado(); }
+    }
+}
+
+export component PainelBiblioteca inherits Rectangle {
+    in property <[string]> abas;
+    in property <int> aba_ativa;
+    in property <int> aba_tocando: -1;
+    in-out property <string> texto_busca;
+    in property <int> total;
+    in property <int> primeira;
+    in property <[LinhaPainel]> linhas;
+    in property <[LinhaPainel]> fila;
+    in property <int> selecionado: -1;
+    /// Incrementados pela janela: navegar pelo teclado / foco na busca
+    in property <int> pedido_rolar;
+    in property <int> pedido_busca;
+    in property <color> cor;
+    in property <[float]> barras;
+
+    callback aba_selecionada(int);
+    callback busca_mudou(string);
+    callback rolou(int, int);
+    callback linha_clicada(int);
+    callback fila_clicada(int);
+    callback devolver_foco();
+    callback fechar();
+
+    /// 0 = biblioteca, 1 = a seguir
+    property <int> guia: 0;
+    property <length> passo: 60px;
+
+    background: #0a0e15eb;
+
+    function informar() {
+        root.rolou(max(0, floor(-lista.content-y / root.passo)), ceil(lista.height / root.passo));
+    }
+
+    function rolar_para(y: length) {
+        lista.content-y = max(min(0px, lista.height - root.total * root.passo), min(0px, y));
+        root.informar();
+    }
+
+    // Linha selecionada no centro (ao abrir)
+    function centralizar() {
+        if (root.selecionado >= 0) {
+            root.rolar_para(lista.height / 2 - (root.selecionado + 0.5) * root.passo);
+        } else {
+            root.informar();
+        }
+    }
+
+    // Só rola o necessário para a seleção aparecer (teclado)
+    function manter_visivel() {
+        if (root.selecionado < 0) {
+            return;
+        }
+        if (root.selecionado * root.passo < -lista.content-y) {
+            root.rolar_para(-root.selecionado * root.passo);
+        } else if ((root.selecionado + 1) * root.passo > -lista.content-y + lista.height) {
+            root.rolar_para(lista.height - (root.selecionado + 1) * root.passo);
+        }
+    }
+
+    /// Chamado pela tela depois de avisar o Rust que o painel abriu: a
+    /// primeira rolagem informada já encontra o painel do lado de lá.
+    public function abrir() {
+        root.guia = 0;
+        root.centralizar();
+    }
+    changed pedido_rolar => {
+        root.guia = 0;
+        root.manter_visivel();
+    }
+    changed pedido_busca => {
+        root.guia = 0;
+        entrada.focus();
+    }
+
+    // Engole cliques e rolagem que caíssem na tela de trás
+    TouchArea { }
+
+    // Borda esquerda
+    Rectangle {
+        x: 0px;
+        width: 1px;
+        background: #ffffff1a;
+    }
+
+    // -------------------------------------------------------------
+    // Cabeçalho
+    // -------------------------------------------------------------
+    HorizontalLayout {
+        x: 20px;
+        y: 20px;
+        width: root.width - 40px;
+        height: 32px;
+        spacing: 6px;
+
+        Guia {
+            texto: I18n.library_title;
+            ativa: root.guia == 0;
+            cor: root.cor;
+            clicado => { root.guia = 0; }
+        }
+        Guia {
+            texto: I18n.up_next;
+            ativa: root.guia == 1;
+            cor: root.cor;
+            clicado => { root.guia = 1; }
+        }
+        Rectangle { horizontal-stretch: 1; }
+        Rectangle {
+            width: 32px;
+            border-radius: 16px;
+            background: fechar_toque.has-hover ? #ffffff26 : transparent;
+            animate background { duration: 120ms; }
+
+            Image {
+                source: @image-url("icons/x.svg");
+                width: 14px;
+                height: 14px;
+                x: (parent.width - self.width) / 2;
+                y: (parent.height - self.height) / 2;
+                colorize: #ffffffcc;
+            }
+            fechar_toque := TouchArea {
+                clicked => { root.fechar(); }
+            }
+        }
+    }
+
+    // -------------------------------------------------------------
+    // Biblioteca: abas, busca e lista
+    // -------------------------------------------------------------
+    Rectangle {
+        y: 64px;
+        height: root.height - self.y;
+        visible: root.guia == 0;
+
+        Flickable {
+            x: 20px;
+            y: 0px;
+            width: root.width - 40px;
+            height: 32px;
+            content-width: max(self.width, chips.preferred-width);
+
+            chips := HorizontalLayout {
+                alignment: start;
+                spacing: 6px;
+
+                for nome[i] in root.abas: Rectangle {
+                    height: 32px;
+                    width: min(180px, chip_texto.preferred-width + (i == root.aba_tocando ? 40px : 28px));
+                    border-radius: 16px;
+                    background: i == root.aba_ativa ? root.cor.with-alpha(0.28) : (chip_toque.has-hover ? #ffffff1a : #ffffff0d);
+                    border-width: 1px;
+                    border-color: i == root.aba_ativa ? root.cor.with-alpha(0.7) : #ffffff1a;
+                    animate background, border-color { duration: 130ms; }
+
+                    chip_texto := Text {
+                        x: 14px;
+                        width: parent.width - (i == root.aba_tocando ? 40px : 28px);
+                        height: parent.height;
+                        text: nome;
+                        color: i == root.aba_ativa ? #ffffff : #ffffffb0;
+                        font-size: 13px;
+                        vertical-alignment: center;
+                        overflow: elide;
+                    }
+                    // Pontinho: de onde vem o som agora
+                    if i == root.aba_tocando : Rectangle {
+                        x: parent.width - 20px;
+                        y: (parent.height - self.height) / 2;
+                        width: 6px;
+                        height: 6px;
+                        border-radius: 3px;
+                        background: root.cor;
+                    }
+                    chip_toque := TouchArea {
+                        clicked => {
+                            root.aba_selecionada(i);
+                            root.rolar_para(0px);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Busca (Esc ou Enter devolvem o foco aos atalhos)
+        Rectangle {
+            x: 20px;
+            y: 44px;
+            width: root.width - 40px;
+            height: 40px;
+            border-radius: 20px;
+            background: #ffffff14;
+            border-width: 1px;
+            border-color: entrada.has-focus ? root.cor.with-alpha(0.8) : #ffffff1a;
+            animate border-color { duration: 140ms; }
+
+            Image {
+                source: @image-url("icons/busca.svg");
+                width: 16px;
+                height: 16px;
+                x: 14px;
+                y: (parent.height - self.height) / 2;
+                colorize: #ffffff90;
+            }
+            Text {
+                x: 40px;
+                height: parent.height;
+                text: (root.texto_busca == "" && entrada.preedit-text == "") ? I18n.search_placeholder : "";
+                color: #ffffff60;
+                font-size: 14px;
+                vertical-alignment: center;
+            }
+            FocusScope {
+                x: 40px;
+                width: parent.width - 52px;
+                key-pressed(e) => {
+                    if (e.text == Key.Escape) {
+                        root.devolver_foco();
+                        return accept;
+                    }
+                    return reject;
+                }
+
+                entrada := TextInput {
+                    height: parent.height;
+                    color: #ffffff;
+                    font-size: 14px;
+                    vertical-alignment: center;
+                    selection-background-color: root.cor.with-alpha(0.4);
+                    text <=> root.texto_busca;
+                    edited => {
+                        root.busca_mudou(self.text);
+                        root.rolar_para(0px);
+                    }
+                    accepted => { root.devolver_foco(); }
+                }
+            }
+        }
+
+        lista := Flickable {
+            x: 12px;
+            y: 96px;
+            width: root.width - 24px;
+            height: parent.height - self.y - 12px;
+            content-height: root.total * root.passo;
+
+            changed content-y => { root.informar(); }
+            changed height => { root.informar(); }
+
+            for l[i] in root.linhas: Linha {
+                x: 0px;
+                y: (root.primeira + i) * root.passo;
+                width: lista.width;
+                dados: l;
+                selecionada: root.primeira + i == root.selecionado;
+                cor: root.cor;
+                barras: root.barras;
+                clicado => {
+                    root.linha_clicada(root.primeira + i);
+                    root.devolver_foco();
+                }
+            }
+        }
+
+        if root.total == 0 : Text {
+            y: 120px;
+            width: root.width;
+            text: I18n.library_empty;
+            color: #ffffff80;
+            font-size: 14px;
+            horizontal-alignment: center;
+        }
+    }
+
+    // -------------------------------------------------------------
+    // A seguir
+    // -------------------------------------------------------------
+    Rectangle {
+        y: 64px;
+        height: root.height - self.y;
+        visible: root.guia == 1;
+
+        for l[i] in root.fila: Linha {
+            x: 12px;
+            y: i * root.passo;
+            width: root.width - 24px;
+            dados: l;
+            cor: root.cor;
+            clicado => {
+                root.fila_clicada(i);
+                root.devolver_foco();
+            }
+        }
+
+        if root.fila.length == 0 : Text {
+            y: 20px;
+            width: root.width;
+            text: I18n.up_next_empty;
+            color: #ffffff80;
+            font-size: 14px;
+            horizontal-alignment: center;
+        }
+    }
+}

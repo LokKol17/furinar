@@ -9,6 +9,9 @@ mod fundo;
 mod imersivo;
 mod lrc;
 mod memoria;
+mod miniaturas;
+mod painel;
+mod sono;
 mod track;
 mod translations;
 mod updates;
@@ -23,7 +26,7 @@ use std::rc::Rc;
 use std::sync::mpsc::Sender;
 #[cfg(any(feature = "mpris", target_os = "windows"))]
 use std::sync::mpsc::{self, Receiver};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use config::AppConfig;
 use lrc::{caminho_lrc, indice_letra, janela_letra, parse_lrc};
@@ -125,6 +128,13 @@ fn aplicar_idioma(idioma: &str, ui: &MainWindow) {
     i18n.set_tip_settings(g("tip_settings"));
     i18n.set_tip_immersive(g("tip_immersive"));
     i18n.set_tip_exit_immersive(g("tip_exit_immersive"));
+    i18n.set_tip_library(g("tip_library"));
+    i18n.set_library_title(g("library_title"));
+    i18n.set_library_empty(g("library_empty"));
+    i18n.set_up_next(g("up_next"));
+    i18n.set_up_next_empty(g("up_next_empty"));
+    i18n.set_tip_lyrics_only(g("tip_lyrics_only"));
+    i18n.set_tip_sleep(g("tip_sleep"));
     i18n.set_bg_label(g("bg_label"));
     i18n.set_bg_choose(g("bg_choose"));
     i18n.set_bg_clear(g("bg_clear"));
@@ -200,6 +210,11 @@ struct EstadoAudio {
     /// vazia, força reembaralho) quando a pasta de reprodução muda, a
     /// lista de faixas muda, ou o modo sai/entra no inteligente.
     sacola_shuffle: Vec<usize>,
+    /// Shuffle comum: próximas faixas já sorteadas, para a fila "a seguir"
+    /// mostrar o que vai tocar de verdade. Zera junto com a sacola.
+    sorteio: Vec<usize>,
+    /// Temporizador de sono ligado.
+    sono: Option<sono::Sono>,
     escanear_subpastas: bool,
     tema_claro: bool,
     idioma: String,
@@ -243,6 +258,8 @@ impl Default for EstadoAudio {
             modo_loop: 0,
             modo_shuffle: 0,
             sacola_shuffle: Vec::new(),
+            sorteio: Vec::new(),
+            sono: None,
             escanear_subpastas: false,
             tema_claro: false,
             idioma: "pt-br".to_string(),
@@ -325,6 +342,9 @@ fn atualizar_lista(estado: &mut EstadoAudio, ui: &MainWindow) {
     ui.set_musicas(ModelRc::new(VecModel::from(modelo)));
 
     atualizar_selecao_visivel(estado, ui);
+    atualizar_painel(estado, ui);
+    // O filtro da aba que toca muda a ordem de navegação
+    atualizar_fila(estado);
 }
 
 /// Espelha a lista de pastas e os índices das abas na UI.
@@ -440,6 +460,7 @@ fn reescaneiar_pastas(estado: &mut EstadoAudio, ui: &MainWindow) {
     // Índices podem ter mudado com o reescaneio; a sacola do shuffle
     // inteligente não serve mais.
     estado.sacola_shuffle.clear();
+    estado.sorteio.clear();
 
     if let (Some(p), Some(nome)) = (estado.pasta_reproducao, estado.arquivo_atual.clone()) {
         let novo = estado
@@ -541,6 +562,62 @@ fn atualizar_imersivo(estado: &mut EstadoAudio, ui: &MainWindow) {
     let faixa = faixa_imersiva(estado);
     if let Some(imv) = estado.imersivo.as_mut() {
         imv.trocar_faixa(ui, faixa);
+    }
+    atualizar_painel(estado, ui);
+    atualizar_fila(estado);
+}
+
+/// Republica a janela de linhas do painel da biblioteca (se aberto).
+fn atualizar_painel(estado: &mut EstadoAudio, ui: &MainWindow) {
+    let Some(painel) = estado.imersivo.as_mut().and_then(|i| i.painel.as_mut()) else {
+        return;
+    };
+    let pasta = estado.pastas.get(estado.aba_visivel);
+    let tocando = if estado.pasta_reproducao == Some(estado.aba_visivel) {
+        estado.indice_atual
+    } else {
+        None
+    };
+    let indices = &estado.indices_visiveis;
+    painel.publicar(ui, indices.len(), |pos| {
+        item_painel(pasta?, *indices.get(pos)?, tocando)
+    });
+}
+
+fn item_painel(
+    pasta: &PastaMusical,
+    indice: usize,
+    tocando: Option<usize>,
+) -> Option<painel::Item> {
+    let t = pasta.tracks.get(indice)?;
+    Some(painel::Item {
+        caminho: pasta.caminho.join(&t.path),
+        indice,
+        titulo: t.titulo.clone(),
+        artista: t.artista.clone(),
+        tocando: tocando == Some(indice),
+    })
+}
+
+/// Quantas faixas a fila "a seguir" mostra.
+const TAMANHO_FILA: usize = 5;
+
+/// Republica a fila "a seguir" do painel (se aberto).
+fn atualizar_fila(estado: &mut EstadoAudio) {
+    let aberto = estado.imersivo.as_ref().is_some_and(|i| i.painel.is_some());
+    if !aberto {
+        return;
+    }
+    let proximas = proximas(estado, TAMANHO_FILA);
+    let itens = match estado.pasta_reproducao.and_then(|p| estado.pastas.get(p)) {
+        Some(pasta) => proximas
+            .iter()
+            .filter_map(|&i| item_painel(pasta, i, None))
+            .collect(),
+        None => Vec::new(),
+    };
+    if let Some(painel) = estado.imersivo.as_mut().and_then(|i| i.painel.as_mut()) {
+        painel.publicar_fila(itens);
     }
 }
 
@@ -693,6 +770,7 @@ fn iniciar_faixa(
         // Pasta de reprodução mudou: a sacola do shuffle inteligente era
         // da pasta antiga, não serve mais aqui.
         estado.sacola_shuffle.clear();
+        estado.sorteio.clear();
     }
 
     estado.pasta_reproducao = Some(pasta_idx);
@@ -789,7 +867,6 @@ fn alternar_play_pause(estado: &EstadoAudio, ui: &MainWindow) {
     }
 }
 
-#[cfg(feature = "mpris")]
 fn pausar(estado: &EstadoAudio, ui: &MainWindow) {
     if let Some(ref sink) = estado.audio_player
         && !sink.is_paused()
@@ -830,71 +907,122 @@ fn stop_music(estado: &mut EstadoAudio, ui: &MainWindow) {
     publicar_letra(estado, ui);
 }
 
-fn tocar_proxima_manual(estado: &mut EstadoAudio, ui: &MainWindow) {
-    // Navega na pasta de onde vem a faixa atual, nunca na aba visível.
-    let alvo = {
-        let Some(pasta_idx) = estado.pasta_reproducao else {
-            return;
-        };
-        let Some(pasta) = estado.pastas.get(pasta_idx) else {
-            return;
-        };
+/// Pasta que está tocando e sua ordem de navegação (com o filtro, quando ele
+/// é dessa pasta). Navegar é sempre na pasta da faixa atual, nunca na aba
+/// visível.
+fn ordem_reproducao(estado: &EstadoAudio) -> Option<(usize, Vec<usize>)> {
+    let pasta_idx = estado.pasta_reproducao?;
+    let pasta = estado.pastas.get(pasta_idx)?;
+    let filtro = filtro_efetivo(estado.aba_visivel, estado.pasta_reproducao, &estado.filtro);
+    let ordem = ordem_filtrada(&pasta.tracks, filtro);
+    (!ordem.is_empty()).then_some((pasta_idx, ordem))
+}
 
-        let filtro = filtro_efetivo(estado.aba_visivel, estado.pasta_reproducao, &estado.filtro);
-        let ordem = ordem_filtrada(&pasta.tracks, filtro);
-        if ordem.is_empty() {
-            return;
-        }
+/// Shuffle inteligente: uma "sacola" embaralhada é consumida até esvaziar e
+/// só então outra é feita. Garante que todas as faixas tocam uma vez antes de
+/// qualquer repetição.
+fn encher_sacola(estado: &mut EstadoAudio, ordem: &[usize]) {
+    let mut rng = rand::thread_rng();
+    let mut nova_sacola = ordem.to_vec();
+    nova_sacola.shuffle(&mut rng);
 
-        let pos = estado
-            .indice_atual
-            .and_then(|idx| ordem.iter().position(|&i| i == idx));
+    // Evita repetição colada na emenda entre um ciclo e o outro: a próxima a
+    // sair é `nova_sacola.last()` (o pop consome do fim) — se for igual à
+    // última tocada, troca de lugar com outra posição.
+    if nova_sacola.len() > 1 && nova_sacola.last().copied() == estado.indice_atual {
+        let ultimo = nova_sacola.len() - 1;
+        nova_sacola.swap(0, ultimo);
+    }
 
-        if estado.modo_shuffle == 2 {
-            // Shuffle inteligente: consome de uma "sacola" embaralhada até
-            // esvaziar; só então reembaralha uma nova. Garante que todas
-            // as faixas tocam uma vez antes de qualquer repetição.
+    estado.sacola_shuffle = nova_sacola;
+}
+
+/// As próximas `n` faixas (índices na pasta que toca), sem tocar nenhuma. O
+/// sorteio do shuffle acontece aqui, adiantado, e `tocar_proxima_manual`
+/// consome a mesma fila: o que aparece em "a seguir" é o que toca.
+fn proximas(estado: &mut EstadoAudio, n: usize) -> Vec<usize> {
+    let Some((_, ordem)) = ordem_reproducao(estado) else {
+        return Vec::new();
+    };
+    match estado.modo_shuffle {
+        2 => {
             if estado.sacola_shuffle.is_empty() {
-                let mut rng = rand::thread_rng();
-                let mut nova_sacola = ordem.clone();
-                nova_sacola.shuffle(&mut rng);
-
-                // Evita repetição colada na emenda entre um ciclo e o
-                // outro: a próxima a sair é `nova_sacola.last()` (o pop
-                // consome do fim) — se for igual à última tocada, troca de
-                // lugar com outra posição.
-                if nova_sacola.len() > 1 && nova_sacola.last().copied() == estado.indice_atual {
-                    let ultimo = nova_sacola.len() - 1;
-                    nova_sacola.swap(0, ultimo);
-                }
-
-                estado.sacola_shuffle = nova_sacola;
+                encher_sacola(estado, &ordem);
             }
-            estado.sacola_shuffle.pop().map(|i| (pasta_idx, i))
-        } else if estado.modo_shuffle == 1 {
-            // Aleatório de verdade: sorteia entre todas as faixas, sem
-            // excluir nada (pode repetir, inclusive de seguida — é assim
-            // que aleatório de verdade se comporta). Quem quiser evitar
-            // repetição é o Shuffle Inteligente.
-            let mut rng = rand::thread_rng();
-            ordem.choose(&mut rng).copied().map(|i| (pasta_idx, i))
-        } else {
-            match pos {
-                Some(p) if p + 1 < ordem.len() => Some((pasta_idx, ordem[p + 1])),
-                Some(_) if estado.modo_loop == 2 => Some((pasta_idx, ordem[0])),
-                Some(_) => None, // fim da pasta: para
-                None => Some((pasta_idx, ordem[0])),
-            }
+            estado
+                .sacola_shuffle
+                .iter()
+                .rev()
+                .take(n)
+                .copied()
+                .collect()
         }
+        1 => {
+            let mut rng = rand::thread_rng();
+            while estado.sorteio.len() < n {
+                match ordem.choose(&mut rng) {
+                    Some(&i) => estado.sorteio.push(i),
+                    None => break,
+                }
+            }
+            estado.sorteio.iter().take(n).copied().collect()
+        }
+        _ => {
+            let mut pos = estado
+                .indice_atual
+                .and_then(|idx| ordem.iter().position(|&i| i == idx));
+            let mut saida = Vec::new();
+            for _ in 0..n.min(ordem.len()) {
+                let proxima = match pos {
+                    Some(p) if p + 1 < ordem.len() => p + 1,
+                    Some(_) if estado.modo_loop == 2 => 0,
+                    Some(_) => break,
+                    None => 0,
+                };
+                saida.push(ordem[proxima]);
+                pos = Some(proxima);
+            }
+            saida
+        }
+    }
+}
+
+fn tocar_proxima_manual(estado: &mut EstadoAudio, ui: &MainWindow) {
+    let Some((pasta_idx, ordem)) = ordem_reproducao(estado) else {
+        return;
+    };
+
+    let alvo = match estado.modo_shuffle {
+        2 => {
+            if estado.sacola_shuffle.is_empty() {
+                encher_sacola(estado, &ordem);
+            }
+            estado.sacola_shuffle.pop()
+        }
+        // Aleatório de verdade: sorteia entre todas as faixas, sem excluir
+        // nada (pode repetir, inclusive de seguida — é assim que aleatório de
+        // verdade se comporta). Quem quiser evitar repetição é o Shuffle
+        // Inteligente. Se a fila "a seguir" já sorteou, vale o sorteio dela.
+        1 if !estado.sorteio.is_empty() => Some(estado.sorteio.remove(0)),
+        1 => ordem.choose(&mut rand::thread_rng()).copied(),
+        // Em ordem: `proximas` já sabe parar no fim da pasta
+        _ => proximas(estado, 1).first().copied(),
     };
 
     match alvo {
-        Some((pasta_idx, track_idx)) => tocar_faixa(estado, ui, pasta_idx, track_idx),
-        None => stop_music(estado, ui),
+        Some(track_idx) => tocar_faixa(estado, ui, pasta_idx, track_idx),
+        None => stop_music(estado, ui), // fim da pasta: para
     }
 }
 
 fn proxima_musica_auto(estado: &mut EstadoAudio, ui: &MainWindow) {
+    if estado.sono == Some(sono::Sono::FimDaFaixa) {
+        // Hora de dormir: já deixa a próxima engatilhada, mas pausada
+        estado.sono = None;
+        tocar_proxima_manual(estado, ui);
+        pausar(estado, ui);
+        return;
+    }
     if estado.modo_loop == 1 {
         executar_seek(estado, ui, 0);
     } else {
@@ -965,6 +1093,41 @@ fn atualizar_progresso(estado: &mut EstadoAudio, ui: &MainWindow) {
                 .into(),
             );
         }
+    }
+}
+
+/// Temporizador de sono: esmaece o volume no fim e pausa. Roda no timer de
+/// 250 ms, com ou sem o modo imersivo.
+fn verificar_sono(estado: &mut EstadoAudio, ui: &MainWindow) {
+    let agora = Instant::now();
+    if let Some(sono::Sono::Ate { fim, .. }) = estado.sono {
+        let fator = sono::fator_volume(fim, agora);
+        if fator <= 0.0 {
+            estado.sono = None;
+            pausar(estado, ui);
+            if let Some(sink) = &estado.audio_player {
+                sink.set_volume(estado.volume_atual);
+            }
+        } else if fator < 1.0
+            && let Some(sink) = &estado.audio_player
+        {
+            sink.set_volume(estado.volume_atual * fator);
+        }
+    }
+
+    let lang = translations::get_translations(&estado.idioma);
+    let fim_da_faixa = lang.get("sleep_end").copied().unwrap_or("sleep_end");
+    let texto = sono::texto(estado.sono, agora, fim_da_faixa);
+    if ui.get_imv_sono() != texto.as_str() {
+        ui.set_imv_sono(texto.into());
+    }
+}
+
+/// Relógio do modo imersivo: só mexe na UI quando o minuto vira.
+fn atualizar_relogio(ui: &MainWindow) {
+    let agora = chrono::Local::now().format("%H:%M").to_string();
+    if ui.get_imv_relogio() != agora.as_str() {
+        ui.set_imv_relogio(agora.into());
     }
 }
 
@@ -1671,6 +1834,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let lang = translations::get_translations(&e.idioma);
                 ui.set_texto_loop(texto_loop(e.modo_loop, &lang).into());
                 ui.set_loop_ativo(e.modo_loop != 0);
+                atualizar_fila(&mut e);
                 salvar_configuracao(&e);
             }
         });
@@ -1685,9 +1849,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 e.modo_shuffle = (e.modo_shuffle + 1) % 3;
                 // Sacola da pasta antiga não serve pro modo novo.
                 e.sacola_shuffle.clear();
+                e.sorteio.clear();
                 let lang = translations::get_translations(&e.idioma);
                 ui.set_texto_shuffle(texto_shuffle(e.modo_shuffle, &lang).into());
                 ui.set_shuffle_modo(e.modo_shuffle as i32);
+                atualizar_fila(&mut e);
                 salvar_configuracao(&e);
             }
         });
@@ -1871,6 +2037,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ui.set_modo_imersivo(true);
             ui.window().set_fullscreen(true);
             atualizar_imersivo(&mut e, &ui);
+            atualizar_relogio(&ui);
 
             let estado = estado.clone();
             let ui_fraca = ui.as_weak();
@@ -1940,6 +2107,98 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
     }
 
+    {
+        let estado = estado.clone();
+        let ui_fraca = ui.as_weak();
+        ui.on_imv_painel_alternado(move |aberto| {
+            let Some(ui) = ui_fraca.upgrade() else {
+                return;
+            };
+            let mut e = estado.borrow_mut();
+            let Some(imv) = e.imersivo.as_mut() else {
+                return;
+            };
+            if aberto {
+                imv.painel = Some(painel::Painel::novo(&ui));
+                atualizar_painel(&mut e, &ui);
+                atualizar_fila(&mut e);
+            } else {
+                // Fechado não segura miniatura nem thread
+                imv.painel = None;
+                painel::limpar_ui(&ui);
+            }
+        });
+    }
+
+    {
+        let estado = estado.clone();
+        let ui_fraca = ui.as_weak();
+        ui.on_imv_painel_rolou(move |primeira, quantas| {
+            let Some(ui) = ui_fraca.upgrade() else {
+                return;
+            };
+            let mut e = estado.borrow_mut();
+            let mudou = e
+                .imersivo
+                .as_mut()
+                .and_then(|i| i.painel.as_mut())
+                .is_some_and(|p| p.rolou(primeira.max(0) as usize, quantas.max(0) as usize));
+            if mudou {
+                atualizar_painel(&mut e, &ui);
+            }
+        });
+    }
+
+    {
+        let estado = estado.clone();
+        let ui_fraca = ui.as_weak();
+        ui.on_imv_fila_clicada(move |posicao| {
+            let Some(ui) = ui_fraca.upgrade() else {
+                return;
+            };
+            let mut e = estado.borrow_mut();
+            let Some(indice) = e
+                .imersivo
+                .as_ref()
+                .and_then(|i| i.painel.as_ref())
+                .and_then(|p| p.indice_da_fila(posicao.max(0) as usize))
+            else {
+                return;
+            };
+            let Some(pasta_idx) = e.pasta_reproducao else {
+                return;
+            };
+            // Pular para uma faixa da fila consome a fila até ela
+            match e.modo_shuffle {
+                2 => e.sacola_shuffle.retain(|&i| i != indice),
+                1 => {
+                    if let Some(pos) = e.sorteio.iter().position(|&i| i == indice) {
+                        e.sorteio.drain(..=pos);
+                    }
+                }
+                _ => {}
+            }
+            tocar_faixa(&mut e, &ui, pasta_idx, indice);
+        });
+    }
+
+    {
+        let estado = estado.clone();
+        let ui_fraca = ui.as_weak();
+        ui.on_alternar_sono(move || {
+            let Some(ui) = ui_fraca.upgrade() else {
+                return;
+            };
+            let mut e = estado.borrow_mut();
+            e.sono = sono::proximo(e.sono, Instant::now());
+            // Trocar ou desligar no meio do esmaecimento devolve o volume
+            if let Some(sink) = &e.audio_player {
+                sink.set_volume(e.volume_atual);
+            }
+            verificar_sono(&mut e, &ui);
+        });
+    }
+
     // Timer de progresso
     let timer = Timer::default();
     {
@@ -1989,6 +2248,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 #[cfg(target_os = "windows")]
                 processar_eventos_taskbar(&rx_taskbar, &mut e, &ui);
                 atualizar_progresso(&mut e, &ui);
+                verificar_sono(&mut e, &ui);
+                if e.imersivo.is_some() {
+                    atualizar_relogio(&ui);
+                }
                 #[cfg(feature = "mpris")]
                 sincronizar_controles(&controles, &mut e);
                 #[cfg(target_os = "windows")]
@@ -2278,6 +2541,42 @@ mod tests {
         ui.set_letra_completa(ModelRc::new(VecModel::from(linhas)));
         ui.set_progresso(0.35);
         ui.set_texto_tempo("01:14 / 03:31".into());
+        ui.set_imv_relogio("21:47".into());
+        ui.set_imv_sono("29:41".into());
+
+        // FURINAR_CAPTURA_PAINEL=1: painel aberto com as faixas da pasta
+        if std::env::var_os("FURINAR_CAPTURA_PAINEL").is_some() {
+            let raiz = caminho.parent().map(PathBuf::from).unwrap_or_default();
+            let mut tracks = Vec::new();
+            coletar_arquivos_audio(&raiz, &raiz, false, &mut tracks);
+            tracks.sort_by(|a, b| a.path.cmp(&b.path));
+            let nome = caminho.strip_prefix(&raiz).ok().and_then(|n| n.to_str());
+            let atual = tracks.iter().position(|t| Some(t.path.as_str()) == nome);
+            let pasta = PastaMusical {
+                nome: nome_da_pasta(&raiz),
+                caminho: raiz,
+                tracks,
+                carregada: true,
+            };
+            ui.set_abas(ModelRc::new(VecModel::from(vec![
+                SharedString::from(pasta.nome.as_str()),
+                "Outra pasta".into(),
+            ])));
+            ui.set_aba_tocando(0);
+            ui.set_indice_selecionado(atual.map_or(-1, |i| i as i32));
+            ui.set_imv_painel_aberto(true);
+            let mut p = painel::Painel::novo(&ui);
+            let inicio = atual.unwrap_or(0).saturating_sub(6);
+            p.rolou(inicio, 17);
+            p.publicar(&ui, pasta.tracks.len(), |pos| {
+                item_painel(&pasta, pos, atual)
+            });
+            let fila = (1..=5)
+                .filter_map(|k| item_painel(&pasta, atual.unwrap_or(0) + k, None))
+                .collect();
+            p.publicar_fila(fila);
+            imv.painel = Some(p);
+        }
 
         // Espera a thread da capa e deixa as animações chegarem ao fim
         for _ in 0..40 {

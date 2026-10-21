@@ -1,6 +1,7 @@
 import { Tema, BotaoIcone, BotaoTitulo, BarraDeslizante, CampoBusca, CaixaSelecao } from "theme.slint";
 import { I18n } from "i18n.slint";
 import { TelaImersiva } from "imersivo.slint";
+import { LinhaPainel } from "painel.slint";
 
 export component MainWindow inherits Window {
     title: "Furinar Audio Player";
@@ -73,6 +74,22 @@ export component MainWindow inherits Window {
     callback escolher_fundo();
     callback limpar_fundo();
     callback letra_completa_clicada(int);
+    // Painel da biblioteca do imersivo (lista virtualizada: só uma janela de
+    // linhas a partir de `imv_painel_primeira`)
+    in-out property <bool> imv_painel_aberto: false;
+    in property <int> imv_painel_total: 0;
+    in property <int> imv_painel_primeira: 0;
+    in property <[LinhaPainel]> imv_painel_linhas: [];
+    in property <[LinhaPainel]> imv_fila: [];
+    private property <int> imv_pedido_rolar: 0;
+    private property <int> imv_pedido_busca: 0;
+    in-out property <bool> imv_so_letra: false;
+    in property <string> imv_relogio: "";
+    in property <string> imv_sono: "";
+    callback imv_painel_alternado(bool);
+    callback imv_painel_rolou(int, int);
+    callback imv_fila_clicada(int);
+    callback alternar_sono();
 
     callback abrir_pasta();
     callback anterior();
@@ -133,8 +150,28 @@ export component MainWindow inherits Window {
                 alternar_imersivo();
                 return accept;
             } else if (event.text == Key.Escape && modo_imersivo) {
-                alternar_imersivo();
+                // Esc em camadas: painel, depois só letra, depois sai
+                if (imv_painel_aberto) {
+                    imv_painel_aberto = false;
+                } else if (imv_so_letra) {
+                    imv_so_letra = false;
+                } else {
+                    alternar_imersivo();
+                }
                 return accept;
+            } else if (modo_imersivo && (event.text == "l" || event.text == "L")) {
+                imv_painel_aberto = !imv_painel_aberto;
+                return accept;
+            } else if (modo_imersivo && event.text == "/") {
+                imv_painel_aberto = true;
+                imv_pedido_busca += 1;
+                return accept;
+            } else if (modo_imersivo && (event.text == "h" || event.text == "H")) {
+                imv_so_letra = !imv_so_letra;
+                return accept;
+            } else if (modo_imersivo && !imv_painel_aberto && (event.text == Key.UpArrow || event.text == Key.DownArrow || event.text == Key.Return)) {
+                // Sem o painel não há lista à vista para navegar
+                return reject;
             } else if (event.text == Key.Space) {
                 play_pause();
                 return accept;
@@ -155,6 +192,7 @@ export component MainWindow inherits Window {
                     }
                 }
                 manter_visivel();
+                imv_pedido_rolar += 1;
                 return accept;
             } else if (event.text == Key.DownArrow) {
                 if (musicas.length > 0) {
@@ -167,6 +205,7 @@ export component MainWindow inherits Window {
                     }
                 }
                 manter_visivel();
+                imv_pedido_rolar += 1;
                 return accept;
             } else if (event.text == Key.Return) {
                 if (indice_selecionado >= 0) {
@@ -659,6 +698,30 @@ export component MainWindow inherits Window {
         volume_mudou(v) => { volume_mudou(v); }
         progresso_mudou(v) => { progresso_mudou(v); }
         letra_clicada(i) => { letra_completa_clicada(i); }
+
+        painel_aberto <=> imv_painel_aberto;
+        abas: abas;
+        aba_ativa: aba_ativa;
+        aba_tocando: aba_tocando;
+        texto_busca <=> texto_busca;
+        painel_total: imv_painel_total;
+        painel_primeira: imv_painel_primeira;
+        painel_linhas: imv_painel_linhas;
+        fila: imv_fila;
+        selecionado: indice_selecionado;
+        pedido_rolar: imv_pedido_rolar;
+        pedido_busca: imv_pedido_busca;
+        so_letra <=> imv_so_letra;
+        relogio: imv_relogio;
+        sono: imv_sono;
+        painel_alternado(aberto) => { imv_painel_alternado(aberto); }
+        aba_selecionada(i) => { aba_selecionada(i); }
+        busca_mudou(t) => { busca_mudou(t); }
+        painel_rolou(a, b) => { imv_painel_rolou(a, b); }
+        linha_clicada(i) => { musica_selecionada(i); }
+        fila_clicada(i) => { imv_fila_clicada(i); }
+        devolver_foco => { atalhos.focus(); }
+        alternar_sono => { alternar_sono(); }
     }
 
     // -------------------------------------------------------------
@@ -854,4 +917,4 @@ export component MainWindow inherits Window {
     }
 }
 
-export { I18n }
+export { I18n, LinhaPainel }

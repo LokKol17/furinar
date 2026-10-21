@@ -14,6 +14,7 @@ use slint::{Image, Model, ModelRc, SharedString, VecModel};
 use crate::MainWindow;
 use crate::capa::{self, Carregado};
 use crate::fundo::{self, Reprodutor};
+use crate::painel::{self, Painel};
 use crate::translations;
 use crate::visualizador::{self, Analisador, Captura};
 
@@ -45,6 +46,8 @@ pub struct EstadoImersivo {
     analisador: Analisador,
     /// Modelo das barras, reaproveitado (só os valores mudam a cada tick).
     barras: Rc<VecModel<f32>>,
+    /// Painel da biblioteca; só existe aberto.
+    pub painel: Option<Painel>,
 }
 
 impl EstadoImersivo {
@@ -63,6 +66,7 @@ impl EstadoImersivo {
             fundo_novo: false,
             analisador: Analisador::default(),
             barras,
+            painel: None,
         }
     }
 
@@ -122,6 +126,10 @@ impl EstadoImersivo {
             if geracao == self.geracao {
                 self.aplicar(ui, carregado, idioma);
             }
+        }
+
+        if let Some(p) = self.painel.as_mut() {
+            p.tick();
         }
 
         let quadro = self.fundo.as_mut().and_then(|r| r.proximo(Instant::now()));
@@ -202,4 +210,8 @@ pub fn limpar_ui(ui: &MainWindow) {
     ui.set_imv_tem_fundo(false);
     ui.set_imv_fundo_pixelado(false);
     ui.set_imv_barras(slint::ModelRc::default());
+    ui.set_imv_painel_aberto(false);
+    ui.set_imv_so_letra(false);
+    ui.set_imv_relogio(SharedString::new());
+    painel::limpar_ui(ui);
 }

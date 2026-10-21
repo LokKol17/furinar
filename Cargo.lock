@@ -1540,6 +1540,7 @@ dependencies = [
 name = "furinar"
 version = "1.5.3"
 dependencies = [
+ "chrono",
  "image",
  "libc",
  "lofty",

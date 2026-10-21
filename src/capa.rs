@@ -76,7 +76,7 @@ pub fn carregar(caminho: &Path) -> Carregado {
     }
 }
 
-fn para_buffer(img: &RgbaImage) -> SharedPixelBuffer<Rgba8Pixel> {
+pub fn para_buffer(img: &RgbaImage) -> SharedPixelBuffer<Rgba8Pixel> {
     SharedPixelBuffer::clone_from_slice(img.as_raw(), img.width(), img.height())
 }
 
@@ -107,20 +107,24 @@ fn ler_tags(caminho: &Path) -> (Detalhes, Option<Vec<u8>>) {
             .map(|s| s.trim().to_string())
             .filter(|s| !s.is_empty());
         detalhes.ano = tag.date().map(|d| d.year).filter(|&a| a > 0);
-
-        let fotos = tag.pictures();
-        capa = fotos
-            .iter()
-            .find(|p| p.pic_type() == PictureType::CoverFront)
-            .or_else(|| fotos.first())
-            .map(|p| p.data().to_vec());
+        capa = capa_da_tag(tag);
     }
 
     (detalhes, capa)
 }
 
+/// Bytes da capa embutida, preferindo a frontal.
+pub fn capa_da_tag(tag: &lofty::tag::Tag) -> Option<Vec<u8>> {
+    let fotos = tag.pictures();
+    fotos
+        .iter()
+        .find(|p| p.pic_type() == PictureType::CoverFront)
+        .or_else(|| fotos.first())
+        .map(|p| p.data().to_vec())
+}
+
 /// `cover.jpg`, `folder.png`... na pasta da faixa.
-fn capa_da_pasta(caminho_faixa: &Path) -> Option<Vec<u8>> {
+pub fn capa_da_pasta(caminho_faixa: &Path) -> Option<Vec<u8>> {
     let pasta = caminho_faixa.parent()?;
     NOMES_CAPA.iter().find_map(|nome| {
         EXTENSOES_IMAGEM.iter().find_map(|ext| {

@@ -7,6 +7,7 @@
 
 import { Tema, BarraDeslizante } from "theme.slint";
 import { I18n } from "i18n.slint";
+import { PainelBiblioteca, LinhaPainel } from "painel.slint";
 
 // Botão redondo e translúcido, para ficar sobre qualquer fundo
 component BotaoImersivo inherits Rectangle {
@@ -73,6 +74,26 @@ export component TelaImersiva inherits Rectangle {
     in-out property <float> volume: 0;
     in-out property <float> progresso: 0;
 
+    // Painel da biblioteca (gaveta à direita)
+    in-out property <bool> painel_aberto: false;
+    in property <[string]> abas;
+    in property <int> aba_ativa;
+    in property <int> aba_tocando: -1;
+    in-out property <string> texto_busca;
+    in property <int> painel_total;
+    in property <int> painel_primeira;
+    in property <[LinhaPainel]> painel_linhas;
+    in property <[LinhaPainel]> fila;
+    in property <int> selecionado: -1;
+    in property <int> pedido_rolar;
+    in property <int> pedido_busca;
+
+    /// Só a letra sobre o fundo (tecla H)
+    in-out property <bool> so_letra: false;
+    in property <string> relogio: "";
+    /// Indicador do temporizador de sono ("" = desligado)
+    in property <string> sono: "";
+
     callback sair();
     callback anterior();
     callback play_pause();
@@ -82,6 +103,14 @@ export component TelaImersiva inherits Rectangle {
     callback volume_mudou(float);
     callback progresso_mudou(float);
     callback letra_clicada(int);
+    callback painel_alternado(bool);
+    callback aba_selecionada(int);
+    callback busca_mudou(string);
+    callback painel_rolou(int, int);
+    callback linha_clicada(int);
+    callback fila_clicada(int);
+    callback devolver_foco();
+    callback alternar_sono();
 
     background: #05080d;
 
@@ -98,6 +127,19 @@ export component TelaImersiva inherits Rectangle {
     property <length> altura_visualizador: 56px;
     property <length> y_visualizador: root.y_progresso - 10px - root.altura_visualizador;
     property <length> y_cartao: root.y_visualizador - 18px - root.lado_capa;
+    // Largura que sobra à esquerda do painel; segue a gaveta enquanto ela anima
+    property <length> largura_util: painel.x;
+    /// Cartão, visualizador e controles somem no modo só letra
+    property <float> opacidade_extras: root.so_letra ? 0 : 1;
+    animate opacidade_extras { duration: 450ms; easing: ease-in-out; }
+
+    changed painel_aberto => {
+        root.acordar();
+        root.painel_alternado(root.painel_aberto);
+        if (root.painel_aberto) {
+            painel.abrir();
+        }
+    }
 
     function acordar() {
         root.ocioso = false;
@@ -150,7 +192,7 @@ export component TelaImersiva inherits Rectangle {
 
     auto_hide := Timer {
         interval: 3s;
-        running: !root.ocioso;
+        running: !root.ocioso && !root.painel_aberto;
         triggered => { root.ocioso = true; }
     }
 
@@ -158,10 +200,11 @@ export component TelaImersiva inherits Rectangle {
     // Letra (ou título, quando não há letra)
     // -------------------------------------------------------------
     letra_area := Rectangle {
-        x: root.width * 0.12;
+        x: root.largura_util * 0.12;
         y: root.height * 0.06;
-        width: root.width * 0.76;
-        height: root.y_cartao - 24px - self.y;
+        width: root.largura_util * 0.76;
+        height: (root.so_letra ? root.height * 0.94 : root.y_cartao - 24px) - self.y;
+        animate height { duration: 450ms; easing: ease-in-out; }
         clip: true;
 
         // Desloca o bloco para a linha atual ficar no centro
@@ -223,6 +266,8 @@ export component TelaImersiva inherits Rectangle {
     // Cartão da capa + informações
     // -------------------------------------------------------------
     cartao := Rectangle {
+        visible: root.opacidade_extras > 0;
+        opacity: root.opacidade_extras;
         x: root.margem;
         y: root.y_cartao;
         width: root.lado_capa;
@@ -260,9 +305,11 @@ export component TelaImersiva inherits Rectangle {
     }
 
     VerticalLayout {
+        visible: root.opacidade_extras > 0;
+        opacity: root.opacidade_extras;
         x: cartao.x + cartao.width + 24px;
         y: cartao.y;
-        width: root.width - self.x - root.margem;
+        width: root.largura_util - self.x - root.margem;
         height: cartao.height;
         alignment: end;
         spacing: 4px;
@@ -295,10 +342,11 @@ export component TelaImersiva inherits Rectangle {
     // -------------------------------------------------------------
     visualizador := Rectangle {
         x: root.margem;
-        width: root.width - 2 * root.margem;
+        width: root.largura_util - 2 * root.margem;
         height: root.altura_visualizador;
         y: root.y_visualizador;
-        visible: root.barras.length > 0;
+        visible: root.barras.length > 0 && root.opacidade_extras > 0;
+        opacity: root.opacidade_extras;
 
         property <length> passo: self.width / max(1, root.barras.length);
 
@@ -315,8 +363,46 @@ export component TelaImersiva inherits Rectangle {
     // -------------------------------------------------------------
     // Controles (somem quando ocioso)
     // -------------------------------------------------------------
+    // Relógio e sono: sempre à vista (fora do modo só letra), discretos
+    VerticalLayout {
+        visible: root.opacidade_extras > 0;
+        opacity: root.opacidade_extras;
+        x: root.largura_util - self.width - root.margem;
+        y: 22px;
+        width: 160px;
+        height: self.preferred-height;
+        spacing: 2px;
+
+        Text {
+            text: root.relogio;
+            color: #ffffffb0;
+            font-size: 22px;
+            font-weight: 600;
+            horizontal-alignment: right;
+        }
+        if root.sono != "" : HorizontalLayout {
+            alignment: end;
+            spacing: 6px;
+
+            Image {
+                source: @image-url("icons/lua.svg");
+                width: 13px;
+                height: 13px;
+                y: (parent.height - self.height) / 2;
+                colorize: root.destaque;
+            }
+            Text {
+                text: root.sono;
+                color: root.destaque;
+                font-size: 13px;
+                font-weight: 600;
+            }
+        }
+    }
+
     controles := Rectangle {
-        opacity: root.ocioso ? 0 : 1;
+        visible: root.opacidade_extras > 0;
+        opacity: root.ocioso ? 0 : root.opacidade_extras;
         animate opacity { duration: 450ms; easing: ease-in-out; }
 
         BotaoImersivo {
@@ -330,7 +416,7 @@ export component TelaImersiva inherits Rectangle {
         HorizontalLayout {
             x: root.margem;
             y: root.y_progresso;
-            width: root.width - 2 * root.margem;
+            width: root.largura_util - 2 * root.margem;
             height: 26px;
             spacing: 14px;
 
@@ -353,7 +439,7 @@ export component TelaImersiva inherits Rectangle {
         HorizontalLayout {
             x: root.margem - 6px;
             y: root.height - 64px;
-            width: root.width - 2 * root.margem + 12px;
+            width: root.largura_util - 2 * root.margem + 12px;
             height: 52px;
             spacing: 8px;
 
@@ -389,6 +475,28 @@ export component TelaImersiva inherits Rectangle {
                 cor: root.destaque;
                 clicado => { root.alternar_loop(); }
             }
+            BotaoImersivo {
+                y: (parent.height - self.height) / 2;
+                icone: @image-url("icons/biblioteca.svg");
+                dica: I18n.tip_library;
+                ativo: root.painel_aberto;
+                cor: root.destaque;
+                clicado => { root.painel_aberto = !root.painel_aberto; }
+            }
+            BotaoImersivo {
+                y: (parent.height - self.height) / 2;
+                icone: @image-url("icons/letra.svg");
+                dica: I18n.tip_lyrics_only;
+                clicado => { root.so_letra = true; }
+            }
+            BotaoImersivo {
+                y: (parent.height - self.height) / 2;
+                icone: @image-url("icons/lua.svg");
+                dica: I18n.tip_sleep;
+                ativo: root.sono != "";
+                cor: root.destaque;
+                clicado => { root.alternar_sono(); }
+            }
             Image {
                 y: (parent.height - self.height) / 2;
                 source: @image-url("icons/volume.svg");
@@ -414,5 +522,38 @@ export component TelaImersiva inherits Rectangle {
                 clicado => { root.sair(); }
             }
         }
+    }
+
+    // -------------------------------------------------------------
+    // Painel da biblioteca: desliza da direita
+    // -------------------------------------------------------------
+    painel := PainelBiblioteca {
+        width: min(500px, root.width * 0.4);
+        height: root.height;
+        x: root.painel_aberto ? root.width - self.width : root.width;
+        animate x { duration: 280ms; easing: ease-out; }
+        visible: self.x < root.width;
+
+        abas: root.abas;
+        aba_ativa: root.aba_ativa;
+        aba_tocando: root.aba_tocando;
+        texto_busca <=> root.texto_busca;
+        total: root.painel_total;
+        primeira: root.painel_primeira;
+        linhas: root.painel_linhas;
+        fila: root.fila;
+        selecionado: root.selecionado;
+        pedido_rolar: root.pedido_rolar;
+        pedido_busca: root.pedido_busca;
+        cor: root.destaque;
+        barras: root.barras;
+
+        aba_selecionada(i) => { root.aba_selecionada(i); }
+        busca_mudou(t) => { root.busca_mudou(t); }
+        rolou(a, b) => { root.painel_rolou(a, b); }
+        linha_clicada(i) => { root.linha_clicada(i); }
+        fila_clicada(i) => { root.fila_clicada(i); }
+        devolver_foco => { root.devolver_foco(); }
+        fechar => { root.painel_aberto = false; }
     }
 }
