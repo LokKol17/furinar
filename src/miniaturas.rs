@@ -4,12 +4,14 @@
 //! Duas threads atendem uma fila em que o pedido novo substitui o anterior:
 //! rolar a lista rápido não deixa trabalho velho na frente. As capas reduzidas
 //! ficam em cache no disco, então a segunda visita a uma pasta não decodifica
-//! capa nenhuma. As threads terminam quando o `Carregador` é solto.
+//! capa nenhuma; ele tem teto (`LIMITE_CACHE`) e perde primeiro o que foi
+//! usado há mais tempo. As threads terminam quando o `Carregador` é solto.
 
 use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Condvar, Mutex};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use image::{DynamicImage, ImageFormat};
 use lofty::config::ParseOptions;
@@ -23,6 +25,12 @@ use crate::capa;
 pub const LADO: u32 = 96;
 const THREADS: usize = 2;
 const QUALIDADE_JPEG: u8 = 85;
+/// Teto do cache em disco. Cada miniatura gasta uns 4–8 KB de disco, então
+/// cabem perto de 10 mil faixas.
+const LIMITE_CACHE: u64 = 64 * 1024 * 1024;
+/// Menor espaço que um arquivo ocupa no disco: o marcador vazio de "sem
+/// capa" também conta.
+const BLOCO: u64 = 4096;
 
 pub struct Meta {
     pub album: Option<String>,
@@ -56,6 +64,11 @@ impl Carregador {
             Condvar::new(),
         ));
         let (tx, rx) = mpsc::channel();
+        if let Some(pasta) = cache.clone() {
+            let _ = std::thread::Builder::new()
+                .name("furinar-capas-limpeza".into())
+                .spawn(move || aparar_cache(&pasta, LIMITE_CACHE));
+        }
         for _ in 0..THREADS {
             let fila = fila.clone();
             let tx = tx.clone();
@@ -126,6 +139,9 @@ fn trabalhar(fila: &Compartilhada, tx: &Sender<(PathBuf, Meta)>, cache: Option<&
 pub fn carregar(caminho: &Path, cache: Option<&Path>) -> Meta {
     let arquivo_cache = cache.and_then(|pasta| chave(caminho).map(|k| pasta.join(k)));
     let em_cache = arquivo_cache.as_ref().and_then(|a| std::fs::read(a).ok());
+    if let (Some(arquivo), Some(_)) = (&arquivo_cache, &em_cache) {
+        tocar(arquivo);
+    }
 
     let opcoes = ParseOptions::new().read_cover_art(em_cache.is_none());
     let lido = Probe::open(caminho).and_then(|p| p.options(opcoes).read());
@@ -190,6 +206,48 @@ fn gravar(arquivo: &Path, img: Option<&DynamicImage>) {
     }
 }
 
+/// Marca a miniatura como usada agora: o `aparar_cache` apaga pela data de
+/// modificação, e a de acesso nem sempre é gravada (`noatime`).
+fn tocar(arquivo: &Path) {
+    let _ = std::fs::File::options()
+        .write(true)
+        .open(arquivo)
+        .and_then(|f| f.set_modified(SystemTime::now()));
+}
+
+/// Se o cache passou de `limite`, apaga as miniaturas usadas há mais tempo até
+/// descer a 3/4 dele (folga para não limpar toda vez que o painel abre).
+/// Chaves de arquivos que mudaram nunca mais são lidas, então saem primeiro.
+fn aparar_cache(pasta: &Path, limite: u64) {
+    let Ok(entradas) = std::fs::read_dir(pasta) else {
+        return;
+    };
+    let mut arquivos: Vec<_> = entradas
+        .flatten()
+        .filter_map(|e| {
+            let meta = e.metadata().ok()?;
+            meta.is_file().then(|| {
+                let usado = meta.modified().unwrap_or(UNIX_EPOCH);
+                (usado, meta.len().max(BLOCO), e.path())
+            })
+        })
+        .collect();
+    let mut total: u64 = arquivos.iter().map(|(_, tamanho, _)| tamanho).sum();
+    if total <= limite {
+        return;
+    }
+    arquivos.sort_unstable_by_key(|(usado, _, _)| *usado);
+    let alvo = limite / 4 * 3;
+    for (_, tamanho, caminho) in arquivos {
+        if total <= alvo {
+            break;
+        }
+        if std::fs::remove_file(&caminho).is_ok() {
+            total -= tamanho;
+        }
+    }
+}
+
 /// Nome do arquivo de cache: hash do caminho + data de modificação +
 /// tamanho. Trocou a capa (ou o arquivo), muda a chave.
 pub fn chave(caminho: &Path) -> Option<String> {
@@ -197,7 +255,7 @@ pub fn chave(caminho: &Path) -> Option<String> {
     let mtime = meta
         .modified()
         .ok()?
-        .duration_since(std::time::UNIX_EPOCH)
+        .duration_since(UNIX_EPOCH)
         .ok()?
         .as_nanos();
     let mut h = Fnv::default();
@@ -311,6 +369,55 @@ mod tests {
         assert!(carregar(&faixa, Some(&cache)).capa.is_none());
         let marcador = cache.join(chave(&faixa).unwrap());
         assert_eq!(std::fs::metadata(marcador).unwrap().len(), 0);
+    }
+
+    #[test]
+    fn ler_do_cache_renova_a_data() {
+        let tmp = TempDir::novo("renova");
+        let faixa = tmp.0.join("tone.mp3");
+        std::fs::copy(fixture("tone.mp3"), &faixa).unwrap();
+        let cache = tmp.0.join("cache");
+        carregar(&faixa, Some(&cache));
+        let marcador = cache.join(chave(&faixa).unwrap());
+        let antiga = UNIX_EPOCH + std::time::Duration::from_secs(1_000_000);
+        std::fs::File::options()
+            .write(true)
+            .open(&marcador)
+            .unwrap()
+            .set_modified(antiga)
+            .unwrap();
+
+        carregar(&faixa, Some(&cache));
+        let agora = std::fs::metadata(&marcador).unwrap().modified().unwrap();
+        assert!(agora > antiga);
+    }
+
+    #[test]
+    fn aparar_apaga_os_mais_antigos() {
+        let tmp = TempDir::novo("aparar");
+        let datar = |nome: &str, segundos: u64| {
+            let p = tmp.0.join(nome);
+            std::fs::write(&p, vec![0u8; 10_000]).unwrap();
+            std::fs::File::options()
+                .write(true)
+                .open(&p)
+                .unwrap()
+                .set_modified(UNIX_EPOCH + std::time::Duration::from_secs(segundos))
+                .unwrap();
+        };
+        // 4 arquivos de 10 KB; limite de 30 KB → desce até 22,5 KB: sobram 2
+        datar("velho.jpg", 1_000);
+        datar("medio.jpg", 2_000);
+        datar("novo.jpg", 3_000);
+        datar("mais-novo.jpg", 4_000);
+        aparar_cache(&tmp.0, 30_000);
+        let existe = |nome: &str| tmp.0.join(nome).exists();
+        assert!(!existe("velho.jpg") && !existe("medio.jpg"));
+        assert!(existe("novo.jpg") && existe("mais-novo.jpg"));
+
+        // Abaixo do limite: nada some
+        aparar_cache(&tmp.0, 30_000);
+        assert!(existe("novo.jpg") && existe("mais-novo.jpg"));
     }
 
     #[test]

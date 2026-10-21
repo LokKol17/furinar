@@ -14,7 +14,7 @@ e o projeto adere ao [Semantic Versioning](https://semver.org/).
   - fundos personalizados: `background.*` ou `furinar-bg.*` na pasta da música, ou um fundo global nas configurações. Aceita imagem, GIF/WebP animado e vídeo (mp4/webm/mkv/mov/avi, via `ffmpeg` do sistema, se instalado). Sem fundo, a capa desfocada;
   - cor de destaque tirada da capa, crossfade na troca de faixa, controles que somem após 3 s parado;
   - visualizador de espectro (FFT) que reage à música;
-  - painel da biblioteca (`L` ou botão; `/` busca): abas das pastas, busca, lista com miniatura da capa, artista • álbum e duração; a faixa tocando ganha um mini equalizador. As miniaturas ficam em cache em `~/.cache/furinar/capas` (`%LOCALAPPDATA%\furinar\capas` no Windows);
+  - painel da biblioteca (`L` ou botão; `/` busca): abas das pastas, busca, lista com miniatura da capa, artista • álbum e duração; a faixa tocando ganha um mini equalizador. As miniaturas ficam em cache em `~/.cache/furinar/capas` (`%LOCALAPPDATA%\furinar\capas` no Windows), limitado a 64 MB — as menos usadas saem primeiro;
   - fila "a seguir" com as próximas 5 faixas, respeitando shuffle e loop (o shuffle sorteia adiantado, então o que aparece é o que toca); clique pula para a faixa;
   - modo só letra (`H`): esconde capa, visualizador e controles;
   - relógio e temporizador de sono (15/30/60 min ou fim da faixa), com o volume baixando nos últimos 30 s;
