@@ -49,6 +49,14 @@ The visual palette — deep navy, cyan, and gold (or baby blue and pearl white i
 - **Light/dark theme**, switched instantly, no restart needed
 - Frameless window with a custom title bar (drag-to-move, Aero Snap, rounded corners on Windows 11)
 
+**Immersive mode** (fullscreen button, `F11` or `furinar --imersivo`; `Esc` leaves)
+- Cover art (embedded, or `cover`/`folder`/`front`.* in the folder) with artist, album, year, format, sample rate and channels
+- Full lyrics scrolling smoothly, current line highlighted; click a line to jump there
+- Custom backgrounds: drop a `background.*` (or `furinar-bg.*`) into the music folder, or pick a global one in Settings. Images, animated GIF/WebP, and videos (mp4/webm/mkv/mov/avi — played through your system `ffmpeg`, if installed). Small pixel-art backgrounds stay crisp. No background? The blurred cover takes its place
+- Accent color taken from the cover, crossfade between tracks, controls that hide after 3 s of stillness
+- Spectrum visualizer reacting to the music
+- Everything in this mode is only allocated while it's on — back in normal mode, Furinar is as light as before
+
 <div align="center">
 
 <!-- Screenshot 2: synced lyrics panel -->
@@ -59,7 +67,7 @@ The visual palette — deep navy, cyan, and gold (or baby blue and pearl white i
 **Windows integration**
 - **Play/Pause, Previous, and Next** buttons right on the taskbar thumbnail preview
 - System media controls (keyboard media keys, action center) via SMTC
-- Keyboard shortcuts: `Space` play/pause, `←`/`→` seek ±5s, `↑`/`↓` navigate the list, `Enter` plays the selected track
+- Keyboard shortcuts: `Space` play/pause, `←`/`→` seek ±5s, `↑`/`↓` navigate the list, `Enter` plays the selected track, `F11` immersive mode, `Esc` leaves it
 
 <div align="center">
   <table>

@@ -49,6 +49,14 @@ A paleta visual — azul-marinho profundo, ciano e dourado (ou azul-bebê e bran
 - **Tema claro/escuro**, trocado na hora, sem reiniciar o app
 - Janela sem moldura nativa, com barra de título própria (arraste, Aero Snap, cantos arredondados no Windows 11)
 
+**Modo imersivo** (botão de tela cheia, `F11` ou `furinar --imersivo`; `Esc` sai)
+- Capa da faixa (embutida, ou `cover`/`folder`/`front`.* na pasta) com artista, álbum, ano, formato, taxa e canais
+- Letra inteira rolando suave, linha atual em destaque; clique numa linha para pular até ela
+- Fundos personalizados: coloque um `background.*` (ou `furinar-bg.*`) na pasta da música, ou escolha um fundo global nas Configurações. Imagens, GIF/WebP animado e vídeos (mp4/webm/mkv/mov/avi — tocados pelo `ffmpeg` do sistema, se instalado). Fundos pequenos em pixel art ficam nítidos. Sem fundo? A capa desfocada assume
+- Cor de destaque tirada da capa, crossfade entre faixas, controles que somem após 3 s parado
+- Visualizador de espectro reagindo à música
+- Nada desse modo fica alocado fora dele — de volta ao modo normal, o Furinar é tão leve quanto antes
+
 <div align="center">
 
 <!-- Screenshot 2: painel de letras sincronizadas -->
@@ -59,7 +67,7 @@ A paleta visual — azul-marinho profundo, ciano e dourado (ou azul-bebê e bran
 **Integração com o Windows**
 - Botões de **Play/Pause, Anterior e Próxima** direto na miniatura da barra de tarefas
 - Controles multimídia do sistema (teclas de mídia do teclado, central de ações) via SMTC
-- Atalhos de teclado: `Espaço` pausa/retoma, `←`/`→` pulam 5s, `↑`/`↓` navegam a lista, `Enter` toca a faixa selecionada
+- Atalhos de teclado: `Espaço` pausa/retoma, `←`/`→` pulam 5s, `↑`/`↓` navegam a lista, `Enter` toca a faixa selecionada, `F11` modo imersivo, `Esc` sai dele
 
 <div align="center">
   <table>

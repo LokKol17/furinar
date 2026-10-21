@@ -7,6 +7,15 @@ e o projeto adere ao [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Adicionado
+- **Modo imersivo** em tela cheia (botão de tela cheia, `F11` ou `furinar --imersivo`; `Esc` sai):
+  - capa da faixa (embutida ou `cover`/`folder`/`front`.* da pasta) e metadados: artista, álbum, ano, formato, taxa, canais;
+  - letra inteira rolando suavemente, linha atual em destaque, clique pula para o trecho;
+  - fundos personalizados: `background.*` ou `furinar-bg.*` na pasta da música, ou um fundo global nas configurações. Aceita imagem, GIF/WebP animado e vídeo (mp4/webm/mkv/mov/avi, via `ffmpeg` do sistema, se instalado). Sem fundo, a capa desfocada;
+  - cor de destaque tirada da capa, crossfade na troca de faixa, controles que somem após 3 s parado;
+  - visualizador de espectro (FFT) que reage à música.
+- Nada do modo imersivo fica alocado fora dele; ao sair, a memória é devolvida.
+
 ### Alterado
 - Perfil de release com LTO, `codegen-units = 1` e `strip`: ~2 MB a menos de RSS
 - A saída de áudio é aberta uma vez e reaproveitada entre seeks e trocas de faixa (antes era reaberta a cada seek)
