@@ -12,6 +12,7 @@ mod memoria;
 mod track;
 mod translations;
 mod updates;
+mod visualizador;
 
 use std::cell::RefCell;
 use std::fs::{self, File};
@@ -173,6 +174,8 @@ struct EstadoAudio {
     /// e trocas de faixa: reabrir o dispositivo a cada vez recria o stream,
     /// a thread e os buffers do backend. Só é fechada no stop.
     saida: Option<MixerDeviceSink>,
+    /// Amostras para o visualizador; só copia com o modo imersivo ligado.
+    captura: visualizador::Captura,
     audio_player: Option<Player>,
     /// Faixa (caminho completo) cuja duração está em `duracao_total_secs`.
     /// Evita varrer o MP3 inteiro de novo a cada seek.
@@ -226,6 +229,7 @@ impl Default for EstadoAudio {
         Self {
             saida: None,
             audio_player: None,
+            captura: visualizador::Captura::default(),
             duracao_de: None,
             tempo_decorrido: 0.0,
             pastas: Vec::new(),
@@ -631,7 +635,10 @@ fn executar_seek(estado: &mut EstadoAudio, ui: &MainWindow, alvo_secs: u64) {
     estado.duracao_total_secs = total_secs;
     estado.duracao_de = Some(caminho_completo);
 
-    sink.append(decodificador);
+    sink.append(visualizador::Espiao::new(
+        decodificador,
+        estado.captura.clone(),
+    ));
     if alvo_secs > 0 {
         let _ = sink.try_seek(Duration::from_secs(alvo_secs));
     }
@@ -1850,6 +1857,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             if e.imersivo.take().is_some() {
                 // Sair: o Drop do estado derruba threads e imagens pendentes
                 timer_imersivo.stop();
+                e.captura.ligar(false);
                 imersivo::limpar_ui(&ui);
                 ui.set_modo_imersivo(false);
                 ui.window().set_fullscreen(false);
@@ -1858,7 +1866,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 return;
             }
 
-            e.imersivo = Some(imersivo::EstadoImersivo::novo());
+            e.imersivo = Some(imersivo::EstadoImersivo::novo(&ui));
+            e.captura.ligar(true);
             ui.set_modo_imersivo(true);
             ui.window().set_fullscreen(true);
             atualizar_imersivo(&mut e, &ui);
@@ -1871,8 +1880,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 };
                 let mut e = estado.borrow_mut();
                 let e = &mut *e;
+                let tocando = e.audio_player.as_ref().is_some_and(|p| !p.is_paused());
                 if let Some(imv) = e.imersivo.as_mut() {
-                    imv.tick(&ui, &e.idioma);
+                    imv.tick(&ui, &e.idioma, &e.captura, tocando);
                 }
             });
         });
@@ -2236,7 +2246,14 @@ mod tests {
         let caminho = std::env::var_os("FURINAR_CAPTURA_FAIXA")
             .map(PathBuf::from)
             .unwrap_or_else(|| fixture("tone.mp3"));
-        let mut imv = imersivo::EstadoImersivo::novo();
+        let mut imv = imersivo::EstadoImersivo::novo(&ui);
+        // Espectro de mentira: um acorde, para as barras aparecerem
+        let captura = visualizador::Captura::default();
+        captura.ligar(true);
+        let acorde = rodio::source::SineWave::new(220.0)
+            .mix(rodio::source::SineWave::new(1760.0).amplify(0.3))
+            .take_duration(Duration::from_millis(100));
+        let _: Vec<f32> = visualizador::Espiao::new(acorde, captura.clone()).collect();
         ui.set_modo_imersivo(true);
         imv.trocar_faixa(
             &ui,
@@ -2261,14 +2278,10 @@ mod tests {
         ui.set_letra_completa(ModelRc::new(VecModel::from(linhas)));
         ui.set_progresso(0.35);
         ui.set_texto_tempo("01:14 / 03:31".into());
-        let barras: Vec<f32> = (0..48)
-            .map(|i| (i as f32 * 0.7).sin().abs() * 0.8)
-            .collect();
-        ui.set_imv_barras(ModelRc::new(VecModel::from(barras)));
 
         // Espera a thread da capa e deixa as animações chegarem ao fim
         for _ in 0..40 {
-            imv.tick(&ui, "pt-br");
+            imv.tick(&ui, "pt-br", &captura, true);
             slint::platform::update_timers_and_animations();
             std::thread::sleep(Duration::from_millis(50));
         }

@@ -5,15 +5,17 @@
 //! e as propriedades da UI voltam ao vazio.
 
 use std::path::PathBuf;
+use std::rc::Rc;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::time::Instant;
 
-use slint::{Image, SharedString};
+use slint::{Image, Model, ModelRc, SharedString, VecModel};
 
 use crate::MainWindow;
 use crate::capa::{self, Carregado};
 use crate::fundo::{self, Reprodutor};
 use crate::translations;
+use crate::visualizador::{self, Analisador, Captura};
 
 /// O que o modo precisa saber da faixa atual.
 pub struct Faixa {
@@ -40,11 +42,16 @@ pub struct EstadoImersivo {
     fundo: Option<Reprodutor>,
     /// O próximo quadro do fundo é o primeiro: entra com crossfade.
     fundo_novo: bool,
+    analisador: Analisador,
+    /// Modelo das barras, reaproveitado (só os valores mudam a cada tick).
+    barras: Rc<VecModel<f32>>,
 }
 
 impl EstadoImersivo {
-    pub fn novo() -> Self {
+    pub fn novo(ui: &MainWindow) -> Self {
         let (tx, rx) = mpsc::channel();
+        let barras = Rc::new(VecModel::from(vec![0.0f32; visualizador::BARRAS]));
+        ui.set_imv_barras(ModelRc::from(barras.clone()));
         Self {
             geracao: 0,
             tx,
@@ -54,6 +61,8 @@ impl EstadoImersivo {
             mostra_a: true,
             fundo: None,
             fundo_novo: false,
+            analisador: Analisador::default(),
+            barras,
         }
     }
 
@@ -100,7 +109,15 @@ impl EstadoImersivo {
     }
 
     /// Chamado pelo timer do modo (~30 fps).
-    pub fn tick(&mut self, ui: &MainWindow, idioma: &str) {
+    pub fn tick(&mut self, ui: &MainWindow, idioma: &str, captura: &Captura, tocando: bool) {
+        if let Some(barras) = self.analisador.quadro(captura, tocando) {
+            for (i, b) in barras.into_iter().enumerate() {
+                if self.barras.row_data(i) != Some(b) {
+                    self.barras.set_row_data(i, b);
+                }
+            }
+        }
+
         while let Ok((geracao, carregado)) = self.rx.try_recv() {
             if geracao == self.geracao {
                 self.aplicar(ui, carregado, idioma);

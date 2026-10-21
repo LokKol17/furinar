@@ -72,6 +72,8 @@ image = { version = "0.25", default-features = false, features = [
     "gif",
     "webp",
 ] }
+# FFT do visualizador do modo imersivo
+rustfft = "6"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows = { version = "0.62", features = [
