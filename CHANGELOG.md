@@ -7,6 +7,10 @@ e o projeto adere ao [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Corrigido
+
+- Falha de segmentação ocasional no Linux ("segmentation fault" ao tocar, buscar na web ou após minutos de uso). A rotina que devolve memória ao sistema podia descartar a tabela de relocação de uma biblioteca que outra thread estava carregando naquele instante (DNS, plugins do PipeWire).
+
 ## [1.7.0] — 2026-10-21
 
 ### Adicionado
