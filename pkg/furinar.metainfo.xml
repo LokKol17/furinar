@@ -50,8 +50,21 @@
       <image>https://raw.githubusercontent.com/LokKol17/furinar/master/docs/screenshot-player-dark.png</image>
       <caption>Dark theme</caption>
     </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/LokKol17/furinar/master/docs/furinar_immersive_library.png</image>
+      <caption>Immersive mode with the library drawer</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/LokKol17/furinar/master/docs/furinar_immersive_fetch-tags-and-lyrics.png</image>
+      <caption>Identifying a track and fetching lyrics from the web</caption>
+    </screenshot>
   </screenshots>
   <releases>
+    <release version="1.7.1" date="2026-10-22">
+      <description>
+        <p>Fixes an occasional crash (segmentation fault) on Linux while playing, searching the web or after a few minutes of use.</p>
+      </description>
+    </release>
     <release version="1.7.0" date="2026-10-21">
       <description>
         <p>Immersive fullscreen mode with custom and animated backgrounds, visualizer, karaoke-style lyrics and an album grid. Gapless playback, crossfade and ReplayGain. Favorites, most played and per-tab sorting. Track identification and lyrics from the web (MusicBrainz, AcoustID, LRCLIB). Discord status, ListenBrainz and Last.fm scrobbling, and a mini player.</p>

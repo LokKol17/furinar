@@ -7,6 +7,12 @@ e o projeto adere ao [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.7.1] — 2026-10-22
+
+### Adicionado
+
+- Novas capturas de tela do modo imersivo, da busca de tags e letras e do mini player no README e no site.
+
 ### Corrigido
 
 - Falha de segmentação ocasional no Linux ("segmentation fault" ao tocar, buscar na web ou após minutos de uso). A rotina que devolve memória ao sistema podia descartar a tabela de relocação de uma biblioteca que outra thread estava carregando naquele instante (DNS, plugins do PipeWire).
@@ -138,7 +144,9 @@ e o projeto adere ao [Semantic Versioning](https://semver.org/).
 - Retoma última faixa e posição ao reabrir
 - Migración automática do campo `pasta` → `pastas` na config
 
-[Unreleased]: https://github.com/LokKol17/furinar/compare/v1.5.3...HEAD
+[Unreleased]: https://github.com/LokKol17/furinar/compare/v1.7.1...HEAD
+[1.7.1]: https://github.com/LokKol17/furinar/compare/v1.7.0...v1.7.1
+[1.7.0]: https://github.com/LokKol17/furinar/compare/v1.5.3...v1.7.0
 [1.5.3]: https://github.com/LokKol17/furinar/compare/v1.5.2...v1.5.3
 [1.4.0]: https://github.com/LokKol17/furinar/compare/v0.1.0...v1.4.0
 [0.1.0]: https://github.com/LokKol17/furinar/releases/tag/v0.1.0
