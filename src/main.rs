@@ -696,7 +696,8 @@ mod tests {
     /// toda chave pedida via `g("...")`.
     #[test]
     fn aplicar_idioma_so_usa_chaves_existentes() {
-        let fonte = include_str!("main.rs");
+        // No Windows o checkout do git pode trazer o fonte com CRLF
+        let fonte = include_str!("main.rs").replace("\r\n", "\n");
         let inicio = fonte
             .find("fn aplicar_idioma(")
             .expect("aplicar_idioma deve existir");
