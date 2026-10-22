@@ -116,7 +116,7 @@ sync-version:
 	@sed -i "s/^pkgver=.*/pkgver=$(VERSION)/" pkg/arch/PKGBUILD
 	@sed -i "s/^Version:.*/Version:        $(VERSION)/" pkg/fedora/furinar.spec
 	@sed -i "s/VERSION=\"\$${FURINAR_VERSION:-.*}/VERSION=\"\$${FURINAR_VERSION:-$(VERSION)}/" pkg/install.sh
-	@sed -i 's/<release version=".*"/<release version="$(VERSION)"/' pkg/furinar.metainfo.xml
+	@sed -i 's/<release version="[^"]*"/<release version="$(VERSION)"/' pkg/furinar.metainfo.xml
 	@echo "  Done. All packaging files updated to $(VERSION)."
 
 check-version:
@@ -128,7 +128,7 @@ check-version:
 		if [ "$$ARCH_VER" != "$$VER" ]; then echo "  MISMATCH: pkg/arch/PKGBUILD has $$ARCH_VER, expected $$VER"; OK=0; fi; \
 		SPEC_VER=$$(grep '^Version:' pkg/fedora/furinar.spec | sed 's/Version:\s*//'); \
 		if [ "$$SPEC_VER" != "$$VER" ]; then echo "  MISMATCH: pkg/fedora/furinar.spec has $$SPEC_VER, expected $$VER"; OK=0; fi; \
-		INSTALL_VER=$$(grep 'FURINAR_VERSION' pkg/install.sh | sed 's/.*FURINAR_VERSION:-//;s/".*//'); \
+		INSTALL_VER=$$(grep -m1 'FURINAR_VERSION:-' pkg/install.sh | sed 's/.*FURINAR_VERSION:-//;s/}.*//'); \
 		if [ "$$INSTALL_VER" != "$$VER" ]; then echo "  MISMATCH: pkg/install.sh has $$INSTALL_VER, expected $$VER"; OK=0; fi; \
 		META_VER=$$(grep '<release version=' pkg/furinar.metainfo.xml | sed 's/.*version="//;s/".*//'); \
 		if [ "$$META_VER" != "$$VER" ]; then echo "  MISMATCH: pkg/furinar.metainfo.xml has $$META_VER, expected $$VER"; OK=0; fi; \

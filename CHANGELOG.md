@@ -7,6 +7,8 @@ e o projeto adere ao [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.7.0] — 2026-10-21
+
 ### Adicionado
 - **Modo imersivo** em tela cheia (botão de tela cheia, `F11` ou `furinar --imersivo`; `Esc` sai):
   - capa da faixa (embutida ou `cover`/`folder`/`front`.* da pasta) e metadados: artista, álbum, ano, formato, taxa, canais;
@@ -47,6 +49,7 @@ e o projeto adere ao [Semantic Versioning](https://semver.org/).
   - a thread e o cliente HTTP só existem enquanto há trabalho.
 
 ### Alterado
+- Instalador (`install.sh`) com menu interativo para instalar ou desinstalar, e mensagens em inglês
 - Idioma padrão agora é inglês (`en`); antes era português (`pt-br`). Configs já salvas com `pt-br` continuam em português
 - Fundo reativo do modo imersivo vai para a tela a no máximo ~15 fps e só quando o pulso muda o bastante (cada mudança repinta a tela inteira; antes custava ~20% de um núcleo). Passa a vir desligado em instalações novas, com o aviso "usa mais CPU".
 - Depois de abrir o dispositivo de áudio, o código das bibliotecas de áudio que só serviu à inicialização volta ao sistema: tocando, ~21 MB em vez de ~27 MB.
