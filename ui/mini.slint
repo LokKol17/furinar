@@ -1,0 +1,150 @@
+// ---------------------------------------------------------------------
+// Mini player: a própria janela encolhida numa barra, sempre por cima
+// (onde o sistema deixa). Capa, título, anterior/play/próxima e o botão de
+// voltar ao tamanho normal. Arrastar pelo fundo move a janela.
+// ---------------------------------------------------------------------
+
+import { Tema } from "theme.slint";
+import { I18n } from "i18n.slint";
+
+component BotaoMini inherits Rectangle {
+    in property <image> icone;
+    in property <string> dica;
+    in property <bool> destaque: false;
+    callback clicado();
+
+    width: destaque ? 38px : 32px;
+    height: self.width;
+    border-radius: self.width / 2;
+    background: destaque
+        ? (toque.has-hover ? Tema.oceano.brighter(0.12) : Tema.oceano)
+        : (toque.has-hover ? Tema.neutro_hover : transparent);
+    accessible-role: button;
+    accessible-label: root.dica;
+    animate background { duration: 120ms; }
+
+    Image {
+        source: root.icone;
+        width: root.destaque ? 18px : 16px;
+        height: self.width;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        colorize: root.destaque ? Tema.sobre_acento : Tema.texto;
+    }
+    toque := TouchArea {
+        clicked => { root.clicado(); }
+    }
+}
+
+export component MiniPlayer inherits Rectangle {
+    in property <string> titulo;
+    in property <string> artista;
+    in property <image> capa;
+    in property <bool> tem_capa;
+    in property <bool> tocando;
+    in property <float> progresso;
+    callback anterior();
+    callback play_pause();
+    callback proxima();
+    callback expandir();
+
+    background: Tema.fundo_janela;
+
+    // O fundo inteiro arrasta a janela (os botões ficam por cima)
+    WindowMoveArea {
+        width: 100%;
+        height: 100%;
+    }
+
+    HorizontalLayout {
+        padding: 12px;
+        padding-bottom: 15px;
+        spacing: 12px;
+
+        Rectangle {
+            width: self.height;
+            border-radius: 6px;
+            clip: true;
+            background: Tema.oceano.with-alpha(0.25);
+
+            if root.tem_capa : Image {
+                width: parent.width;
+                height: parent.height;
+                source: root.capa;
+                image-fit: cover;
+            }
+            if !root.tem_capa : Image {
+                source: @image-url("icons/letra.svg");
+                width: parent.width * 0.4;
+                height: self.width;
+                x: (parent.width - self.width) / 2;
+                y: (parent.height - self.height) / 2;
+                colorize: Tema.texto_suave;
+            }
+        }
+
+        VerticalLayout {
+            spacing: 2px;
+            alignment: center;
+
+            Text {
+                text: root.titulo;
+                color: Tema.texto;
+                font-size: 14px;
+                font-weight: 700;
+                overflow: elide;
+            }
+            Text {
+                text: root.artista;
+                color: Tema.texto_suave;
+                font-size: 12px;
+                overflow: elide;
+            }
+            HorizontalLayout {
+                padding-top: 6px;
+                spacing: 4px;
+
+                BotaoMini {
+                    y: (parent.height - self.height) / 2;
+                    icone: @image-url("icons/anterior.svg");
+                    dica: I18n.tip_previous;
+                    clicado => { root.anterior(); }
+                }
+                BotaoMini {
+                    icone: root.tocando ? @image-url("icons/pause.svg") : @image-url("icons/play.svg");
+                    dica: root.tocando ? I18n.pause_label : I18n.play_label;
+                    destaque: true;
+                    clicado => { root.play_pause(); }
+                }
+                BotaoMini {
+                    y: (parent.height - self.height) / 2;
+                    icone: @image-url("icons/proxima.svg");
+                    dica: I18n.tip_next;
+                    clicado => { root.proxima(); }
+                }
+                Rectangle { horizontal-stretch: 1; }
+                BotaoMini {
+                    y: (parent.height - self.height) / 2;
+                    icone: @image-url("icons/tela_cheia.svg");
+                    dica: I18n.tip_mini_exit;
+                    clicado => { root.expandir(); }
+                }
+            }
+        }
+    }
+
+    // Progresso: um fio no pé da janela
+    Rectangle {
+        x: 0px;
+        y: parent.height - 3px;
+        width: parent.width;
+        height: 3px;
+        background: Tema.neutro;
+
+        Rectangle {
+            x: 0px;
+            width: parent.width * root.progresso;
+            background: Tema.oceano;
+        }
+    }
+}

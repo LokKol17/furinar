@@ -3,6 +3,7 @@ import { I18n } from "i18n.slint";
 import { TelaImersiva } from "imersivo.slint";
 import { LinhaPainel, CartaoAlbum } from "painel.slint";
 import { JanelaInfo, CandidatoInfo, ItemRevisao } from "info.slint";
+import { MiniPlayer } from "mini.slint";
 
 /// Linha da playlist do modo normal.
 export struct LinhaLista {
@@ -13,12 +14,15 @@ export struct LinhaLista {
 export component MainWindow inherits Window {
     title: "Furinar Audio Player";
     // Tamanho fixo no modo normal; o imersivo libera para a tela cheia crescer
-    preferred-width: 660px;
-    preferred-height: 734px;
-    min-width: 660px;
-    min-height: 734px;
-    max-width: modo_imersivo ? 16384px : 660px;
-    max-height: modo_imersivo ? 16384px : 734px;
+    preferred-width: modo_mini ? 380px : 660px;
+    preferred-height: modo_mini ? 112px : 734px;
+    min-width: modo_mini ? 380px : 660px;
+    min-height: modo_mini ? 112px : 734px;
+    max-width: modo_imersivo ? 16384px : (modo_mini ? 380px : 660px);
+    max-height: modo_imersivo ? 16384px : (modo_mini ? 112px : 734px);
+    // Mini player por cima das outras janelas (no Wayland o compositor
+    // decide e costuma ignorar)
+    always-on-top: modo_mini;
     background: Tema.fundo_janela;
 
     // Sem moldura nativa: a barra de título é nossa. O Slint (winit) ainda
@@ -62,6 +66,15 @@ export component MainWindow inherits Window {
 
     // Busca na web: tela de informações da faixa e lote da aba
     in-out property <bool> info_aberta: false;
+    // Mini player
+    in-out property <bool> modo_mini: false;
+    in property <string> mini_titulo;
+    in property <string> mini_artista;
+    in property <image> mini_capa;
+    in property <bool> mini_tem_capa;
+    /// Faixa cuja capa está no mini (para descartar capa atrasada)
+    in-out property <string> mini_chave;
+    callback alternar_mini();
     in-out property <bool> config_aberta: false;
     in-out property <int> info_guia: 0;
     in property <string> info_titulo;
@@ -265,6 +278,9 @@ export component MainWindow inherits Window {
                 imv_painel_aberto = true;
                 imv_pedido_busca += 1;
                 return accept;
+            } else if (event.text == "m" || event.text == "M") {
+                alternar_mini();
+                return accept;
             } else if (event.text == "f" || event.text == "F") {
                 alternar_favorita_atual();
                 return accept;
@@ -321,7 +337,7 @@ export component MainWindow inherits Window {
 
     // Interface normal: some no modo imersivo (não pinta nem por baixo)
     Rectangle {
-        visible: !modo_imersivo;
+        visible: !modo_imersivo && !modo_mini;
 
         // -------------------------------------------------------------
         // Barra de título customizada
@@ -358,6 +374,11 @@ export component MainWindow inherits Window {
 
                     Rectangle { horizontal-stretch: 1; }
 
+                    BotaoTitulo {
+                        icone: @image-url("icons/mini.svg");
+                        dica: I18n.tip_mini;
+                        clicado => { alternar_mini(); }
+                    }
                     BotaoTitulo {
                         icone: @image-url("icons/minimizar.svg");
                         dica: I18n.tip_minimize;
@@ -924,6 +945,21 @@ export component MainWindow inherits Window {
                 }
             }
         }
+    }
+
+    if modo_mini : MiniPlayer {
+        width: parent.width;
+        height: parent.height;
+        titulo: mini_titulo;
+        artista: mini_artista;
+        capa: mini_capa;
+        tem_capa: mini_tem_capa;
+        tocando: tocando;
+        progresso: progresso;
+        anterior => { anterior(); }
+        play_pause => { play_pause(); }
+        proxima => { proxima(); }
+        expandir => { alternar_mini(); }
     }
 
     if modo_imersivo : TelaImersiva {

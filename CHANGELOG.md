@@ -32,6 +32,10 @@ e o projeto adere ao [Semantic Versioning](https://semver.org/).
 - Favoritas (estrela na linha, no painel, no modo imersivo ou tecla `F`) e Mais tocadas (contada depois de metade da faixa ou 4 min), como abas fixas antes das pastas. Guardadas em `furinar_biblioteca.json`, ao lado da configuração.
 - Ordenação por aba (padrão, título, artista, álbum, duração, adicionadas recentemente, mais tocadas), lembrada por pasta.
 - Letra embutida nas tags quando não há `.lrc`: SYLT (MP3) e USLT/LYRICS/©lyr; texto em LRC sincroniza, texto puro aparece inteiro, sem destaque.
+- **Mini player** (botão na barra de título ou `M`): a janela encolhe numa barra com capa, título e anterior/play/próxima, sempre por cima (no Windows e X11; no Wayland o compositor decide).
+- **Discord**: "Ouvindo" com título, artista, barra de progresso e capa (Cover Art Archive, quando conhecida). Opção nas configurações; pausado limpa o status.
+- **Scrobble** no ListenBrainz (token) e no Last.fm (chave e segredo da API account, conexão pelo navegador): "tocando agora" e cada faixa ouvida (metade ou 4 min). Envios que falham por rede ficam guardados e vão depois.
+- **Letra estilo karaokê** na tela cheia: a linha atual enche no ritmo do canto — exata com LRC estendido (`<mm:ss.xx>` por palavra), estimada nas letras só com tempo por linha.
 - Temporizador de sono também no modo normal (botão da lua), com o restante ao lado do tempo.
 - **Metadados e letras da web** (botão de informações ou tecla `I`, nos dois modos):
   - identificação pelo MusicBrainz (título, artista, álbum, ano, número da faixa) com nota de confiança; sem tags, tenta o nome do arquivo ("Artista - Título", "Artista 'Título'");

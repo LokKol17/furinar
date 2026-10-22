@@ -185,6 +185,8 @@ fn aplicar_idioma(idioma: &str, ui: &MainWindow) {
     i18n.set_acoustid_key(g("acoustid_key"));
     i18n.set_acoustid_desc(g("acoustid_desc"));
     i18n.set_discord_status(g("discord_status"));
+    i18n.set_tip_mini(g("tip_mini"));
+    i18n.set_tip_mini_exit(g("tip_mini_exit"));
     i18n.set_scrobble_title(g("scrobble_title"));
     i18n.set_listenbrainz_token(g("listenbrainz_token"));
     i18n.set_lastfm_keys(g("lastfm_keys"));
@@ -564,6 +566,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 processar_web(&mut e, &ui);
                 atualizar_discord(&mut e);
                 atualizar_scrobble(&mut e);
+                atualizar_mini(&e, &ui);
                 if e.imersivo.is_some() {
                     atualizar_relogio(&ui);
                     atualizar_previa(&mut e, &ui);

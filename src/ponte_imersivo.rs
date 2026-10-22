@@ -2,6 +2,7 @@
 //! biblioteca, fila "a seguir", prévia da próxima e relógio.
 
 use crate::*;
+use slint::Image;
 
 /// Resumo dos fundos globais nas configurações: o nome do arquivo, ou
 /// quantos são ("" = nenhum).
@@ -205,6 +206,69 @@ pub(crate) fn atualizar_karaoke(estado: &mut EstadoAudio, ui: &MainWindow) {
         || (progresso == 1.0) != (ui.get_imv_letra_progresso() == 1.0)
     {
         ui.set_imv_letra_progresso(progresso);
+    }
+}
+
+/// Mini player: título, artista e capa da faixa atual. A capa é a miniatura
+/// (do cache em disco), lida numa thread; resposta de uma faixa que já
+/// passou é descartada.
+pub(crate) fn atualizar_mini(estado: &EstadoAudio, ui: &MainWindow) {
+    if !ui.get_modo_mini() {
+        return;
+    }
+    let chave = chave_atual(estado).unwrap_or_default();
+    if ui.get_mini_chave() == chave.as_str() {
+        return;
+    }
+    ui.set_mini_chave(chave.as_str().into());
+    ui.set_mini_tem_capa(false);
+    ui.set_mini_capa(Image::default());
+    let Some(faixa) = faixa_imersiva(estado) else {
+        ui.set_mini_titulo(SharedString::new());
+        ui.set_mini_artista(SharedString::new());
+        return;
+    };
+    ui.set_mini_titulo(faixa.titulo.as_str().into());
+    ui.set_mini_artista(faixa.artista.as_deref().unwrap_or("").into());
+    let ui_fraca = ui.as_weak();
+    std::thread::spawn(move || {
+        let capa = miniaturas::miniatura(&faixa.caminho, faixa.capa_web.as_deref());
+        let _ = ui_fraca.upgrade_in_event_loop(move |ui| {
+            if let Some(buf) = capa
+                && ui.get_mini_chave() == chave.as_str()
+            {
+                ui.set_mini_capa(Image::from_rgba8(buf));
+                ui.set_mini_tem_capa(true);
+            }
+        });
+    });
+}
+
+/// Entra ou sai do mini player: a mesma janela, encolhida.
+fn alternar_mini(estado: &Rc<RefCell<EstadoAudio>>, ui: &MainWindow) {
+    let entrar = !ui.get_modo_mini();
+    // Do modo imersivo direto para o mini: sai da tela cheia antes
+    let imersivo = estado.borrow().imersivo.is_some();
+    if entrar && imersivo {
+        ui.invoke_alternar_imersivo();
+    }
+    ui.set_info_aberta(false);
+    ui.set_config_aberta(false);
+    ui.set_modo_mini(entrar);
+    let (largura, altura) = if entrar {
+        (380.0, 112.0)
+    } else {
+        (660.0, 734.0)
+    };
+    ui.window()
+        .set_size(slint::LogicalSize::new(largura, altura));
+    if entrar {
+        atualizar_mini(&estado.borrow(), ui);
+    } else {
+        // Fora do mini a capa não fica segurada
+        ui.set_mini_capa(Image::default());
+        ui.set_mini_tem_capa(false);
+        ui.set_mini_chave(SharedString::new());
     }
 }
 
@@ -433,6 +497,16 @@ pub(crate) fn ligar(ui: &MainWindow, estado: &Rc<RefCell<EstadoAudio>>) {
                 return;
             };
             abrir_album(&mut e, &ui, &grupo);
+        });
+    }
+
+    {
+        let estado = estado.clone();
+        let ui_fraca = ui.as_weak();
+        ui.on_alternar_mini(move || {
+            if let Some(ui) = ui_fraca.upgrade() {
+                alternar_mini(&estado, &ui);
+            }
         });
     }
 }

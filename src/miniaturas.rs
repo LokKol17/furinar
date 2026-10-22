@@ -132,6 +132,11 @@ fn trabalhar(fila: &Compartilhada, tx: &Sender<(PathBuf, Capa)>, cache: Option<&
     }
 }
 
+/// Miniatura de uma faixa só, com o cache em disco (mini player).
+pub fn miniatura(caminho: &Path, web: Option<&Path>) -> Capa {
+    carregar(caminho, web, pasta_cache().as_deref())
+}
+
 /// Acha a miniatura: do cache (sem nem abrir a faixa), ou da capa embutida /
 /// `cover.jpg` / capa baixada `web` (e então grava no cache). Arquivo de cache
 /// vazio quer dizer "essa faixa não tem capa", para não procurar de novo.

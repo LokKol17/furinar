@@ -61,6 +61,8 @@ pub fn pt_br() -> Translations {
     t.insert("batch_summary", "{auto} corrigidas sozinhas · {revisar} para revisar · {nada} sem resultado · {letras} letras baixadas");
     t.insert("info_error", "Erro");
     t.insert("discord_status", "Mostrar no Discord o que está tocando");
+    t.insert("tip_mini", "Mini player (M)");
+    t.insert("tip_mini_exit", "Voltar ao tamanho normal (M)");
     t.insert("scrobble_title", "Scrobble");
     t.insert("listenbrainz_token", "Token do ListenBrainz");
     t.insert("lastfm_keys", "Last.fm: chave e segredo da API");
@@ -211,6 +213,8 @@ pub fn en() -> Translations {
     t.insert("batch_summary", "{auto} fixed automatically · {revisar} to review · {nada} not found · {letras} lyrics downloaded");
     t.insert("info_error", "Error");
     t.insert("discord_status", "Show what's playing on Discord");
+    t.insert("tip_mini", "Mini player (M)");
+    t.insert("tip_mini_exit", "Back to full size (M)");
     t.insert("scrobble_title", "Scrobble");
     t.insert("listenbrainz_token", "ListenBrainz token");
     t.insert("lastfm_keys", "Last.fm: API key and secret");

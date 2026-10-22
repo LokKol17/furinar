@@ -50,6 +50,8 @@ The visual palette — deep navy, cyan, and gold (or baby blue and pearl white i
 - **Favorites** (star on the row, or `F`) and **Most played**, as fixed tabs gathering tracks from every folder
 
 **Extras**
+- **Mini player** (`M`): the window shrinks into a small always-on-top bar with cover and controls
+- **Discord** ("Listening to …" on your profile) and **scrobbling** to ListenBrainz and Last.fm
 - **Web metadata and lyrics** (`I` key): identifies the track on MusicBrainz — or by sound, with a free AcoustID key —, downloads cover art and synced lyrics (LRCLIB), and indexes a whole tab with review. Fixes stay in Furinar until you ask to write them to the tags
 - **Synced lyrics** via `.lrc` files, scrolling along with the track — or the lyrics embedded in the tags (SYLT/USLT/LYRICS), synced or not
 - **Light/dark theme**, switched instantly, no restart needed
@@ -64,6 +66,7 @@ The visual palette — deep navy, cyan, and gold (or baby blue and pearl white i
 - Library drawer (`L`, or `/` to search): folder tabs, search, and a list with cover thumbnails, artist • album and duration; an "Up next" queue that respects shuffle and loop; and an **albums** grid — clicking an album opens it in a tab and starts playing
 - "Up next" notice in the last 10 s of a track, and a background that pulses with the bass (can be turned off in Settings)
 - Fullscreen settings without leaving it (gear icon at the top)
+- Karaoke-style lyrics: the current line fills as it's sung (word by word with enhanced LRC)
 - Lyrics-only view (`H`), a clock, and the sleep timer
 - Everything in this mode is only allocated while it's on — back in normal mode, Furinar is as light as before
 

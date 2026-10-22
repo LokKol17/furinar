@@ -50,6 +50,8 @@ A paleta visual — azul-marinho profundo, ciano e dourado (ou azul-bebê e bran
 - **Favoritas** (estrela na linha ou `F`) e **Mais tocadas**, como abas fixas que juntam faixas de todas as pastas
 
 **Extras**
+- **Mini player** (`M`): a janela vira uma barrinha com capa e controles, sempre por cima
+- **Discord** ("Ouvindo …" no seu perfil) e **scrobble** no ListenBrainz e no Last.fm
 - **Metadados e letras da web** (tecla `I`): identifica a faixa no MusicBrainz — ou pelo som, com uma chave grátis do AcoustID —, baixa capa e letra sincronizada (LRCLIB), e indexa a aba inteira com revisão. As correções ficam no Furinar até você pedir para gravar nas tags
 - **Letras sincronizadas** via arquivos `.lrc`, rolando junto com a música — ou a letra embutida nas tags (SYLT/USLT/LYRICS), sincronizada ou não
 - **Tema claro/escuro**, trocado na hora, sem reiniciar o app
@@ -64,6 +66,7 @@ A paleta visual — azul-marinho profundo, ciano e dourado (ou azul-bebê e bran
 - Painel da biblioteca (`L`, ou `/` para buscar): abas das pastas, busca e lista com miniatura da capa, artista • álbum e duração; a fila "a seguir", que respeita shuffle e loop; e a grade de **álbuns** — clicar num álbum abre uma aba com ele e começa a tocar
 - Aviso "a seguir" nos últimos 10 s da faixa e fundo que pulsa com os graves (desligável nas Configurações)
 - Configurações da tela cheia sem sair dela (ícone de engrenagem no alto)
+- Letra estilo karaokê: a linha atual enche no ritmo do canto (palavra por palavra com LRC estendido)
 - Modo só letra (`H`), relógio e temporizador de sono
 - Nada desse modo fica alocado fora dele — de volta ao modo normal, o Furinar é tão leve quanto antes
 

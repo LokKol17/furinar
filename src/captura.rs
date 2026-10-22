@@ -26,7 +26,13 @@ fn captura_modo_normal() {
         }
     }
 
-    let (largura, altura) = (660u32, 734u32);
+    // FURINAR_CAPTURA_MINI=1: o mini player (janela encolhida)
+    let mini = std::env::var_os("FURINAR_CAPTURA_MINI").is_some();
+    let (largura, altura) = if mini {
+        (380u32, 112u32)
+    } else {
+        (660u32, 734u32)
+    };
     let janela = MinimalSoftwareWindow::new(RepaintBufferType::NewBuffer);
     slint::platform::set_platform(Box::new(Plataforma(janela.clone())))
         .expect("plataforma de teste");
@@ -74,6 +80,18 @@ fn captura_modo_normal() {
     // FURINAR_CAPTURA_CONFIG=1: configurações abertas
     if std::env::var_os("FURINAR_CAPTURA_CONFIG").is_some() {
         ui.set_config_aberta(true);
+    }
+    if mini {
+        ui.set_modo_mini(true);
+        let t = &e.pastas[ESPECIAIS].tracks[2];
+        ui.set_mini_titulo(t.titulo.as_str().into());
+        ui.set_mini_artista(t.artista.as_deref().unwrap_or("").into());
+        if let Some(c) = e.pastas[ESPECIAIS].caminho_faixa(2)
+            && let Some(buf) = miniaturas::miniatura(&c, None)
+        {
+            ui.set_mini_capa(slint::Image::from_rgba8(buf));
+            ui.set_mini_tem_capa(true);
+        }
     }
     // FURINAR_CAPTURA_INFO=1 (ou =2 para a guia do lote): informações
     if let Some(guia) = std::env::var_os("FURINAR_CAPTURA_INFO") {
