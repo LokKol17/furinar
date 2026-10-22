@@ -696,7 +696,7 @@ code {
 }
 
 .weight-bar--furinar {
-  width: 4%;
+  width: 10%;
   background: var(--color-primary);
   min-width: 60px;
 }
@@ -1683,6 +1683,275 @@ code {
 }
 
 /* ============================================================
+   WHAT'S NEW (1.7)
+   ============================================================ */
+.section-news {
+  padding: var(--section-pad) 0;
+  border-top: 1px solid var(--border-soft);
+}
+
+.news-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-top: 48px;
+}
+
+.news-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 22px 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: border-color 0.2s ease, transform 0.2s var(--ease-out);
+}
+
+.news-card:hover {
+  border-color: var(--color-primary);
+  transform: translateY(-2px);
+}
+
+.news-tag {
+  align-self: flex-start;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--color-primary);
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface-2);
+}
+
+.news-title {
+  font-size: 1.02rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.news-desc {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.news-more {
+  margin-top: 28px;
+  text-align: center;
+}
+
+/* ===== Immersive mode demo ===== */
+.imv-demo {
+  position: relative;
+  width: 100%;
+  max-width: 360px;
+  aspect-ratio: 16 / 10;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  background:
+    radial-gradient(120% 90% at 80% 10%, #3a2a5a 0%, transparent 60%),
+    radial-gradient(100% 80% at 10% 90%, #1d4a5e 0%, transparent 65%),
+    #081320;
+  padding: 18px 18px 14px;
+  display: flex;
+  flex-direction: column;
+}
+
+.imv-lyrics {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.imv-line {
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.imv-line--now {
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+/* A linha atual "enche" da esquerda para a direita, como no app */
+.imv-fill {
+  background: linear-gradient(90deg, #fff 50%, rgba(255, 255, 255, 0.4) 50%);
+  background-size: 200% 100%;
+  background-position: 100% 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: imv-karaoke 4.5s linear infinite;
+}
+
+@keyframes imv-karaoke {
+  0%   { background-position: 100% 0; }
+  85%  { background-position: 0% 0; }
+  100% { background-position: 0% 0; }
+}
+
+.imv-footer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.imv-cover {
+  width: 38px;
+  height: 38px;
+  border-radius: 3px;
+  border: 2px solid #fff;
+  background: linear-gradient(135deg, #8a63d2, #3da9d6);
+  flex-shrink: 0;
+}
+
+.imv-meta {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+}
+
+.imv-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.imv-artist {
+  font-size: 0.66rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.imv-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 26px;
+}
+
+.imv-bars span {
+  flex: 1;
+  height: 30%;
+  border-radius: 1px;
+  background: rgba(138, 99, 210, 0.75);
+  animation: imv-bar 1.1s ease-in-out infinite alternate;
+}
+
+.imv-bars span:nth-child(3n)   { animation-duration: 0.8s; }
+.imv-bars span:nth-child(3n+1) { animation-duration: 1.3s; animation-delay: -0.4s; }
+.imv-bars span:nth-child(4n)   { animation-duration: 0.95s; animation-delay: -0.7s; }
+.imv-bars span:nth-child(-n+5) { background: rgba(61, 169, 214, 0.8); }
+
+@keyframes imv-bar {
+  from { height: 15%; }
+  to   { height: 100%; }
+}
+
+/* ===== Web metadata demo ===== */
+.web-demo {
+  width: 100%;
+  max-width: 340px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.web-demo-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 10px;
+  margin-bottom: 2px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.web-demo-file {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--text-faint);
+}
+
+.web-demo-btn {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--color-on-primary);
+  background: var(--color-primary);
+  padding: 4px 10px;
+  border-radius: 4px;
+}
+
+.web-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 5px;
+  border: 1px solid transparent;
+}
+
+.web-row--sel {
+  background: var(--surface-2);
+  border-color: var(--color-primary);
+}
+
+.web-row-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.35;
+}
+
+.web-row-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.web-row-sub {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.web-pill {
+  font-size: 0.66rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+.web-pill--high { color: #4cd685; background: rgba(46, 157, 91, 0.2); }
+.web-pill--mid  { color: #e3bd6a; background: rgba(201, 160, 80, 0.2); }
+.web-pill--low  { color: #ef7d75; background: rgba(201, 86, 79, 0.2); }
+
+@media (prefers-reduced-motion: reduce) {
+  .imv-fill,
+  .imv-bars span {
+    animation: none;
+  }
+  .imv-fill {
+    background-position: 30% 0;
+  }
+}
+
+/* ============================================================
    RESPONSIVE — TABLET
    ============================================================ */
 @media (max-width: 960px) {
@@ -1721,6 +1990,10 @@ code {
     grid-template-columns: 1fr;
   }
 
+  .news-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
   .showcase-col {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -1754,6 +2027,11 @@ code {
 @media (max-width: 640px) {
   :root {
     --section-pad: 56px;
+  }
+
+
+  .news-grid {
+    grid-template-columns: 1fr;
   }
 
   .container {

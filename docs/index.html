@@ -8,7 +8,7 @@
   <!-- Primary Meta -->
   <title>Furinar — A light, fast, local music player</title>
   <meta name="description"
-    content="Furinar is a lightweight, native desktop music player built with Rust. Opens in milliseconds, uses 2–10 MB of RAM, and plays your local music library beautifully. Windows & Linux.">
+    content="Furinar is a lightweight, native desktop music player built with Rust. About 20 MB of RAM while playing, gapless and crossfade, synced and karaoke lyrics, an immersive fullscreen mode and web metadata. Windows & Linux.">
   <meta name="author" content="LokKol17">
   <meta name="keywords"
     content="music player, local music, lightweight, desktop app, Rust, Windows, Linux, audio player, Furinar">
@@ -16,7 +16,7 @@
   <!-- Open Graph -->
   <meta property="og:title" content="Furinar — A light, fast, local music player">
   <meta property="og:description"
-    content="A native desktop music player that opens in milliseconds and uses 2–10 MB of RAM. Tags, synced lyrics, multiple libraries, and system integration.">
+    content="A native desktop music player that opens in milliseconds and uses about 20 MB of RAM while playing. Immersive fullscreen mode, karaoke lyrics, web metadata, Discord and scrobbling.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://lokkol17.github.io/furinar/">
   <meta property="og:image" content="screenshot-player-dark.png">
@@ -24,7 +24,7 @@
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Furinar — A light, fast, local music player">
-  <meta name="twitter:description" content="Native desktop music player. 2–10 MB RAM. Windows & Linux.">
+  <meta name="twitter:description" content="Native desktop music player. ~20 MB of RAM while playing. Windows & Linux.">
   <meta name="twitter:image" content="screenshot-player-dark.png">
 
   <!-- Favicon -->
@@ -50,6 +50,7 @@
         <span class="nav-logo-text">FURINAR</span>
       </a>
       <div class="nav-links">
+        <a href="#whats-new" data-i18n="nav.news">What's new</a>
         <a href="#features" data-i18n="nav.features">Features</a>
         <a href="#showcase" data-i18n="nav.gallery">Gallery</a>
         <a href="#download" data-i18n="nav.download">Download</a>
@@ -74,6 +75,7 @@
       </button>
     </div>
     <div class="mobile-menu" id="mobile-menu" aria-hidden="true">
+      <a href="#whats-new" data-i18n="nav.news">What's new</a>
       <a href="#features" data-i18n="nav.features">Features</a>
       <a href="#showcase" data-i18n="nav.gallery">Gallery</a>
       <a href="#download" data-i18n="nav.download">Download</a>
@@ -107,9 +109,9 @@
 
       <div class="hero-stat-row" aria-label="Memory usage">
         <div class="hero-stat">
-          <span class="stat-value">2–10</span>
+          <span class="stat-value">~20</span>
           <span class="stat-unit">MB</span>
-          <span class="stat-label" data-i18n="hero.ram">of RAM</span>
+          <span class="stat-label" data-i18n="hero.ram">of RAM while playing</span>
         </div>
         <div class="stat-divider" aria-hidden="true"></div>
         <p class="stat-context" data-i18n="hero.tab">Less than a single browser tab</p>
@@ -171,6 +173,58 @@
     </div>
   </header>
 
+  <!-- ===== WHAT'S NEW (1.7) ===== -->
+  <section id="whats-new" class="section-news" aria-labelledby="news-heading">
+    <div class="container">
+      <div class="section-header reveal">
+        <p class="section-label" data-i18n="news.label">What's new · 1.7</p>
+        <h2 id="news-heading" class="section-title" data-i18n="news.title">The biggest update yet.<br>Still light.</h2>
+        <p class="section-body section-body--center" data-i18n="news.sub">
+          A fullscreen mode made for listening, smarter playback, and your library tidied up from the web —
+          while staying around 20 MB of RAM. Everything heavy only exists while you use it.
+        </p>
+      </div>
+
+      <div class="news-grid" role="list">
+        <article class="news-card reveal" role="listitem">
+          <span class="news-tag">F11</span>
+          <h3 class="news-title" data-i18n="news.c1t">Immersive mode</h3>
+          <p class="news-desc" data-i18n="news.c1d">Fullscreen with the cover's accent color, animated or video backgrounds, a spectrum visualizer, karaoke lyrics and an album grid.</p>
+        </article>
+        <article class="news-card reveal reveal-delay-1" role="listitem">
+          <span class="news-tag">Gapless</span>
+          <h3 class="news-title" data-i18n="news.c2t">Playback, refined</h3>
+          <p class="news-desc" data-i18n="news.c2d">No silence between tracks, optional crossfade, ReplayGain loudness, smart shuffle and a sleep timer.</p>
+        </article>
+        <article class="news-card reveal reveal-delay-2" role="listitem">
+          <span class="news-tag">★</span>
+          <h3 class="news-title" data-i18n="news.c3t">Favorites &amp; sorting</h3>
+          <p class="news-desc" data-i18n="news.c3d">Favorites and Most played tabs across all folders, and each tab remembers its own sort order.</p>
+        </article>
+        <article class="news-card reveal" role="listitem">
+          <span class="news-tag">I</span>
+          <h3 class="news-title" data-i18n="news.c4t">Metadata &amp; lyrics from the web</h3>
+          <p class="news-desc" data-i18n="news.c4d">Identify tracks on MusicBrainz — even by their sound — fetch covers and synced lyrics, and fix a whole tab at once.</p>
+        </article>
+        <article class="news-card reveal reveal-delay-1" role="listitem">
+          <span class="news-tag">Discord</span>
+          <h3 class="news-title" data-i18n="news.c5t">Discord &amp; scrobbling</h3>
+          <p class="news-desc" data-i18n="news.c5d">"Listening to…" on your Discord profile, and every play scrobbled to ListenBrainz or Last.fm.</p>
+        </article>
+        <article class="news-card reveal reveal-delay-2" role="listitem">
+          <span class="news-tag">M</span>
+          <h3 class="news-title" data-i18n="news.c6t">Mini player</h3>
+          <p class="news-desc" data-i18n="news.c6d">The window shrinks into a small always-on-top bar with the cover and playback controls.</p>
+        </article>
+      </div>
+
+      <p class="news-more reveal">
+        <a href="https://github.com/LokKol17/furinar/blob/master/CHANGELOG.md" target="_blank" rel="noopener noreferrer"
+          class="text-link" data-i18n="news.more">Full release notes →</a>
+      </p>
+    </div>
+  </section>
+
   <!-- ===== LIGHTWEIGHT SECTION ===== -->
   <section class="section-light" aria-label="Lightweight philosophy">
     <div class="container">
@@ -191,7 +245,7 @@
             </li>
             <li>
               <span class="pillar-dot" aria-hidden="true"></span>
-              <span data-i18n="light.p2">2–10 MB of RAM — consistently</span>
+              <span data-i18n="light.p2">~12 MB idle, ~20 MB playing</span>
             </li>
             <li>
               <span class="pillar-dot" aria-hidden="true"></span>
@@ -208,7 +262,7 @@
             <div class="weight-label">Furinar</div>
             <div class="weight-bar-wrap">
               <div class="weight-bar weight-bar--furinar">
-                <span class="weight-bar-value">~6 MB</span>
+                <span class="weight-bar-value">~20 MB</span>
               </div>
             </div>
           </div>
@@ -243,11 +297,11 @@
         <div class="feature-row reveal">
           <div class="feature-row-text">
             <span class="feature-number" aria-hidden="true">01</span>
-            <h3 class="feature-title" data-i18n="feat1.title">Full Playback Control</h3>
+            <h3 class="feature-title" data-i18n="feat1.title">Playback That Gets the Details Right</h3>
             <p class="feature-desc" data-i18n="feat1.desc">
-              Play, pause, stop, seek, adjust volume, and navigate tracks with clean controls.
-              Loop modes — off, single track, or full playlist — plus shuffle. Furinar picks up
-              exactly where you left off on every reopen.
+              Always gapless, with optional crossfade that leaves consecutive tracks of the same album alone,
+              and ReplayGain so every track plays at the same loudness. Smart shuffle plays every track once
+              before repeating, a sleep timer fades you out, and Furinar reopens paused right where you left off.
             </p>
             <ul class="feature-tags" role="list" aria-label="Supported formats">
               <li>MP3</li>
@@ -288,9 +342,9 @@
                 </button>
               </div>
               <div class="demo-badges">
-                <span class="demo-badge demo-badge--active">Shuffle</span>
-                <span class="demo-badge">Repeat</span>
-                <span class="demo-badge">Loop</span>
+                <span class="demo-badge demo-badge--active">Gapless</span>
+                <span class="demo-badge">Crossfade</span>
+                <span class="demo-badge">ReplayGain</span>
               </div>
             </div>
           </div>
@@ -302,17 +356,17 @@
         <div class="feature-row feature-row--reverse reveal">
           <div class="feature-row-text">
             <span class="feature-number" aria-hidden="true">02</span>
-            <h3 class="feature-title" data-i18n="feat2.title">Multiple Libraries as Tabs</h3>
+            <h3 class="feature-title" data-i18n="feat2.title">Your Library, Organized</h3>
             <p class="feature-desc" data-i18n="feat2.desc">
-              Open as many folders as you want — each becomes its own tab. Switching between
-              libraries never interrupts what's currently playing. Optional recursive subfolder
-              scanning means no track is left behind.
+              Open as many folders as you want — each becomes its own tab, and switching never interrupts
+              what's playing. Favorites and Most played gather tracks from every folder, and each tab
+              remembers how you like it sorted.
             </p>
             <ul class="feature-list" role="list">
-              <li data-i18n="feat2.l1">Folder tabs — each library independent</li>
-              <li data-i18n="feat2.l2">Recursive subfolder scanning</li>
-              <li data-i18n="feat2.l3">ID3 / Vorbis tag reading — title, artist</li>
-              <li data-i18n="feat2.l4">Falls back gracefully to filename</li>
+              <li data-i18n="feat2.l1">Folder tabs, plus Favorites and Most played</li>
+              <li data-i18n="feat2.l2">Sort by title, artist, album, duration, date added or plays</li>
+              <li data-i18n="feat2.l3">Tags: title, artist, album, track number, duration</li>
+              <li data-i18n="feat2.l4">Optional subfolder scanning</li>
             </ul>
           </div>
           <div class="feature-row-visual">
@@ -384,15 +438,16 @@
       <div class="feature-row feature-row--reverse reveal">
         <div class="feature-row-text">
           <span class="feature-number" aria-hidden="true">04</span>
-          <h3 class="feature-title" data-i18n="feat4.title">Synchronized Lyrics (LRC)</h3>
+          <h3 class="feature-title" data-i18n="feat4.title">Synced Lyrics — Even Karaoke</h3>
           <p class="feature-desc" data-i18n="feat4.desc">
-            Furinar automatically detects and loads synced .lrc files alongside your tracks.
-            The lyrics view highlights lines in sync with playback time.
+            Furinar loads .lrc files next to your tracks, or lyrics embedded in the tags. Missing ones can be
+            fetched from LRCLIB. In fullscreen, the current line fills as it's sung — word by word with
+            enhanced LRC.
           </p>
           <ul class="feature-list" role="list">
-            <li data-i18n="feat4.l1">Auto-loads .lrc files with same basename</li>
-            <li data-i18n="feat4.l2">Real-time line synchronization</li>
-            <li data-i18n="feat4.l3">Clean scrolling lyrics view</li>
+            <li data-i18n="feat4.l1">.lrc files and embedded lyrics (SYLT / USLT)</li>
+            <li data-i18n="feat4.l2">Optional download from LRCLIB</li>
+            <li data-i18n="feat4.l3">Karaoke-style fill in fullscreen</li>
           </ul>
         </div>
         <div class="feature-row-visual">
@@ -423,16 +478,18 @@
           <span class="feature-number" aria-hidden="true">05</span>
           <h3 class="feature-title" data-i18n="feat5.title">Native System Integration</h3>
           <p class="feature-desc" data-i18n="feat5.desc">
-            Furinar feels like part of the OS. On Windows, playback controls appear directly
-            in the taskbar thumbnail and in the system media overlay. On Linux, MPRIS
-            integration connects it to desktop media controls.
+            Furinar feels like part of the OS. On Windows, playback controls appear in the taskbar
+            thumbnail and the system media overlay; on Linux, MPRIS connects it to your desktop's media
+            controls. It can also show what you're listening to on Discord and scrobble to ListenBrainz
+            or Last.fm.
           </p>
           <ul class="feature-list" role="list">
             <li data-i18n="feat5.l1">Windows taskbar thumbnail controls</li>
             <li data-i18n="feat5.l2">SMTC — system media keys &amp; action center</li>
             <li data-i18n="feat5.l3">MPRIS on Linux</li>
+            <li data-i18n="feat5.l4">Discord status, ListenBrainz &amp; Last.fm</li>
             <li><span data-i18n="feat5.kbd_prefix">Keyboard:</span> <kbd>Space</kbd> <kbd>&larr;</kbd> <kbd>&rarr;</kbd>
-              <kbd>&uarr;</kbd> <kbd>&darr;</kbd> <kbd>Enter</kbd></li>
+              <kbd>F</kbd> <kbd>I</kbd> <kbd>M</kbd> <kbd>F11</kbd></li>
           </ul>
         </div>
         <div class="feature-row-visual">
@@ -452,8 +509,108 @@
               <span class="kbd-action" data-i18n="kbd.nav">Navigate list</span>
             </div>
             <div class="kbd-row">
-              <div class="kbd-key kbd-key--wide">Enter</div>
-              <span class="kbd-action" data-i18n="kbd.play_sel">Play selected</span>
+              <div class="kbd-key">F</div>
+              <span class="kbd-action" data-i18n="kbd.fav">Favorite</span>
+            </div>
+            <div class="kbd-row">
+              <div class="kbd-key">M</div>
+              <span class="kbd-action" data-i18n="kbd.mini">Mini player</span>
+            </div>
+            <div class="kbd-row">
+              <div class="kbd-key kbd-key--wide">F11</div>
+              <span class="kbd-action" data-i18n="kbd.imv">Immersive mode</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="feature-divider" aria-hidden="true"></div>
+
+      <!-- Feature block: Immersive mode -->
+      <div class="feature-row feature-row--reverse reveal">
+        <div class="feature-row-text">
+          <span class="feature-number" aria-hidden="true">06</span>
+          <h3 class="feature-title" data-i18n="feat6.title">Immersive Fullscreen Mode</h3>
+          <p class="feature-desc" data-i18n="feat6.desc">
+            Press F11 and the music takes the whole screen: the cover, an accent color taken from it,
+            your own backgrounds — images, animated GIF/WebP or video — and a spectrum visualizer. A library
+            drawer brings the album grid and the up-next queue. Everything it uses is freed when you leave.
+          </p>
+          <ul class="feature-list" role="list">
+            <li data-i18n="feat6.l1">Backgrounds that rotate on every track</li>
+            <li data-i18n="feat6.l2">Spectrum visualizer and karaoke lyrics</li>
+            <li data-i18n="feat6.l3">Library drawer, album grid and up-next queue</li>
+            <li data-i18n="feat6.l4">Lyrics-only view, clock and sleep timer</li>
+          </ul>
+        </div>
+        <div class="feature-row-visual">
+          <div class="imv-demo" aria-hidden="true">
+            <div class="imv-lyrics">
+              <div class="imv-line" data-i18n="imv.l1">The room goes dark, the music stays</div>
+              <div class="imv-line imv-line--now"><span class="imv-fill" data-i18n="imv.l2">Every word lights up as it's sung</span></div>
+              <div class="imv-line" data-i18n="imv.l3">line by line, until the end</div>
+            </div>
+            <div class="imv-footer">
+              <div class="imv-cover"></div>
+              <div class="imv-meta">
+                <span class="imv-title" data-i18n="imv.title">Your favorite song</span>
+                <span class="imv-artist" data-i18n="imv.artist">Demo · Furinar 1.7</span>
+              </div>
+            </div>
+            <div class="imv-bars">
+              <span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+              <span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+              <span></span><span></span><span></span><span></span><span></span><span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="feature-divider" aria-hidden="true"></div>
+
+      <!-- Feature block: Web metadata -->
+      <div class="feature-row reveal">
+        <div class="feature-row-text">
+          <span class="feature-number" aria-hidden="true">07</span>
+          <h3 class="feature-title" data-i18n="feat7.title">Fix Your Tags From the Web</h3>
+          <p class="feature-desc" data-i18n="feat7.desc">
+            Messy tags or files called "track01.mp3"? Press I: Furinar looks the track up on MusicBrainz —
+            or by its sound, with a free AcoustID key — and shows candidates with a confidence score. Index a
+            whole tab at once; fixes stay in Furinar until you choose to write them to your files.
+          </p>
+          <ul class="feature-list" role="list">
+            <li data-i18n="feat7.l1">MusicBrainz search and AcoustID fingerprinting</li>
+            <li data-i18n="feat7.l2">Covers from the Cover Art Archive</li>
+            <li data-i18n="feat7.l3">Whole-tab indexing with review</li>
+            <li data-i18n="feat7.l4">Nothing touches your files without confirmation</li>
+          </ul>
+        </div>
+        <div class="feature-row-visual">
+          <div class="web-demo" aria-hidden="true">
+            <div class="web-demo-head">
+              <span class="web-demo-file">track01.mp3</span>
+              <span class="web-demo-btn" data-i18n="web.search">Search the web</span>
+            </div>
+            <div class="web-row web-row--sel">
+              <div class="web-row-text">
+                <span class="web-row-title">Bohemian Rhapsody</span>
+                <span class="web-row-sub">Queen · A Night at the Opera (1975) · 05:55</span>
+              </div>
+              <span class="web-pill web-pill--high">100%</span>
+            </div>
+            <div class="web-row">
+              <div class="web-row-text">
+                <span class="web-row-title">Bohemian Rhapsody (Live)</span>
+                <span class="web-row-sub">Queen · Live Killers (1979) · 05:58</span>
+              </div>
+              <span class="web-pill web-pill--mid">83%</span>
+            </div>
+            <div class="web-row">
+              <div class="web-row-text">
+                <span class="web-row-title">Bohemian Rhapsody</span>
+                <span class="web-row-sub" data-i18n="web.by_sound">Cover Band · matched by sound</span>
+              </div>
+              <span class="web-pill web-pill--low">61%</span>
             </div>
           </div>
         </div>
@@ -676,7 +833,7 @@
           <a href="https://github.com/LokKol17/furinar" target="_blank" rel="noopener noreferrer" class="text-link"
             data-i18n="links.github">GitHub repository</a>
           <span class="link-sep" aria-hidden="true">·</span>
-          <a href="https://github.com/LokKol17/furinar/blob/main/docs/README.md" target="_blank"
+          <a href="https://github.com/LokKol17/furinar#readme" target="_blank"
             rel="noopener noreferrer" class="text-link" data-i18n="links.docs">Documentation</a>
         </div>
       </div>
@@ -703,9 +860,9 @@
             <a href="https://github.com/LokKol17/furinar" target="_blank" rel="noopener noreferrer">GitHub</a>
             <a href="https://github.com/LokKol17/furinar/releases" target="_blank" rel="noopener noreferrer"
               data-i18n="links.releases">Releases</a>
-            <a href="https://github.com/LokKol17/furinar/blob/main/docs/README.md" target="_blank"
+            <a href="https://github.com/LokKol17/furinar#readme" target="_blank"
               rel="noopener noreferrer" data-i18n="links.docs">Documentation</a>
-            <a href="https://github.com/LokKol17/furinar/blob/main/LICENSE" target="_blank" rel="noopener noreferrer"
+            <a href="https://github.com/LokKol17/furinar/blob/master/LICENSE" target="_blank" rel="noopener noreferrer"
               data-i18n="links.license">License</a>
           </nav>
           <a href="#" class="back-to-top" id="back-to-top" aria-label="Back to top">
