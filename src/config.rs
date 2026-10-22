@@ -144,7 +144,7 @@ fn verdadeiro() -> bool {
 }
 
 fn default_idioma() -> String {
-    "pt-br".to_string()
+    "en".to_string()
 }
 
 pub fn config_path() -> PathBuf {
@@ -257,7 +257,7 @@ mod tests {
 
         assert_eq!(config.volume, 0.8, "config corrompida não pode deixar mudo");
         assert!(config.pastas.is_empty());
-        assert_eq!(config.idioma, "pt-br");
+        assert_eq!(config.idioma, "en");
     }
 
     #[test]

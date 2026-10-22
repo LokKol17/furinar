@@ -275,7 +275,7 @@ impl Default for EstadoAudio {
             lote: Lote::default(),
             escanear_subpastas: false,
             tema_claro: false,
-            idioma: "pt-br".to_string(),
+            idioma: "en".to_string(),
             indices_visiveis: Vec::new(),
             filtro: String::new(),
             letra_atual: Vec::new(),

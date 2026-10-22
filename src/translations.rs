@@ -308,8 +308,8 @@ pub fn en() -> Translations {
 
 pub fn get_translations(lang: &str) -> Translations {
     match lang {
-        "en" => en(),
-        _ => pt_br(),
+        "pt-br" | "pt" => pt_br(),
+        _ => en(),
     }
 }
 
@@ -341,10 +341,11 @@ mod tests {
     }
 
     #[test]
-    fn idioma_desconhecido_cai_no_pt_br() {
+    fn idioma_desconhecido_cai_no_ingles() {
         assert_eq!(get_translations("en").get("tip_stop"), Some(&"Stop"));
         assert_eq!(get_translations("pt-br").get("tip_stop"), Some(&"Parar"));
-        assert_eq!(get_translations("fr").get("tip_stop"), Some(&"Parar"));
-        assert_eq!(get_translations("").get("tip_stop"), Some(&"Parar"));
+        assert_eq!(get_translations("pt").get("tip_stop"), Some(&"Parar"));
+        assert_eq!(get_translations("fr").get("tip_stop"), Some(&"Stop"));
+        assert_eq!(get_translations("").get("tip_stop"), Some(&"Stop"));
     }
 }

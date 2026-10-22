@@ -47,6 +47,7 @@ e o projeto adere ao [Semantic Versioning](https://semver.org/).
   - a thread e o cliente HTTP só existem enquanto há trabalho.
 
 ### Alterado
+- Idioma padrão agora é inglês (`en`); antes era português (`pt-br`). Configs já salvas com `pt-br` continuam em português
 - Fundo reativo do modo imersivo vai para a tela a no máximo ~15 fps e só quando o pulso muda o bastante (cada mudança repinta a tela inteira; antes custava ~20% de um núcleo). Passa a vir desligado em instalações novas, com o aviso "usa mais CPU".
 - Depois de abrir o dispositivo de áudio, o código das bibliotecas de áudio que só serviu à inicialização volta ao sistema: tocando, ~21 MB em vez de ~27 MB.
 - Ícones de loop e shuffle mostram o modo: desligado fica apagado; loop da faixa tem um "1"; shuffle inteligente (cada faixa uma vez) usa as setas e o aleatório (pode repetir) um dado. O ciclo do shuffle passa a ser desligado → inteligente → aleatório.
