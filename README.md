@@ -6,9 +6,9 @@
 
 **A light, fast, and beautiful audio player — inspired by the Hydro Archon.**
 
-![Windows and Linux](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-3da9d6?style=flat-square)
+![Platforms](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-3da9d6?style=flat-square)
 ![Rust](https://img.shields.io/badge/built%20with-Rust-c9a050?style=flat-square)
-![RAM](https://img.shields.io/badge/RAM-2--10MB-0b1a2b?style=flat-square)
+![RAM](https://img.shields.io/badge/RAM-~20MB%20playing-0b1a2b?style=flat-square)
 ![License](https://img.shields.io/badge/license-BSD--3--Clause-lightgrey?style=flat-square)
 
 🇺🇸 English | [🇧🇷 Português](README.pt-BR.md)
@@ -19,100 +19,120 @@
 
 <div align="center">
 
-<!-- Screenshot 1: main player view (folder/tabs/playlist visible) -->
 ![Furinar - main player](docs/screenshot-player.png)
 
 </div>
 
 ## Why Furinar?
 
-Most desktop music players these days ship an entire browser engine just to play an MP3. Furinar does the opposite: it opens in milliseconds and sits in the background using **2 to 10 MB of RAM** — less than a single browser tab — while still covering everything a real player needs: tags, synced lyrics, multiple libraries, and native Windows integration.
+Most desktop music players ship an entire browser engine just to play an MP3. Furinar does the opposite: it's a native Rust binary that opens in milliseconds and uses **about 12 MB of RAM idle and 20 MB while playing** — less than an idle browser tab.
 
-The visual palette — deep navy, cyan, and gold (or baby blue and pearl white in light mode) — is a tribute to **Furina**, from *Genshin Impact*. No official affiliation, just a fan project.
+It isn't minimal at the cost of features, though: gapless playback and crossfade, ReplayGain, synced lyrics (even karaoke-style), a fullscreen mode with animated backgrounds and a visualizer, web track identification, and scrobbling. The heavy parts only exist while in use: leaving fullscreen or finishing a web lookup gives the memory back.
+
+The palette — deep navy, cyan, and gold (or baby blue and pearl white in light mode) — is a tribute to **Furina**, from *Genshin Impact*. A fan project with no official affiliation with HoYoverse.
 
 ## ✨ Features
 
-**Playback**
-- MP3, WAV, FLAC, OGG/Vorbis, and M4A support
-- Play/Pause, Stop, Previous, Next, seeking, and volume control
-- Loop (off / track / playlist) and Shuffle (smart, no repeats until everything played, or random); "previous" in shuffle goes back to what actually played
-- **Gapless playback** and optional **crossfade** of 3, 6 or 10 s — consecutive tracks from the same album always join without crossfading
+### Playback
+- MP3, WAV, FLAC, OGG/Vorbis, and M4A
+- Always **gapless**, plus optional **crossfade** of 3, 6 or 10 s — consecutive tracks from the same album join without crossfading, so live albums stay intact
 - **ReplayGain**: uses the gain stored in the tags so every track plays at the same loudness
-- Sleep timer (15/30/60 min or end of track), fading the volume out
-- On reopen, comes back paused on the last track, position and shuffle queue
+- Loop (off / track / list) and two shuffles: **smart** (every track once before repeating) and **random**; "previous" in shuffle goes back to what actually played
+- **"Up next"** queue showing exactly what will play, shuffle included
+- **Sleep timer** (15/30/60 min or end of track), fading the volume out
+- On reopen, comes back paused on the last track, at the same position, with the same queue
 
-**Organization**
-- **Multiple folders as tabs** — open as many libraries as you want; switching tabs never interrupts what's currently playing
-- Optional recursive subfolder scanning
-- **ID3/Vorbis/MP4 tag reading** (title, artist, album, track number, duration)
-- Search/filter by title or artist, accent- and case-insensitive
-- **Per-tab sorting**: default, title, artist, album, duration, recently added or most played
-- **Favorites** (star on the row, or `F`) and **Most played**, as fixed tabs gathering tracks from every folder
+### Library
+- **Multiple folders as tabs** — switching tabs never interrupts playback
+- ID3/Vorbis/MP4 tags (title, artist, album, number, duration), optional subfolders
+- Search by title and artist, accent- and case-insensitive
+- **Per-tab sorting**: title, artist, album, duration, recently added or most played
+- **Favorites** (star or `F`) and **Most played**, fixed tabs gathering tracks from every folder
 
-**Extras**
-- **Mini player** (`M`): the window shrinks into a small always-on-top bar with cover and controls
-- **Discord** ("Listening to …" on your profile) and **scrobbling** to ListenBrainz and Last.fm
-- **Web metadata and lyrics** (`I` key): identifies the track on MusicBrainz — or by sound, with a free AcoustID key —, downloads cover art and synced lyrics (LRCLIB), and indexes a whole tab with review. Fixes stay in Furinar until you ask to write them to the tags
-- **Synced lyrics** via `.lrc` files, scrolling along with the track — or the lyrics embedded in the tags (SYLT/USLT/LYRICS), synced or not
-- **Light/dark theme**, switched instantly, no restart needed
-- Frameless window with a custom title bar (drag-to-move, Aero Snap, rounded corners on Windows 11)
+### Lyrics
+- `.lrc` next to the track, scrolling with the music — click a line to jump there
+- Lyrics embedded in the tags (SYLT, USLT, LYRICS) when there's no `.lrc`
+- **Karaoke-style** in fullscreen: the current line fills as it's sung (word by word with enhanced LRC, `<mm:ss.xx>`)
+- Optional download from [LRCLIB](https://lrclib.net) for tracks without lyrics
 
-**Immersive mode** (fullscreen button, `F11` or `furinar --imersivo`; `Esc` leaves)
-- Cover art (embedded, or `cover`/`folder`/`front`.* in the folder) with artist, album, year, format, sample rate and channels
-- Full lyrics scrolling smoothly, current line highlighted; click a line to jump there
-- Custom backgrounds: drop a `background.*` (or `furinar-bg.*`) into the music folder, or pick global ones in Settings. Several (`background-1.png`, `background-2.gif`... or several global ones) rotate, one per track. Images, animated GIF/WebP, and videos (mp4/webm/mkv/mov/avi — played through your system `ffmpeg`, if installed). Small pixel-art backgrounds stay crisp. No background? The blurred cover takes its place
-- Accent color taken from the cover, crossfade between tracks, controls that hide after 3 s of stillness
-- Spectrum visualizer reacting to the music
-- Library drawer (`L`, or `/` to search): folder tabs, search, and a list with cover thumbnails, artist • album and duration; an "Up next" queue that respects shuffle and loop; and an **albums** grid — clicking an album opens it in a tab and starts playing
-- "Up next" notice in the last 10 s of a track, and a background that pulses with the bass (can be turned off in Settings)
-- Fullscreen settings without leaving it (gear icon at the top)
-- Karaoke-style lyrics: the current line fills as it's sung (word by word with enhanced LRC)
-- Lyrics-only view (`H`), a clock, and the sleep timer
-- Everything in this mode is only allocated while it's on — back in normal mode, Furinar is as light as before
+### Immersive mode (fullscreen)
+Fullscreen button, `F11` or `furinar --imersivo`.
+- Cover, artist, album, year and technical details, with the **accent color taken from the cover**
+- **Custom backgrounds**: image, animated GIF/WebP or video (mp4/webm/mkv/mov/avi, through the system `ffmpeg`). Several backgrounds rotate per track. No background? The blurred cover takes over
+- **Spectrum visualizer** and a background that pulses with the bass (optional — uses more CPU)
+- **Library drawer** (`L`): tabs, search (`/`), list with thumbnails, "up next" queue and an **album grid** — clicking an album opens it in a tab and starts playing
+- "Up next" notice in the last 10 s, lyrics-only view (`H`), clock, and settings without leaving fullscreen
+- Controls hide when the mouse stops; cover and visualizer move down to the bottom of the screen
 
 <div align="center">
 
-<!-- Screenshot 2: synced lyrics panel -->
 ![Furinar - synced lyrics](docs/screenshot-lyrics.png)
 
 </div>
 
-**Windows integration**
-- **Play/Pause, Previous, and Next** buttons right on the taskbar thumbnail preview
-- System media controls (keyboard media keys, action center) via SMTC
-- Keyboard shortcuts: `Space` play/pause, `←`/`→` seek ±5s, `↑`/`↓` navigate the list, `Enter` plays the selected track, `F` favorites the current track, `I` track info, `F11` immersive mode, `Esc` leaves it (in immersive mode: `L` library, `/` search, `H` lyrics only)
+### Web metadata
+Track info screen (`I`):
+- Identifies the track on [MusicBrainz](https://musicbrainz.org) by name — or **by sound**, with a free [AcoustID](https://acoustid.org) key
+- Shows the candidates with a confidence score; you apply the right one
+- Downloads cover art from the [Cover Art Archive](https://coverartarchive.org) when the track and folder have none
+- **Indexes a whole tab**: matches of 90% or more are applied automatically, the rest waits for your review
+- Fixes stay in Furinar. They only go into your files' tags if you ask (with confirmation), and "Restore original" undoes them
+
+### Integrations
+- **Discord**: "Listening to …" on your profile, with cover art and a progress bar
+- **Scrobbling** to [ListenBrainz](https://listenbrainz.org) and [Last.fm](https://www.last.fm), queued while offline
+- System media controls: MPRIS on Linux, SMTC on Windows (media keys, action center)
+- Windows: previous/play/next on the taskbar thumbnail and rounded corners on Windows 11
+
+### Window
+- **Mini player** (`M`): the window shrinks into a bar with cover and controls, always on top (on Windows and X11; on Wayland the compositor decides)
+- Light and dark themes, switched instantly; Portuguese and English
+- Custom title bar, frameless (drag to move, Aero Snap)
 
 <div align="center">
   <table>
     <tr>
-      <td align="center"><b>Bright Theme</b></td>
-      <td align="center"><b>Dark Theme</b></td>
+      <td align="center"><b>Light theme</b></td>
+      <td align="center"><b>Dark theme</b></td>
     </tr>
     <tr>
-      <td><img src="docs/screenshot-player.png" alt="Furinar - tema claro"></td>
-      <td><img src="docs/screenshot-player-dark.png" alt="Furinar - tema escuro"></td>
+      <td><img src="docs/screenshot-player.png" alt="Furinar - light theme"></td>
+      <td><img src="docs/screenshot-player-dark.png" alt="Furinar - dark theme"></td>
     </tr>
   </table>
 </div>
 
-## 🚀 Getting started
+## ⌨️ Shortcuts
+
+| Key | Action |
+|---|---|
+| `Space` | Play / pause |
+| `←` `→` | Seek back / forward 5 s |
+| `↑` `↓` `Enter` | Move through the list and play the selected track |
+| `F` | Favorite the current track |
+| `I` | Track info (web lookup) |
+| `M` | Mini player |
+| `F11` | Immersive mode |
+| `Esc` | Closes whatever is open; in immersive mode, layer by layer until it leaves |
+| `L` / `/` | Immersive: library drawer / search |
+| `H` | Immersive: lyrics only |
+
+## 🚀 Installation
 
 ### Windows
-
-1. Download the latest `furinar.exe` (or build it — see below).
-2. Open the app and click **Open folder** to point it at your music.
-3. That's it — Furinar remembers everything on its own from then on.
+1. Download `furinar-windows-x86_64.exe` from the [Releases](https://github.com/LokKol17/furinar/releases) page.
+2. Open it and click **Open folder** to point it at your music.
+3. Furinar remembers everything next time, and tells you when a new version is out (updating is one click).
 
 ### Linux
 
-**Option 1 — Universal installer:**
+**Universal installer** (detects your distro, installs dependencies, and puts the binary in `/usr/local/bin`):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/LokKol17/furinar/master/pkg/install.sh | bash
 ```
-The installer automatically detects your distro, installs dependencies, and places the binary in `/usr/local/bin`.
 
-Or clone and install from source:
+**From source:**
 
 ```bash
 git clone https://github.com/LokKol17/furinar.git
@@ -122,125 +142,138 @@ cd dist/furinar-*/
 sudo ./install.sh --from-source
 ```
 
-**Option 2 — Native packages:**
+**Native packages:**
 
 | Distro | Command |
 |---|---|
-| Debian/Ubuntu | `make deb && sudo dpkg -i dist/furinar_1.5.2_amd64.deb` |
+| Debian/Ubuntu | `make deb && sudo dpkg -i dist/furinar_*_amd64.deb` |
 | Fedora | `make rpm && sudo rpm -i dist/rpm/RPMS/x86_64/*.rpm` |
-| Arch/Manjaro | `makepkg -si` (from `pkg/arch/PKGBUILD`) |
+| Arch/Manjaro | `makepkg -si` (using `pkg/arch/PKGBUILD`) |
 
-**Option 3 — cargo-deb:**
+**System dependencies:**
 
-```bash
-# Install cargo-deb
-cargo install cargo-deb
+| Distro | Required | Optional (video backgrounds) |
+|---|---|---|
+| Debian/Ubuntu | `sudo apt install libasound2 libgtk-3-0` | `ffmpeg` |
+| Fedora | `sudo dnf install alsa-lib gtk3` | `ffmpeg` |
+| Arch/Manjaro | `sudo pacman -S alsa-lib gtk3` | `ffmpeg` |
 
-# Build and generate .deb
-cargo build --release
-cargo deb
-```
+## ⚙️ Configuration
 
-**System dependencies (all distros):**
+Almost everything is set from the app itself (gear icon, in normal mode and in fullscreen).
 
-| Distro | Install command |
+### Fullscreen backgrounds
+- **Per folder:** put `background.*` or `furinar-bg.*` in the music folder (or the tab's root). Several — `background-1.png`, `background-2.gif` — rotate.
+- **Global:** pick one or more files in Settings.
+- Formats: png, jpg, bmp, gif, webp; video (mp4, webm, mkv, mov, avi) needs `ffmpeg` on the PATH. Small pixel art is scaled up without blurring.
+
+### Online services
+Everything is optional and only happens when you turn it on or ask for it:
+
+| Service | What for | What is sent | When |
+|---|---|---|---|
+| LRCLIB | Lyrics | title, artist, album, duration | "Fetch lyrics from the internet" on, or the "Get lyrics" button |
+| MusicBrainz / Cover Art Archive | Metadata and covers | title, artist, duration | "Search the web" or "Index this tab" |
+| AcoustID | Identify by sound | audio fingerprint | With your key, when the name search isn't enough |
+| ListenBrainz / Last.fm | Scrobbling | tracks you listened to | With a token/account set up |
+| Discord | Profile status | current track (local, through the app's IPC) | "Show what's playing on Discord" on |
+| GitHub | New version notice | — | On startup (off for package installs) |
+
+For **Last.fm**: create an "API account" at [last.fm/api/account/create](https://www.last.fm/api/account/create), paste the key and secret in Settings, click **Connect Last.fm**, authorize in the browser, then click **Finish connecting**. For **ListenBrainz**, the token from [listenbrainz.org/settings](https://listenbrainz.org/settings/) is enough.
+
+### Files
+Stored in `~/.config/furinar/` on Linux and next to the executable on Windows:
+
+| File | Contents |
 |---|---|
-| Debian/Ubuntu | `sudo apt install libasound2 libgtk-3-0` |
-| Fedora | `sudo dnf install alsa-lib gtk3` |
-| Arch/Manjaro | `sudo pacman -S alsa-lib gtk3` |
+| `furinar_config.json` | Folders, options, last track and position, scrobbling accounts |
+| `furinar_biblioteca.json` | Favorites and play counts |
+| `furinar_metadados.json` | Fixes accepted from the web (applied over the tags) |
+| `furinar_scrobbles.json` | Listens waiting for a connection to be sent |
 
-**Configuration (Linux):**
+Caches (safe to delete) live in `~/.cache/furinar/` or `%LOCALAPPDATA%\furinar\`: cover thumbnails (up to 64 MB), downloaded covers and lyrics.
 
-The config file is saved to `~/.config/furinar/furinar_config.json` following the [XDG Base Directory](https://specifications.freedesktop.org/basedir-spec/latest/) specification.
+The ListenBrainz token and the Last.fm secret are stored as plain text in `furinar_config.json` — treat the file as personal.
 
----
-
-## For developers
+## 🛠️ For developers
 
 <details>
-<summary>Build and run</summary>
+<summary>Build, test and package</summary>
 
-**Requirements:** Rust (edition 2024).
-
-```bash
-cargo run
-```
-
-Optimized build:
+**Requirements:** Rust (edition 2024). On Linux: `libasound2-dev libgtk-3-dev pkg-config`.
 
 ```bash
-cargo build --release
+cargo run                      # development
+cargo run -- --imersivo        # start in fullscreen
+cargo build --release          # optimized binary in target/release/
 ```
 
-The final binary lands at:
-- **Windows:** `target/release/furinar.exe`
-- **Linux:** `target/release/furinar`
-
-**Packaging for Linux:**
+**Checks** (CI runs both variants, with zero warnings):
 
 ```bash
-make help          # See all available commands
-make deb           # Generate .deb package (Debian/Ubuntu)
-make rpm           # Generate .rpm package (Fedora)
-make tarball       # Generate tarball with install script
+cargo fmt --all --check
+cargo clippy --all-targets --all-features -- -D warnings
+cargo clippy --all-targets --no-default-features -- -D warnings
+cargo test --all-features
+cargo test --no-default-features
 ```
 
-**Creating a release:**
+Windows-only code is checked locally with `--target x86_64-pc-windows-gnu`. MPRIS is the default `mpris` feature.
+
+**Window-less screenshots**, to check the UI:
 
 ```bash
-make release
-# Upload files from dist/release/ to GitHub Releases
-# Tag format: v0.1.0, v0.2.0, etc.
-# Asset names: furinar-windows-x86_64.exe, furinar-linux-x86_64.tar.gz
+FURINAR_CAPTURA_FAIXA=/music/track.mp3 cargo test captura_modo_normal -- --ignored
+FURINAR_CAPTURA_FAIXA=/music/track.mp3 FURINAR_CAPTURA_PAINEL=1 cargo test captura_modo_imersivo -- --ignored
 ```
+
+They write `target/captura-normal.png` and `target/captura-imersivo.png`. The other variables (`_CONFIG`, `_INFO`, `_MINI`, `_ALBUNS`, `_OCIOSO`...) are listed in [CLAUDE.md](CLAUDE.md).
+
+**Real web lookup** (needs internet): `cargo test web_ao_vivo -- --ignored --nocapture`.
+
+**Packages and release:**
+
+```bash
+make help       # all targets
+make deb        # .deb (Debian/Ubuntu)
+make rpm        # .rpm (Fedora)
+make tarball    # tarball with installer
+make release    # artifacts for GitHub Releases
+```
+
+The version comes from `Cargo.toml`; after changing it, run `make sync-version` and `make check-version`. A `vX.Y.Z` tag triggers the release workflow. The asset names (`furinar-windows-x86_64.exe`, `furinar-linux-x86_64.tar.gz`) must not change: the updater looks for them. Details in [docs/RELEASE_CONVENTION.md](docs/RELEASE_CONVENTION.md).
+
+</details>
+
+<details>
+<summary>Code layout</summary>
+
+- `src/main.rs` — sets the app up: loads the config, wires the callbacks and the 250 ms timer
+- `estado.rs`, `listas.rs`, `reproducao.rs` — state, tabs and lists, playback (gapless, crossfade, shuffle, lyrics)
+- `ponte_imersivo.rs`, `imersivo.rs`, `painel.rs`, `fundo.rs`, `visualizador.rs` — fullscreen mode
+- `web_ui.rs`, `buscador.rs`, `musicbrainz.rs`, `acoustid.rs`, `letras_web.rs`, `metadados.rs` — web lookup
+- `scrobble.rs`, `discord.rs`, `plataforma.rs` — integrations
+- `ui/*.slint` — UI in [Slint](https://slint.dev)
+
+Identifiers and comments are in Portuguese. [CLAUDE.md](CLAUDE.md) has the architecture in detail.
 
 </details>
 
 <details>
 <summary>App icon</summary>
 
-The icon lives at `ui/assets/furinar_icon.png`. It doesn't need to be square: `build.rs` trims transparent edges and centers the content in a 256px square (preserving aspect ratio, no stretching), producing `ui/assets/furinar_icon_quadrado.png`. That derivative feeds both the window icon and the multi-resolution `.ico` (16/32/48/256) embedded in the executable.
-
-To change the icon, just replace the source file — the build handles the rest.
-
-</details>
-
-<details>
-<summary>Config file</summary>
-
-Preferences are saved automatically to `furinar_config.json`. On Linux, the path follows XDG: `~/.config/furinar/furinar_config.json`. On Windows, it's in the project root.
-
-```json
-{
-  "pastas": ["E:\\Music"],
-  "aba_visivel_salva": 0,
-  "pasta_reproducao_salva": 0,
-  "volume": 0.11666667,
-  "modo_loop": 2,
-  "shuffle": true,
-  "indice_atual": 5,
-  "tempo_atual": 42,
-  "escanear_subpastas": true,
-  "tema_claro": false
-}
-```
-
-The old singular `pasta` field (from earlier versions) is still read: if `pastas` is empty and it exists, it's automatically migrated into the list on first run.
-
-On Linux, the config is stored in `~/.config/furinar/` (XDG). On Windows it lives next to the executable.
-
-You can edit the file by hand — the player re-reads the config on every launch.
+The icon lives in `ui/assets/furinar_icon.png` and doesn't need to be square: `build.rs` trims the transparent borders, centers it in a 256 px square, and generates both the window icon and the `.ico` (16/32/48/256) embedded in the Windows executable. To change it, replace the file.
 
 </details>
 
 ## 📄 License
 
-Furinar's own source code is licensed under [BSD 3-Clause](LICENSE) — you're free to use, fork, and modify it, as long as credit is given and the license notice is kept.
-
-Built with [Slint](https://slint.dev) under its Royalty-free License.
+Source code under [BSD 3-Clause](LICENSE): use, fork and modify freely, keeping the credits and the license notice. UI built with [Slint](https://slint.dev), under the Royalty-free license. Stroke icons derived from [Feather Icons](https://feathericons.com) (MIT).
 
 ## 💙 Credits
 
 Inspired by Furina, from *Genshin Impact* (HoYoverse). Furinar is a fan project with no official affiliation.
 
-<a href="https://slint.dev"><img src="https://raw.githubusercontent.com/slint-ui/slint/master/logo/MadeWithSlint-logo-whitebg.png" width="180" alt="Made with Slint" /></a>
+<a href="https://slint.dev">
+    <img src="https://raw.githubusercontent.com/slint-ui/slint/master/logo/MadeWithSlint-logo-whitebg.png" width="180" alt="Made with Slint" />
+</a>
