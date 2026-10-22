@@ -78,6 +78,11 @@
       'showcase.cap1': 'Dark Theme — Playlist & Controls',
       'showcase.cap2': 'Light Theme',
       'showcase.cap3': 'Synchronized Lyrics (.lrc)',
+      'showcase.cap4': 'Immersive Mode (F11)',
+      'showcase.cap5': 'Library Drawer (L)',
+      'showcase.cap6': 'Lyrics Only (H)',
+      'showcase.cap7': 'Tags & Lyrics from the Web (I)',
+      'showcase.cap8': 'Mini Player (M)',
 
       'native.label': 'Native',
       'native.title': 'A desktop app.<br>Actually a desktop app.',
@@ -220,6 +225,11 @@
       'showcase.cap1': 'Tema Escuro — Playlist & Controles',
       'showcase.cap2': 'Tema Claro',
       'showcase.cap3': 'Letras Sincronizadas (.lrc)',
+      'showcase.cap4': 'Modo Imersivo (F11)',
+      'showcase.cap5': 'Painel da Biblioteca (L)',
+      'showcase.cap6': 'Só Letra (H)',
+      'showcase.cap7': 'Tags e Letras da Web (I)',
+      'showcase.cap8': 'Mini Player (M)',
 
       'native.label': 'Nativo',
       'native.title': 'Um app desktop.<br>De verdade.',

@@ -55,6 +55,12 @@ The palette — deep navy, cyan, and gold (or baby blue and pearl white in light
 - **Karaoke-style** in fullscreen: the current line fills as it's sung (word by word with enhanced LRC, `<mm:ss.xx>`)
 - Optional download from [LRCLIB](https://lrclib.net) for tracks without lyrics
 
+<div align="center">
+
+![Furinar - synced lyrics](docs/screenshot-lyrics.png)
+
+</div>
+
 ### Immersive mode (fullscreen)
 Fullscreen button, `F11` or `furinar --imersivo`.
 - Cover, artist, album, year and technical details, with the **accent color taken from the cover**
@@ -66,7 +72,18 @@ Fullscreen button, `F11` or `furinar --imersivo`.
 
 <div align="center">
 
-![Furinar - synced lyrics](docs/screenshot-lyrics.png)
+![Furinar - immersive mode](docs/furinar_immersive_demo.gif)
+
+<table>
+  <tr>
+    <td align="center"><b>Library drawer</b></td>
+    <td align="center"><b>Lyrics only (H)</b></td>
+  </tr>
+  <tr>
+    <td><img src="docs/furinar_immersive_library.png" alt="Furinar - Library drawer"></td>
+    <td><img src="docs/furinar_immersive_lyrics-focus.png" alt="Furinar - Lyrics only (H)"></td>
+  </tr>
+</table>
 
 </div>
 
@@ -78,6 +95,12 @@ Track info screen (`I`):
 - **Indexes a whole tab**: matches of 90% or more are applied automatically, the rest waits for your review
 - Fixes stay in Furinar. They only go into your files' tags if you ask (with confirmation), and "Restore original" undoes them
 
+<div align="center">
+
+![Furinar - identifying a track and fetching lyrics](docs/furinar_immersive_fetch-tags-and-lyrics.png)
+
+</div>
+
 ### Integrations
 - **Discord**: "Listening to …" on your profile, with cover art and a progress bar
 - **Scrobbling** to [ListenBrainz](https://listenbrainz.org) and [Last.fm](https://www.last.fm), queued while offline
@@ -88,6 +111,13 @@ Track info screen (`I`):
 - **Mini player** (`M`): the window shrinks into a bar with cover and controls, always on top on Windows and X11. On Wayland apps can't request it; on GNOME, use `Alt+Space` → "Always on Top"
 - Light and dark themes, switched instantly; Portuguese and English
 - Custom title bar, frameless (drag to move, Aero Snap)
+
+<div align="center">
+
+![Furinar - mini player](docs/furinar_miniplayer.png)
+
+</div>
+
 
 <div align="center">
   <table>

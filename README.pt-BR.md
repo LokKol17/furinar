@@ -55,6 +55,12 @@ A paleta — azul-marinho, ciano e dourado (ou azul-bebê e branco pérola no te
 - **Estilo karaokê** na tela cheia: a linha atual enche no ritmo do canto (palavra por palavra com LRC estendido, `<mm:ss.xx>`)
 - Download opcional do [LRCLIB](https://lrclib.net) para faixas sem letra
 
+<div align="center">
+
+![Furinar - letras sincronizadas](docs/screenshot-lyrics.png)
+
+</div>
+
 ### Modo imersivo (tela cheia)
 Botão de tela cheia, `F11` ou `furinar --imersivo`.
 - Capa, artista, álbum, ano e detalhes técnicos, com a **cor de destaque tirada da capa**
@@ -66,7 +72,18 @@ Botão de tela cheia, `F11` ou `furinar --imersivo`.
 
 <div align="center">
 
-![Furinar - letras sincronizadas](docs/screenshot-lyrics.png)
+![Furinar - modo imersivo](docs/furinar_immersive_demo.gif)
+
+<table>
+  <tr>
+    <td align="center"><b>Painel da biblioteca</b></td>
+    <td align="center"><b>Só letra (H)</b></td>
+  </tr>
+  <tr>
+    <td><img src="docs/furinar_immersive_library.png" alt="Furinar - Painel da biblioteca"></td>
+    <td><img src="docs/furinar_immersive_lyrics-focus.png" alt="Furinar - Só letra (H)"></td>
+  </tr>
+</table>
 
 </div>
 
@@ -78,6 +95,12 @@ Tela de informações da faixa (`I`):
 - **Indexa a aba inteira**: o que tem 90% de confiança ou mais entra sozinho, o resto fica para você revisar
 - As correções ficam no Furinar. Só vão para as tags dos arquivos se você pedir (com confirmação), e "Restaurar original" desfaz
 
+<div align="center">
+
+![Furinar - identificando a faixa e buscando a letra](docs/furinar_immersive_fetch-tags-and-lyrics.png)
+
+</div>
+
 ### Integrações
 - **Discord**: "Ouvindo …" no seu perfil, com capa e barra de progresso
 - **Scrobble** no [ListenBrainz](https://listenbrainz.org) e no [Last.fm](https://www.last.fm), com fila para quando não houver internet
@@ -88,6 +111,13 @@ Tela de informações da faixa (`I`):
 - **Mini player** (`M`): a janela vira uma barra com capa e controles, sempre por cima no Windows e no X11. No Wayland o app não pode pedir isso; no GNOME, use `Alt+Espaço` → "Sempre no topo"
 - Tema claro e escuro, trocados na hora; português e inglês
 - Barra de título própria, sem moldura nativa (arrastar, Aero Snap)
+
+<div align="center">
+
+![Furinar - mini player](docs/furinar_miniplayer.png)
+
+</div>
+
 
 <div align="center">
   <table>
