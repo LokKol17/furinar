@@ -214,6 +214,7 @@ fn captura_modo_imersivo() {
     ui.set_progresso(0.35);
     ui.set_texto_tempo("01:14 / 03:31".into());
     ui.set_imv_relogio("21:47".into());
+    ui.set_imv_letra_progresso(0.45);
     ui.set_sono_texto("29:41".into());
     ui.set_favorita_atual(true);
     ui.set_imv_proxima("Próxima faixa — Artista".into());

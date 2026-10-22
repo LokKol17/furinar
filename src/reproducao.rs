@@ -35,12 +35,22 @@ pub(crate) fn carregar_letra(
     tempo: f64,
 ) {
     let chave = biblioteca::chave_caminho(caminho_faixa);
-    let letra = match fs::read_to_string(caminho_lrc(caminho_faixa)) {
-        Ok(conteudo) => lrc::Letra::Sincronizada(parse_lrc(&conteudo)),
-        Err(_) => {
-            letras_web::do_cache(&chave).unwrap_or_else(|| lrc::letra_embutida(caminho_faixa))
-        }
+    // O texto do LRC (ao lado da faixa ou no cache) traz também os tempos
+    // das palavras, quando é LRC estendido
+    let texto_lrc = fs::read_to_string(caminho_lrc(caminho_faixa))
+        .ok()
+        .or_else(|| letras_web::lrc_do_cache(&chave));
+    let (letra, palavras) = match texto_lrc {
+        Some(conteudo) => (
+            lrc::Letra::Sincronizada(parse_lrc(&conteudo)),
+            lrc::palavras_lrc(&conteudo),
+        ),
+        None => (
+            letras_web::do_cache(&chave).unwrap_or_else(|| lrc::letra_embutida(caminho_faixa)),
+            Vec::new(),
+        ),
     };
+    estado.letra_palavras = palavras;
 
     estado.letra_livre = matches!(&letra, lrc::Letra::Livre(l) if !l.is_empty());
     estado.letra_atual = letra.linhas();

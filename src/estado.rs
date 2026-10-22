@@ -206,6 +206,9 @@ pub(crate) struct EstadoAudio {
     pub(crate) filtro: String,
     /// Letra sincronizada da faixa atual (tempo em segundos, texto), ordenada.
     pub(crate) letra_atual: Vec<(f64, String)>,
+    /// Tempo e posição de cada palavra, por linha (LRC estendido; vazio
+    /// quando a letra só tem tempo por linha).
+    pub(crate) letra_palavras: Vec<Vec<(f64, usize)>>,
     /// A letra atual não tem tempos (veio da tag sem sincronia).
     pub(crate) letra_livre: bool,
     /// Índice da linha da letra exibida (-1 = antes da primeira).
@@ -276,6 +279,7 @@ impl Default for EstadoAudio {
             indices_visiveis: Vec::new(),
             filtro: String::new(),
             letra_atual: Vec::new(),
+            letra_palavras: Vec::new(),
             letra_livre: false,
             letra_indice: -1,
             letra_janela_inicio: 0,

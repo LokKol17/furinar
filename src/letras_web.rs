@@ -157,11 +157,18 @@ fn no_cache(chave: &str, extensao: &str, conteudo: &str) -> Option<PathBuf> {
 /// Letra baixada antes e guardada no cache (para faixas cuja pasta não aceita
 /// escrita, ou só com texto).
 pub fn do_cache(chave: &str) -> Option<crate::lrc::Letra> {
-    let ler = |ext| std::fs::read_to_string(caminho_cache(chave, ext)?).ok();
-    if let Some(lrc) = ler("lrc") {
+    if let Some(lrc) = lrc_do_cache(chave) {
         return Some(crate::lrc::Letra::Sincronizada(crate::lrc::parse_lrc(&lrc)));
     }
-    ler("txt").map(|t| crate::lrc::letra_do_texto(&t))
+    std::fs::read_to_string(caminho_cache(chave, "txt")?)
+        .ok()
+        .map(|t| crate::lrc::letra_do_texto(&t))
+}
+
+/// O texto do `.lrc` guardado no cache (para ler também os tempos das
+/// palavras).
+pub fn lrc_do_cache(chave: &str) -> Option<String> {
+    std::fs::read_to_string(caminho_cache(chave, "lrc")?).ok()
 }
 
 /// Existe letra local para a faixa (.lrc, embutida ou do cache)?

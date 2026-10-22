@@ -74,10 +74,30 @@ pub fn parse_tempo(dentro: &str) -> Option<f64> {
     Some(minutos as f64 * 60.0 + segundos as f64 + fracao)
 }
 
+/// Uma linha do LRC: tempo, texto (sem as marcas de palavra) e, no LRC
+/// estendido, onde cada palavra começa (tempo, posição em caracteres).
+type LinhaLrc = (f64, String, Vec<(f64, usize)>);
+
 /// Parseia um .lrc. Linhas fora do padrão `[tempo]texto` são ignoradas em
 /// silêncio, e uma linha com vários timestamps gera uma entrada por timestamp.
 pub fn parse_lrc(conteudo: &str) -> Vec<(f64, String)> {
-    let mut linhas: Vec<(f64, String)> = Vec::new();
+    parse_lrc_completo(conteudo)
+        .into_iter()
+        .map(|(t, texto, _)| (t, texto))
+        .collect()
+}
+
+/// Tempos das palavras de cada linha (LRC estendido, `<mm:ss.xx>palavra`),
+/// na mesma ordem de `parse_lrc`. Linha sem marcas = lista vazia.
+pub fn palavras_lrc(conteudo: &str) -> Vec<Vec<(f64, usize)>> {
+    parse_lrc_completo(conteudo)
+        .into_iter()
+        .map(|(_, _, p)| p)
+        .collect()
+}
+
+fn parse_lrc_completo(conteudo: &str) -> Vec<LinhaLrc> {
+    let mut linhas: Vec<LinhaLrc> = Vec::new();
 
     for linha in conteudo.lines() {
         let mut resto = linha;
@@ -100,14 +120,94 @@ pub fn parse_lrc(conteudo: &str) -> Vec<(f64, String)> {
             continue;
         }
 
-        let texto = resto.trim().to_string();
+        let (texto, palavras) = separar_palavras(resto);
         for t in tempos {
-            linhas.push((t, texto.clone()));
+            linhas.push((t, texto.clone(), palavras.clone()));
         }
     }
 
     linhas.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
     linhas
+}
+
+/// Tira as marcas `<mm:ss.xx>` do texto, guardando o tempo de cada uma e a
+/// posição (em caracteres do texto limpo, já sem espaços nas pontas) onde
+/// ela estava.
+fn separar_palavras(bruto: &str) -> (String, Vec<(f64, usize)>) {
+    let mut texto = String::new();
+    let mut palavras = Vec::new();
+    let mut resto = bruto;
+    while let Some(i) = resto.find('<') {
+        let Some(f) = resto[i..].find('>') else {
+            break;
+        };
+        texto.push_str(&resto[..i]);
+        match parse_tempo(&resto[i + 1..i + f]) {
+            Some(t) => palavras.push((t, texto.chars().count())),
+            // "<" de verdade no texto
+            None => texto.push_str(&resto[i..i + f + 1]),
+        }
+        resto = &resto[i + f + 1..];
+    }
+    texto.push_str(resto);
+    let antes = texto.chars().count();
+    let limpo = texto.trim_start();
+    let cortados = antes - limpo.chars().count();
+    let limpo = limpo.trim_end().to_string();
+    let total = limpo.chars().count();
+    let palavras = palavras
+        .into_iter()
+        .map(|(t, pos)| (t, pos.saturating_sub(cortados).min(total)))
+        .collect();
+    (limpo, palavras)
+}
+
+/// Quanto da linha atual já foi cantado (0 a 1, em caracteres), para o
+/// destaque estilo karaokê. Com tempo por palavra, segue as palavras; sem,
+/// estima: a linha enche no ritmo de uma fala (sem passar da próxima linha,
+/// para pausas instrumentais não esticarem o preenchimento).
+pub fn progresso_linha(
+    letra: &[(f64, String)],
+    palavras: &[Vec<(f64, usize)>],
+    indice: i32,
+    tempo: f64,
+) -> f32 {
+    let Some((inicio, texto)) = usize::try_from(indice).ok().and_then(|i| letra.get(i)) else {
+        return 0.0;
+    };
+    let n = texto.chars().count();
+    if n == 0 {
+        return 0.0;
+    }
+    let proxima = letra.get(indice as usize + 1).map(|(t, _)| *t);
+    // Ritmo de fala: ~90 ms por caractere, com um respiro
+    let fim_estimado = |de: f64, chars: usize| de + chars as f64 * 0.09 + 0.6;
+    let fracao = |de: f64, ate: f64| {
+        if ate <= de {
+            1.0
+        } else {
+            ((tempo - de) / (ate - de)).clamp(0.0, 1.0)
+        }
+    };
+
+    let ps = palavras
+        .get(indice as usize)
+        .map_or(&[][..], |v| v.as_slice());
+    if ps.is_empty() {
+        let fim = fim_estimado(*inicio, n).min(proxima.unwrap_or(f64::INFINITY));
+        return fracao(*inicio, fim) as f32;
+    }
+    // A última palavra que já começou
+    let Some(k) = ps.iter().rposition(|(t, _)| *t <= tempo) else {
+        return 0.0;
+    };
+    let (t, pos) = ps[k];
+    let pos_seguinte = ps.get(k + 1).map_or(n, |p| p.1);
+    let fim = ps.get(k + 1).map(|p| p.0).unwrap_or_else(|| {
+        fim_estimado(t, pos_seguinte - pos).min(proxima.unwrap_or(f64::INFINITY))
+    });
+    let chars = pos as f64 + fracao(t, fim) * (pos_seguinte - pos) as f64;
+    (chars / n as f64).clamp(0.0, 1.0) as f32
 }
 
 /// Letra guardada nas tags da faixa: o quadro SYLT (sincronizado) do ID3v2,
@@ -316,6 +416,44 @@ sem colchete
     fn faixa_sem_letra_embutida_volta_vazia() {
         let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/tone.mp3");
         assert_eq!(letra_embutida(&fixture), Letra::Livre(Vec::new()));
+    }
+
+    #[test]
+    fn lrc_estendido_separa_as_palavras() {
+        let c = "[00:10.00] <00:10.00>Olá <00:10.50>mundo <00:11.20>bonito";
+        assert_eq!(parse_lrc(c), vec![(10.0, "Olá mundo bonito".to_string())]);
+        assert_eq!(
+            palavras_lrc(c),
+            vec![vec![(10.0, 0), (10.5, 4), (11.2, 10)]]
+        );
+        // Sem marcas: lista vazia; "<" de verdade continua no texto
+        assert_eq!(palavras_lrc("[00:01.00]a <3 b"), vec![Vec::new()]);
+        assert_eq!(parse_lrc("[00:01.00]a <3 b")[0].1, "a <3 b");
+    }
+
+    #[test]
+    fn progresso_segue_as_palavras() {
+        let letra = vec![(10.0, "Olá mundo".to_string()), (20.0, "fim".to_string())];
+        let palavras = vec![vec![(10.0, 0), (11.0, 4)], Vec::new()];
+        assert_eq!(progresso_linha(&letra, &palavras, 0, 9.0), 0.0);
+        // No meio de "Olá " (4 de 9 caracteres): metade dele
+        let meio = progresso_linha(&letra, &palavras, 0, 10.5);
+        assert!((meio - 2.0 / 9.0).abs() < 0.01, "{meio}");
+        // "mundo" começou: pelo menos os 4 primeiros
+        assert!(progresso_linha(&letra, &palavras, 0, 11.0) >= 4.0 / 9.0);
+        assert_eq!(progresso_linha(&letra, &palavras, 0, 19.0), 1.0);
+    }
+
+    #[test]
+    fn progresso_estimado_sem_tempo_de_palavra() {
+        let letra = vec![(10.0, "abcdefghij".to_string()), (60.0, "x".to_string())];
+        let sem = vec![Vec::new(), Vec::new()];
+        assert_eq!(progresso_linha(&letra, &sem, 0, 10.0), 0.0);
+        let p = progresso_linha(&letra, &sem, 0, 10.75);
+        assert!(p > 0.3 && p < 0.7, "{p}");
+        // Pausa longa até a próxima linha: já cheia muito antes dela
+        assert_eq!(progresso_linha(&letra, &sem, 0, 13.0), 1.0);
+        assert_eq!(progresso_linha(&letra, &sem, -1, 13.0), 0.0);
     }
 
     #[test]

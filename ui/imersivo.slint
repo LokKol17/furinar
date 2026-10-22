@@ -223,6 +223,8 @@ export component TelaImersiva inherits Rectangle {
     in property <string> sono: "";
     /// Letra sem tempos: rolável, sem destaque
     in property <bool> letra_livre: false;
+    /// Quanto da linha atual já foi cantado (0 a 1), para o karaokê
+    in property <float> letra_progresso: 0;
     in property <bool> favorita: false;
     /// "Título — Artista" da próxima nos últimos segundos ("" = escondida)
     in property <string> texto_proxima: "";
@@ -408,7 +410,9 @@ export component TelaImersiva inherits Rectangle {
 
             property <int> distancia: abs(i - root.letra_indice);
 
-            Text {
+            // Linha atual em karaokê: o texto apagado embaixo e o aceso por
+            // cima, recortado até onde já foi cantado
+            base_linha := Text {
                 width: parent.width;
                 height: parent.height;
                 text: linha;
@@ -416,10 +420,31 @@ export component TelaImersiva inherits Rectangle {
                 vertical-alignment: center;
                 wrap: no-wrap;
                 overflow: elide;
-                color: i == root.letra_indice ? #ffffff : #ffffff.with-alpha(max(0.18, 0.75 - parent.distancia * 0.14));
+                color: i == root.letra_indice ? #ffffff.with-alpha(0.42) : #ffffff.with-alpha(max(0.18, 0.75 - parent.distancia * 0.14));
                 font-size: i == root.letra_indice ? 32px : 20px;
                 font-weight: i == root.letra_indice ? 800 : 500;
                 animate font-size, color { duration: 300ms; easing: ease-out; }
+            }
+            if i == root.letra_indice : Rectangle {
+                property <length> largura_texto: min(base_linha.preferred-width, parent.width);
+                x: (parent.width - self.largura_texto) / 2;
+                width: self.largura_texto * root.letra_progresso;
+                height: parent.height;
+                clip: true;
+
+                Text {
+                    x: -parent.x;
+                    width: base_linha.width;
+                    height: parent.height;
+                    text: linha;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                    wrap: no-wrap;
+                    overflow: elide;
+                    color: #ffffff;
+                    font-size: base_linha.font-size;
+                    font-weight: 800;
+                }
             }
 
             TouchArea {

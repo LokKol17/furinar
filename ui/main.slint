@@ -163,6 +163,7 @@ export component MainWindow inherits Window {
     in property <string> imv_proxima: "";
     /// Pulso do fundo com os graves (0..1)
     in property <float> imv_pulso: 0;
+    in property <float> imv_letra_progresso: 0;
     in property <[CartaoAlbum]> imv_albuns: [];
     /// Guia do painel: 0 = biblioteca, 1 = a seguir, 2 = álbuns
     in-out property <int> imv_guia: 0;
@@ -976,6 +977,7 @@ export component MainWindow inherits Window {
         relogio: imv_relogio;
         sono: sono_texto;
         letra_livre: letra_livre;
+        letra_progresso: imv_letra_progresso;
         favorita: favorita_atual;
         texto_proxima: imv_proxima;
         pulso: imv_pulso;

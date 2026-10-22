@@ -185,6 +185,29 @@ pub(crate) fn atualizar_relogio(ui: &MainWindow) {
     }
 }
 
+/// Letra estilo karaokê: troca de linha e enche a atual no ritmo do timer do
+/// modo (33 ms), com a posição exata do player. Só a linha atual repinta.
+pub(crate) fn atualizar_karaoke(estado: &mut EstadoAudio, ui: &MainWindow) {
+    if estado.letra_livre || estado.letra_atual.is_empty() {
+        return;
+    }
+    if let Some(p) = estado.audio_player.as_ref().filter(|p| !p.is_paused()) {
+        estado.tempo_decorrido = p.get_pos().as_secs_f64();
+    }
+    sincronizar_letra(estado, ui);
+    let progresso = lrc::progresso_linha(
+        &estado.letra_atual,
+        &estado.letra_palavras,
+        estado.letra_indice,
+        estado.tempo_decorrido,
+    );
+    if (progresso - ui.get_imv_letra_progresso()).abs() >= 0.004
+        || (progresso == 1.0) != (ui.get_imv_letra_progresso() == 1.0)
+    {
+        ui.set_imv_letra_progresso(progresso);
+    }
+}
+
 /// Liga os callbacks da UI desta área.
 pub(crate) fn ligar(ui: &MainWindow, estado: &Rc<RefCell<EstadoAudio>>) {
     // Modo imersivo: o timer de ~30 fps só roda enquanto o modo está ligado
@@ -230,6 +253,7 @@ pub(crate) fn ligar(ui: &MainWindow, estado: &Rc<RefCell<EstadoAudio>>) {
                 if let Some(imv) = e.imersivo.as_mut() {
                     imv.tick(&ui, &e.idioma, &e.captura, tocando, e.fundo_reativo);
                 }
+                atualizar_karaoke(e, &ui);
             });
         });
     }
