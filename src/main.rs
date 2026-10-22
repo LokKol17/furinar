@@ -326,6 +326,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         // SAFETY: chamado antes de qualquer thread ser spawned
         unsafe { std::env::set_var("WINIT_UNIX_BACKEND", "x11") };
         slint::BackendSelector::new().select()?;
+        // Liga a janela ao furinar.desktop: sem isso o GNOME/KDE no Wayland
+        // mostra ícone genérico e "Desconhecido" no Alt+Tab e na dock
+        slint::set_xdg_app_id("furinar")?;
     }
 
     let ui = MainWindow::new()?;

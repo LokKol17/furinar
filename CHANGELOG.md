@@ -68,6 +68,7 @@ e o projeto adere ao [Semantic Versioning](https://semver.org/).
 - Linux: páginas limpas de código e fontes são devolvidas ao sistema (`madvise`) 5 s após abrir, depois da checagem de update e ao minimizar — RSS cai de ~52 MB para ~29 MB
 
 ### Corrigido
+- No Wayland (GNOME/KDE), o Alt+Tab e a dock mostravam ícone genérico e "Desconhecido": a janela não informava o app id que liga ao `furinar.desktop`
 - "Anterior" com shuffle voltava à vizinha na lista; agora volta à faixa que tocou antes (histórico), e "próxima" retorna à de onde se voltou
 - Clicar numa opção das configurações fechava o menu (agora é um cartão sobre a janela, com rolagem, fechado com Esc ou clique fora)
 - O estado "baixando" da atualização nunca era limpo: a thread de download chamava `upgrade()` fora da thread da UI

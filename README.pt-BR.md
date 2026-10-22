@@ -85,7 +85,7 @@ Tela de informações da faixa (`I`):
 - Windows: anterior/play/próxima na miniatura da barra de tarefas e cantos arredondados no Windows 11
 
 ### Janela
-- **Mini player** (`M`): a janela vira uma barra com capa e controles, sempre por cima (no Windows e no X11; no Wayland quem decide é o compositor)
+- **Mini player** (`M`): a janela vira uma barra com capa e controles, sempre por cima no Windows e no X11. No Wayland o app não pode pedir isso; no GNOME, use `Alt+Espaço` → "Sempre no topo"
 - Tema claro e escuro, trocados na hora; português e inglês
 - Barra de título própria, sem moldura nativa (arrastar, Aero Snap)
 

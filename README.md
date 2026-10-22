@@ -85,7 +85,7 @@ Track info screen (`I`):
 - Windows: previous/play/next on the taskbar thumbnail and rounded corners on Windows 11
 
 ### Window
-- **Mini player** (`M`): the window shrinks into a bar with cover and controls, always on top (on Windows and X11; on Wayland the compositor decides)
+- **Mini player** (`M`): the window shrinks into a bar with cover and controls, always on top on Windows and X11. On Wayland apps can't request it; on GNOME, use `Alt+Space` → "Always on Top"
 - Light and dark themes, switched instantly; Portuguese and English
 - Custom title bar, frameless (drag to move, Aero Snap)
 
