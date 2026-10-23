@@ -221,6 +221,7 @@ fn aplicar_idioma(idioma: &str, ui: &MainWindow) {
     i18n.set_search_placeholder(g("search_placeholder"));
     i18n.set_no_lyrics(g("no_lyrics"));
     i18n.set_config_title(g("config_title"));
+    i18n.set_theme(g("theme"));
     i18n.set_theme_dark(g("theme_dark"));
     i18n.set_theme_light(g("theme_light"));
     i18n.set_scan_subfolders(g("scan_subfolders"));

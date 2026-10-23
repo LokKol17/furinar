@@ -1285,28 +1285,44 @@ export component MainWindow inherits Window {
                         }
                     }
 
-                    HorizontalLayout {
-                        spacing: 12px;
-                        Text {
-                            text: I18n.language;
-                            color: Tema.texto;
-                            font-size: 14px;
-                            vertical-alignment: center;
-                        }
-                        // Cada idioma escrito nele mesmo: quem não lê o
-                        // atual ainda acha o seu
-                        Segmentado {
-                            horizontal-stretch: 1;
-                            opcoes: ["English", "Português"];
-                            atual: I18n.idioma == "en" ? 0 : 1;
-                            escolhido(i) => { trocar_idioma(i == 0 ? "en" : "pt-br"); }
-                        }
-                    }
+                    // Grade: os seletores começam na mesma coluna
+                    GridLayout {
+                        spacing-horizontal: 12px;
+                        spacing-vertical: 8px;
 
-                    CaixaSelecao {
-                        rotulo: tema_escuro ? I18n.theme_dark : I18n.theme_light;
-                        marcado <=> tema_escuro;
-                        alternado(v) => { trocar_tema(v); }
+                        Row {
+                            Text {
+                                text: I18n.language;
+                                color: Tema.texto;
+                                font-size: 14px;
+                                vertical-alignment: center;
+                            }
+                            // Cada idioma escrito nele mesmo: quem não lê o
+                            // atual ainda acha o seu
+                            Segmentado {
+                                horizontal-stretch: 1;
+                                opcoes: ["English", "Português"];
+                                atual: I18n.idioma == "en" ? 0 : 1;
+                                escolhido(i) => { trocar_idioma(i == 0 ? "en" : "pt-br"); }
+                            }
+                        }
+                        Row {
+                            Text {
+                                text: I18n.theme;
+                                color: Tema.texto;
+                                font-size: 14px;
+                                vertical-alignment: center;
+                            }
+                            Segmentado {
+                                horizontal-stretch: 1;
+                                opcoes: [I18n.theme_dark, I18n.theme_light];
+                                atual: tema_escuro ? 0 : 1;
+                                escolhido(i) => {
+                                    tema_escuro = i == 0;
+                                    trocar_tema(tema_escuro);
+                                }
+                            }
+                        }
                     }
 
                     CaixaSelecao {
