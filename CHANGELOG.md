@@ -7,6 +7,8 @@ e o projeto adere ao [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.7.3] — 2026-10-23
+
 ### Adicionado
 
 - O status do Discord mostra a capa da música em vez da logo do Furinar: a do lançamento corrigido no MusicBrainz ou, se não houver, a encontrada no Deezer (título e artista, uma vez por faixa, só com a opção ligada). Sem capa encontrada, continua a logo.
@@ -174,7 +176,8 @@ e o projeto adere ao [Semantic Versioning](https://semver.org/).
 - Retoma última faixa e posição ao reabrir
 - Migración automática do campo `pasta` → `pastas` na config
 
-[Unreleased]: https://github.com/LokKol17/furinar/compare/v1.7.2...HEAD
+[Unreleased]: https://github.com/LokKol17/furinar/compare/v1.7.3...HEAD
+[1.7.3]: https://github.com/LokKol17/furinar/compare/v1.7.2...v1.7.3
 [1.7.2]: https://github.com/LokKol17/furinar/compare/v1.7.1...v1.7.2
 [1.7.1]: https://github.com/LokKol17/furinar/compare/v1.7.0...v1.7.1
 [1.7.0]: https://github.com/LokKol17/furinar/compare/v1.5.3...v1.7.0
