@@ -64,6 +64,9 @@ self_update = { version = "0.41", default-features = false, features = [
     "rustls",
 ] }
 semver = "1"
+# Conferência dos downloads de atualização (SHA256SUMS). Já entra na
+# árvore por outras dependências.
+sha2 = "0.10"
 # Capa e fundos do modo imersivo. Já entra no build via Slint; aqui só somam
 # os decodificadores de GIF/WebP.
 image = { version = "0.25", default-features = false, features = [

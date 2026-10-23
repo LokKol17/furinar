@@ -10,14 +10,24 @@ e o projeto adere ao [Semantic Versioning](https://semver.org/).
 ### Adicionado
 
 - Instalador para Windows (`furinar-windows-x86_64-setup.exe`): instala só para o usuário, sem pedir administrador, com atalho no menu Iniciar, atalho opcional na área de trabalho e desinstalador em Configurações → Aplicativos. O `.exe` portátil continua disponível.
+- Aviso de atualização novo, no canto da janela: mostra as novidades da versão, o progresso do download e, no fim, um botão "Reiniciar agora" que reabre o Furinar na mesma música. Se algo der errado, o erro aparece ali, com "Tentar de novo".
+- No Windows instalado, a atualização roda o instalador em silêncio (e reabre o app), mantendo a versão em "Aplicativos" correta.
 
 ### Alterado
 
 - No Windows, as configurações passam a ficar em `%APPDATA%\Furinar`. Quem já tem um `furinar_config.json` ao lado do executável continua no modo portátil, sem perder nada.
+- O instalador do Linux (`install.sh`) instala só para o usuário, em `~/.local`, sem sudo (a não ser que faltem bibliotecas do sistema), sempre a versão mais recente, e remove a instalação antiga em `/usr/local`. Assim o Furinar passa a se atualizar sozinho também no Linux.
+- Quando o Furinar não pode se atualizar sozinho (pasta sem permissão de escrita), o aviso oferece abrir a página da release.
+- As notas de cada release vêm do CHANGELOG.
 
 ### Corrigido
 
+- O aviso de nova versão nunca aparecia: atualizar dependia de baixar a versão nova à mão.
 - O arquivo `SHA256SUMS` não era anexado às releases.
+
+### Segurança
+
+- O app e o `install.sh` conferem cada download com o `SHA256SUMS` da release antes de instalar; arquivo corrompido ou adulterado é recusado.
 
 ## [1.7.1] — 2026-10-22
 

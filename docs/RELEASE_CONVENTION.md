@@ -11,7 +11,6 @@ devem refletir essa mesma versão.
 | `pkg/debian/control` | `Version:` | `Version: 1.5.2` |
 | `pkg/arch/PKGBUILD` | `pkgver=` | `pkgver=1.5.2` |
 | `pkg/fedora/furinar.spec` | `Version:` | `Version:        1.5.2` |
-| `pkg/install.sh` | `VERSION=` | `VERSION="${FURINAR_VERSION:-1.5.2}"` |
 | `pkg/furinar.metainfo.xml` | `<release>` | `<release version="1.5.2">` |
 
 O Makefile também lê a versão automaticamente do `Cargo.toml` (via `grep` + `sed`).
@@ -85,7 +84,6 @@ Isso atualiza:
 - `pkg/debian/control`
 - `pkg/arch/PKGBUILD`
 - `pkg/fedora/furinar.spec`
-- `pkg/install.sh`
 - `pkg/furinar.metainfo.xml`
 
 ### 3. Verificar que está tudo em sync

@@ -158,7 +158,7 @@ Settings live in `%APPDATA%\Furinar`. Prefer no installation? Grab `furinar-wind
 
 ### Linux
 
-**Universal installer** (detects your distro, installs dependencies, and puts the binary in `/usr/local/bin`):
+**Universal installer** (installs for your user in `~/.local`, no sudo unless system libraries are missing; Furinar then updates itself from inside the app):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/LokKol17/furinar/master/pkg/install.sh | bash
@@ -171,7 +171,7 @@ git clone https://github.com/LokKol17/furinar.git
 cd furinar
 make tarball
 cd dist/furinar-*/
-sudo ./install.sh --from-source
+./install.sh --from-source
 ```
 
 **Native packages:**

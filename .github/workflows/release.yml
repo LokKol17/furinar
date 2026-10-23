@@ -87,8 +87,32 @@ jobs:
     needs: [build-windows, build-linux]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
+
+      # O corpo da release é a seção desta versão no CHANGELOG: é o que o
+      # aviso de atualização do app mostra (até o "## Downloads")
+      - name: Release notes from CHANGELOG
+        run: |
+          versao="${GITHUB_REF_NAME#v}"
+          awk -v v="$versao" 'index($0, "## [" v "]") == 1 { f = 1; next } f && /^## \[/ { exit } f' CHANGELOG.md > notas.md
+          if ! grep -q '[^[:space:]]' notas.md; then
+            echo "::error::CHANGELOG.md não tem a seção [$versao]"
+            exit 1
+          fi
+          cat >> notas.md <<'EOF'
+
+          ## Downloads
+          - **Windows (installer):** `furinar-windows-x86_64-setup.exe` — installs for your user, no admin needed, with Start menu shortcut and uninstaller
+          - **Windows (portable):** `furinar-windows-x86_64.exe` — just run it; settings stay next to it if you create an empty `furinar_config.json` there
+          - **Linux:** `furinar-linux-x86_64.tar.gz`, or `curl -fsSL https://raw.githubusercontent.com/LokKol17/furinar/master/pkg/install.sh | bash`
+          - `SHA256SUMS` — checksums of all files (the app and the installers verify them)
+
+          Full history: [CHANGELOG.md](https://github.com/LokKol17/furinar/blob/master/CHANGELOG.md)
+          EOF
+          cat notas.md
 
       - name: Generate checksums
         run: |
@@ -100,14 +124,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           name: "Furinar - ${{ github.ref_name }}"
-          body: |
-            ## What's Changed
-            See [CHANGELOG.md](https://github.com/LokKol17/furinar/blob/master/CHANGELOG.md) for details.
-
-            ## Downloads
-            - **Windows (installer):** `furinar-windows-x86_64-setup.exe` — installs for your user, no admin needed, with Start menu shortcut and uninstaller
-            - **Windows (portable):** `furinar-windows-x86_64.exe` — just run it; settings stay next to it if you create an empty `furinar_config.json` there
-            - **Linux:** `furinar-linux-x86_64.tar.gz`
+          body_path: notas.md
           files: |
             windows/furinar-windows-x86_64-setup.exe
             windows/furinar-windows-x86_64.exe

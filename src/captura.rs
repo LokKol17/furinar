@@ -93,6 +93,23 @@ fn captura_modo_normal() {
             ui.set_mini_tem_capa(true);
         }
     }
+    // FURINAR_CAPTURA_UPDATE=1..5: aviso de atualização naquele estado
+    if let Some(estado) = std::env::var("FURINAR_CAPTURA_UPDATE")
+        .ok()
+        .and_then(|e| e.parse().ok())
+    {
+        ui.set_update_versao("1.7.2".into());
+        ui.set_update_notas(
+            updates::notas_legiveis(
+                "### Adicionado\n\n- Instalador para Windows\n\n### Corrigido\n\n- O aviso de atualização não aparecia\n- O `SHA256SUMS` não era anexado às releases\n",
+            )
+            .into(),
+        );
+        ui.set_update_progresso(0.42);
+        ui.set_update_erro("o arquivo baixado não confere com o SHA256SUMS".into());
+        ui.set_update_estado(estado);
+    }
+
     // FURINAR_CAPTURA_INFO=1 (ou =2 para a guia do lote): informações
     if let Some(guia) = std::env::var_os("FURINAR_CAPTURA_INFO") {
         let candidato = |titulo: &str, confianca, fonte| metadados::Candidato {

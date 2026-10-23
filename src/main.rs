@@ -51,6 +51,7 @@ use std::rc::Rc;
 use std::sync::mpsc::Sender;
 #[cfg(any(feature = "mpris", target_os = "windows"))]
 use std::sync::mpsc::{self, Receiver};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use web_ui::*;
 
@@ -228,6 +229,13 @@ fn aplicar_idioma(idioma: &str, ui: &MainWindow) {
     i18n.set_update_downloading(g("update_downloading"));
     i18n.set_update_button(g("update_button"));
     i18n.set_update_later(g("update_later"));
+    i18n.set_update_ready_title(g("update_ready_title"));
+    i18n.set_update_ready(g("update_ready"));
+    i18n.set_update_restart(g("update_restart"));
+    i18n.set_update_failed(g("update_failed"));
+    i18n.set_update_retry(g("update_retry"));
+    i18n.set_update_manual(g("update_manual"));
+    i18n.set_update_open_page(g("update_open_page"));
     i18n.set_play_label(g("play"));
     i18n.set_pause_label(g("pause"));
     i18n.set_loop_off(g("loop_off"));
@@ -616,47 +624,92 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
     }
 
-    // Checagem de update em segundo plano. A thread entrega o resultado
-    // direto no event loop (`upgrade_in_event_loop`), sem timer de polling.
+    // Atualização: a checagem roda numa thread e entrega o resultado no
+    // event loop. `update_estado`: 0 nada, 1 disponível, 2 baixando,
+    // 3 pronta para reiniciar, 4 erro, 5 manual (pasta sem escrita).
     {
-        let ui_fraca = ui.as_weak();
-        std::thread::spawn(move || {
-            let atualizacao = updates::check_for_update();
-            // A checagem desserializa a lista inteira de releases e sobe um
-            // runtime HTTP: código e heap que não voltam a ser usados.
-            memoria::aparar();
-            if let Some(info) = atualizacao {
-                let _ = ui_fraca.upgrade_in_event_loop(move |ui| {
-                    ui.set_update_versao(info.version.into());
-                    ui.set_update_descricao(info.body.into());
-                    ui.set_update_disponivel(true);
-                });
-            }
-        });
-    }
+        let pendente: Arc<Mutex<Option<updates::Atualizacao>>> = Arc::default();
+        let pronta: Arc<Mutex<Option<updates::Baixado>>> = Arc::default();
 
-    {
-        let ui_fraca = ui.as_weak();
-        ui.on_baixar_atualizacao(move || {
-            if let Some(ui) = ui_fraca.upgrade() {
-                ui.set_atualizando(true);
-                let ui_fraca = ui.as_weak();
-                std::thread::spawn(move || {
-                    // O erro vira texto: `Box<dyn Error>` não é `Send`
-                    let resultado = updates::perform_update().map_err(|e| e.to_string());
-                    // `upgrade()` só funciona na thread da UI: fora dela
-                    // devolve sempre `None` e o "baixando" nunca sumia.
+        {
+            let ui_fraca = ui.as_weak();
+            let pendente = pendente.clone();
+            std::thread::spawn(move || {
+                let atualizacao = updates::verificar();
+                // A checagem desserializa a lista inteira de releases e sobe
+                // um runtime HTTP: código e heap que não voltam a ser usados.
+                memoria::aparar();
+                if let Some(at) = atualizacao {
+                    let (versao, notas) = (at.versao.clone(), at.notas.clone());
+                    let manual = at.modo == updates::Modo::Manual;
+                    *pendente.lock().unwrap() = Some(at);
                     let _ = ui_fraca.upgrade_in_event_loop(move |ui| {
-                        ui.set_atualizando(false);
-                        match resultado {
-                            Ok(()) => {
-                                ui.set_update_disponivel(false);
-                                println!("Update complete! Please restart Furinar.");
-                            }
-                            Err(e) => eprintln!("Update failed: {e}"),
+                        ui.set_update_versao(versao.into());
+                        ui.set_update_notas(notas.into());
+                        ui.set_update_estado(if manual { 5 } else { 1 });
+                    });
+                }
+            });
+        }
+
+        {
+            let ui_fraca = ui.as_weak();
+            let pendente = pendente.clone();
+            let pronta = pronta.clone();
+            ui.on_baixar_atualizacao(move || {
+                let Some(ui) = ui_fraca.upgrade() else { return };
+                let Some(at) = pendente.lock().unwrap().clone() else {
+                    return;
+                };
+                ui.set_update_progresso(0.0);
+                ui.set_update_estado(2);
+                let ui_fraca = ui.as_weak();
+                let pronta = pronta.clone();
+                std::thread::spawn(move || {
+                    let progresso_ui = ui_fraca.clone();
+                    let resultado = updates::baixar(&at, &move |p| {
+                        let _ = progresso_ui.upgrade_in_event_loop(move |ui| {
+                            ui.set_update_progresso(p);
+                        });
+                    });
+                    let resultado = resultado.map(|b| *pronta.lock().unwrap() = Some(b));
+                    let _ = ui_fraca.upgrade_in_event_loop(move |ui| match resultado {
+                        Ok(()) => ui.set_update_estado(3),
+                        Err(e) => {
+                            eprintln!("Falha na atualização: {e}");
+                            ui.set_update_erro(e.into());
+                            ui.set_update_estado(4);
                         }
                     });
                 });
+            });
+        }
+
+        {
+            let ui_fraca = ui.as_weak();
+            let estado = estado.clone();
+            ui.on_reiniciar_atualizacao(move || {
+                let Some(ui) = ui_fraca.upgrade() else { return };
+                let Some(baixado) = pronta.lock().unwrap().take() else {
+                    return;
+                };
+                // Salva antes de abrir a nova: ela lê a configuração ao iniciar
+                salvar_configuracao(&estado.borrow());
+                match updates::reiniciar(&baixado) {
+                    Ok(()) => {
+                        let _ = ui.hide();
+                    }
+                    Err(e) => {
+                        ui.set_update_erro(e.into());
+                        ui.set_update_estado(4);
+                    }
+                }
+            });
+        }
+
+        ui.on_abrir_pagina_atualizacao(move || {
+            if let Some(at) = pendente.lock().unwrap().as_ref() {
+                abrir_no_navegador(&at.pagina);
             }
         });
     }

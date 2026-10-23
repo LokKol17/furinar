@@ -413,19 +413,23 @@ export component CampoTexto inherits Rectangle {
 
 export component BotaoTexto inherits Rectangle {
     in property <string> texto;
+    // Ação principal: cheio na cor de destaque
+    in property <bool> primario: false;
     callback clicado();
 
     height: 30px;
     min-width: rotulo.preferred-width + 24px;
     border-radius: 8px;
-    border-width: 1px;
+    border-width: primario ? 0 : 1px;
     border-color: Tema.borda;
-    background: toque.has-hover ? Tema.neutro_hover : Tema.neutro;
+    background: primario
+        ? (toque.has-hover ? Tema.oceano.brighter(0.12) : Tema.oceano)
+        : (toque.has-hover ? Tema.neutro_hover : Tema.neutro);
     animate background { duration: 120ms; }
 
     rotulo := Text {
         text: root.texto;
-        color: Tema.texto;
+        color: root.primario ? Tema.sobre_acento : Tema.texto;
         font-size: 13px;
         horizontal-alignment: center;
         vertical-alignment: center;

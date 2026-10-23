@@ -1574,6 +1574,7 @@ dependencies = [
  "semver",
  "serde",
  "serde_json",
+ "sha2",
  "slint",
  "slint-build",
  "souvlaki",

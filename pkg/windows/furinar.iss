@@ -5,6 +5,10 @@
 ; sozinho. As configurações ficam em %APPDATA%\Furinar (ver config.rs) e
 ; sobrevivem à desinstalação.
 ;
+; O atualizador do app baixa este setup e roda com
+;   /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /reabrir=1
+; (ver updates.rs::reiniciar).
+;
 ; Compilar (a partir da raiz do repositório):
 ;   iscc /DVersao=1.7.1 /DExe=target\release\furinar.exe /DIcone=caminho\furinar.ico pkg\windows\furinar.iss
 ; O instalador sai em dist\furinar-windows-x86_64-setup.exe.
@@ -66,3 +70,11 @@ Name: "{autodesktop}\Furinar"; Filename: "{app}\furinar.exe"; WorkingDir: "{app}
 
 [Run]
 Filename: "{app}\furinar.exe"; Description: "{cm:LaunchProgram,Furinar}"; Flags: nowait postinstall skipifsilent
+; Atualização pelo próprio Furinar: roda em silêncio e reabre o app no fim
+Filename: "{app}\furinar.exe"; Flags: nowait; Check: DeveReabrir
+
+[Code]
+function DeveReabrir: Boolean;
+begin
+  Result := WizardSilent and (ExpandConstant('{param:reabrir|0}') = '1');
+end;

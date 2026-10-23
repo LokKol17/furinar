@@ -139,10 +139,20 @@ pub fn pt_br() -> Translations {
         "scan_subfolders_desc",
         "Inclui arquivos de áudio de subpastas ao abrir uma pasta.",
     );
-    t.insert("update_title", "📦 Nova versão disponível!");
-    t.insert("update_downloading", "Baixando...");
+    t.insert("update_title", "Nova versão disponível");
+    t.insert("update_downloading", "Baixando…");
     t.insert("update_button", "Atualizar");
     t.insert("update_later", "Depois");
+    t.insert("update_ready_title", "Atualização pronta");
+    t.insert(
+        "update_ready",
+        "Reinicie o Furinar para usar a versão nova. Ele volta na mesma música.",
+    );
+    t.insert("update_restart", "Reiniciar agora");
+    t.insert("update_failed", "Não deu para atualizar:");
+    t.insert("update_retry", "Tentar de novo");
+    t.insert("update_manual", "O Furinar não consegue se atualizar nesta pasta. Baixe a versão nova na página da release.");
+    t.insert("update_open_page", "Página da release");
     t.insert("play", "Play");
     t.insert("pause", "Pausar");
     t.insert("loop_off", "Loop: Desl");
@@ -291,10 +301,20 @@ pub fn en() -> Translations {
         "scan_subfolders_desc",
         "Include audio files from subfolders when opening a folder.",
     );
-    t.insert("update_title", "📦 Update available!");
-    t.insert("update_downloading", "Downloading...");
+    t.insert("update_title", "New version available");
+    t.insert("update_downloading", "Downloading…");
     t.insert("update_button", "Update");
     t.insert("update_later", "Later");
+    t.insert("update_ready_title", "Update ready");
+    t.insert(
+        "update_ready",
+        "Restart Furinar to use the new version. It reopens on the same track.",
+    );
+    t.insert("update_restart", "Restart now");
+    t.insert("update_failed", "Couldn't update:");
+    t.insert("update_retry", "Try again");
+    t.insert("update_manual", "Furinar can't update itself in this folder. Download the new version from the release page.");
+    t.insert("update_open_page", "Release page");
     t.insert("play", "Play");
     t.insert("pause", "Pause");
     t.insert("loop_off", "Loop: Off");

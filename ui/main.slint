@@ -210,12 +210,16 @@ export component MainWindow inherits Window {
     callback trocar_tema(bool);
     callback trocar_idioma(string);
 
-    // Auto-update
-    in-out property <bool> update_disponivel: false;
+    // Atualização: 0 nada, 1 disponível, 2 baixando, 3 pronta para
+    // reiniciar, 4 erro, 5 manual (o app não pode se trocar sozinho)
+    in-out property <int> update_estado: 0;
     in property <string> update_versao: "";
-    in property <string> update_descricao: "";
-    in-out property <bool> atualizando: false;
+    in property <string> update_notas: "";
+    in property <float> update_progresso: 0;
+    in property <string> update_erro: "";
     callback baixar_atualizacao();
+    callback reiniciar_atualizacao();
+    callback abrir_pagina_atualizacao();
 
     // Altura de cada linha da playlist
     private property <length> altura_linha: 30px;
@@ -1106,84 +1110,120 @@ export component MainWindow inherits Window {
     // -------------------------------------------------------------
     // Configurações
     // -------------------------------------------------------------
-    update_popup := PopupWindow {
-        x: 170px;
-        y: 200px;
+    // Aviso de atualização: cartão no canto, sem bloquear o resto
+    if update_estado != 0 && !modo_imersivo && !modo_mini : Rectangle {
+        width: min(parent.width - 32px, 360px);
+        height: conteudo_update.preferred-height;
+        x: parent.width - self.width - 16px;
+        y: parent.height - self.height - 16px;
+        background: Tema.painel;
+        border-radius: 12px;
+        border-width: 1px;
+        border-color: Tema.borda;
+        drop-shadow-blur: 24px;
+        drop-shadow-color: #00000060;
 
-        Rectangle {
-            visible: update_disponivel;
-            background: Tema.painel;
-            border-radius: 12px;
-            border-width: 1px;
-            border-color: Tema.borda;
+        TouchArea { }
 
-            VerticalLayout {
-                padding: 20px;
-                spacing: 12px;
+        conteudo_update := VerticalLayout {
+            padding: 16px;
+            spacing: 10px;
 
+            HorizontalLayout {
+                spacing: 8px;
                 Text {
-                    text: I18n.update_title;
-                    font-size: 16px;
+                    text: update_estado == 3 ? I18n.update_ready_title : I18n.update_title;
+                    font-size: 15px;
                     font-weight: 700;
                     color: Tema.texto;
+                    vertical-alignment: center;
                 }
-
                 Text {
                     text: "v" + update_versao;
-                    font-size: 14px;
-                    color: Tema.oceano;
+                    font-size: 13px;
                     font-weight: 600;
+                    color: Tema.oceano;
+                    vertical-alignment: center;
                 }
+                Rectangle { horizontal-stretch: 1; }
+                if update_estado != 2 : BotaoTitulo {
+                    icone: @image-url("icons/x.svg");
+                    dica: I18n.update_later;
+                    clicado => { update_estado = 0; }
+                }
+            }
 
-                Text {
-                    text: update_descricao;
+            // Novidades da versão (CHANGELOG), rolável
+            if update_notas != "" && (update_estado == 1 || update_estado == 5) : Flickable {
+                height: min(notas_update.preferred-height, 150px);
+                content-height: notas_update.preferred-height;
+                notas_update := Text {
+                    width: parent.width;
+                    text: update_notas;
                     font-size: 12px;
                     color: Tema.texto_suave;
                     wrap: word-wrap;
-                    overflow: elide;
-                    max-height: 80px;
                 }
+            }
 
-                HorizontalLayout {
-                    spacing: 8px;
-                    alignment: center;
+            if update_estado == 5 : Text {
+                text: I18n.update_manual;
+                font-size: 12px;
+                color: Tema.texto_suave;
+                wrap: word-wrap;
+            }
 
+            if update_estado == 2 : VerticalLayout {
+                spacing: 6px;
+                Text {
+                    text: I18n.update_downloading + " " + round(update_progresso * 100) + "%";
+                    font-size: 12px;
+                    color: Tema.texto_suave;
+                }
+                Rectangle {
+                    height: 6px;
+                    border-radius: 3px;
+                    background: Tema.borda;
                     Rectangle {
-                        width: 120px;
-                        height: 32px;
-                        border-radius: 8px;
+                        x: 0;
+                        width: parent.width * clamp(update_progresso, 0, 1);
+                        border-radius: 3px;
                         background: Tema.oceano;
-                        TouchArea {
-                            clicked => { baixar_atualizacao(); }
-                        }
-                        Text {
-                            text: atualizando ? I18n.update_downloading : I18n.update_button;
-                            color: white;
-                            font-size: 13px;
-                            font-weight: 600;
-                            horizontal-alignment: center;
-                            vertical-alignment: center;
-                        }
+                        animate width { duration: 150ms; }
                     }
+                }
+            }
 
-                    Rectangle {
-                        width: 80px;
-                        height: 32px;
-                        border-radius: 8px;
-                        border-width: 1px;
-                        border-color: Tema.borda;
-                        background: Tema.painel;
-                        TouchArea {
-                            clicked => { update_disponivel = false; }
-                        }
-                        Text {
-                            text: I18n.update_later;
-                            color: Tema.texto;
-                            font-size: 13px;
-                            horizontal-alignment: center;
-                            vertical-alignment: center;
-                        }
-                    }
+            if update_estado == 3 : Text {
+                text: I18n.update_ready;
+                font-size: 12px;
+                color: Tema.texto_suave;
+                wrap: word-wrap;
+            }
+
+            if update_estado == 4 : Text {
+                text: I18n.update_failed + " " + update_erro;
+                font-size: 12px;
+                color: Tema.texto_suave;
+                wrap: word-wrap;
+            }
+
+            if update_estado != 2 : HorizontalLayout {
+                spacing: 8px;
+                alignment: end;
+                if update_estado == 4 || update_estado == 5 : BotaoTexto {
+                    texto: I18n.update_open_page;
+                    clicado => { abrir_pagina_atualizacao(); }
+                }
+                if update_estado == 1 || update_estado == 4 : BotaoTexto {
+                    primario: true;
+                    texto: update_estado == 4 ? I18n.update_retry : I18n.update_button;
+                    clicado => { baixar_atualizacao(); }
+                }
+                if update_estado == 3 : BotaoTexto {
+                    primario: true;
+                    texto: I18n.update_restart;
+                    clicado => { reiniciar_atualizacao(); }
                 }
             }
         }

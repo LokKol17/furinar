@@ -158,7 +158,7 @@ As configurações ficam em `%APPDATA%\Furinar`. Prefere não instalar? Baixe o 
 
 ### Linux
 
-**Instalador universal** (detecta a distro, instala as dependências e coloca o binário em `/usr/local/bin`):
+**Instalador universal** (instala para o seu usuário em `~/.local`, sem sudo a não ser que faltem bibliotecas do sistema; depois o Furinar se atualiza sozinho pelo app):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/LokKol17/furinar/master/pkg/install.sh | bash
@@ -171,7 +171,7 @@ git clone https://github.com/LokKol17/furinar.git
 cd furinar
 make tarball
 cd dist/furinar-*/
-sudo ./install.sh --from-source
+./install.sh --from-source
 ```
 
 **Pacotes nativos:**
