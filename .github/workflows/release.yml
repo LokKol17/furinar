@@ -4,6 +4,9 @@ on:
   push:
     tags:
       - 'v*'
+  # Rodar à mão (Actions → Release → Run workflow) testa os builds sem
+  # publicar nada: o job "release" só roda em tag
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -29,21 +32,27 @@ jobs:
           copy target\release\furinar.exe dist\furinar-windows-x86_64.exe
         shell: cmd
 
-      # Versão fixa e conferida: o .iss é escrito para o Inno Setup 6
+      # O Inno Setup costuma vir na imagem do runner; senão, Chocolatey. O
+      # instalador baixado à mão travava o passo sem saída (Start-Process -Wait)
       - name: Install Inno Setup
         shell: pwsh
+        timeout-minutes: 10
         run: |
-          Invoke-WebRequest "https://github.com/jrsoftware/issrc/releases/download/is-6_7_3/innosetup-6.7.3.exe" -OutFile innosetup.exe
-          $hash = (Get-FileHash innosetup.exe -Algorithm SHA256).Hash
-          if ($hash -ne "9C73C3BAE7ED48D44112A0F48E66742C00090BDB5BEF71D9D3C056C66E97B732") { throw "hash do Inno Setup não confere: $hash" }
-          Start-Process innosetup.exe -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/CURRENTUSER","/DIR=$env:RUNNER_TEMP\inno" -Wait
+          $iscc = Get-ChildItem "${env:ProgramFiles(x86)}\Inno Setup *\ISCC.exe", "$env:ProgramFiles\Inno Setup *\ISCC.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $iscc) {
+            choco install innosetup -y --no-progress
+            $iscc = Get-ChildItem "${env:ProgramFiles(x86)}\Inno Setup *\ISCC.exe", "$env:ProgramFiles\Inno Setup *\ISCC.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+          }
+          if (-not $iscc) { throw "ISCC.exe não encontrado" }
+          Write-Output "Usando $($iscc.FullName)"
+          "ISCC=$($iscc.FullName)" >> $env:GITHUB_ENV
 
       - name: Build installer
         shell: pwsh
         run: |
           $versao = (Select-String -Path Cargo.toml -Pattern '^version = "(.+)"' | Select-Object -First 1).Matches.Groups[1].Value
           $icone = (Get-ChildItem target\release\build -Recurse -Filter furinar.ico | Select-Object -First 1).FullName
-          & "$env:RUNNER_TEMP\inno\ISCC.exe" /Q "/DVersao=$versao" "/DExe=$PWD\target\release\furinar.exe" "/DIcone=$icone" pkg\windows\furinar.iss
+          & "$env:ISCC" /Q "/DVersao=$versao" "/DExe=$PWD\target\release\furinar.exe" "/DIcone=$icone" pkg\windows\furinar.iss
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Get-Item dist\furinar-windows-x86_64-setup.exe
 
@@ -85,6 +94,7 @@ jobs:
 
   release:
     needs: [build-windows, build-linux]
+    if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

@@ -48,7 +48,7 @@ Cada release deve conter os seguintes arquivos como assets (binários anexados):
 make release
 ```
 
-O instalador do Windows é gerado só pelo `release.yml` (Inno Setup 6.7.3,
+O instalador do Windows é gerado só pelo `release.yml` (Inno Setup 6 da imagem do runner ou do Chocolatey,
 `pkg/windows/furinar.iss`); para testar localmente, instale o Inno Setup
 (no Linux, num prefixo do wine) e rode o `iscc` como no cabeçalho do `.iss`.
 
@@ -198,3 +198,7 @@ make sync-version   # Sincroniza versão com Cargo.toml
 make check-version  # Verifica se versões estão em sync
 make release        # Gera artefatos para GitHub Releases
 ```
+
+Para testar os builds de release sem publicar: Actions → Release → **Run
+workflow** no `dev` (`gh workflow run release.yml --ref dev`). O job que cria
+a release só roda em tag.
