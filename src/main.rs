@@ -229,6 +229,7 @@ fn aplicar_idioma(idioma: &str, ui: &MainWindow) {
     i18n.set_update_downloading(g("update_downloading"));
     i18n.set_update_button(g("update_button"));
     i18n.set_update_later(g("update_later"));
+    i18n.set_language(g("language"));
     i18n.set_update_ready_title(g("update_ready_title"));
     i18n.set_update_ready(g("update_ready"));
     i18n.set_update_restart(g("update_restart"));

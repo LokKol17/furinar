@@ -31,7 +31,13 @@ fn captura_modo_normal() {
     let (largura, altura) = if mini {
         (380u32, 112u32)
     } else {
-        (660u32, 734u32)
+        // FURINAR_CAPTURA_ALTURA=<px>: janela mais alta, para ver um cartão
+        // de configurações inteiro sem rolar
+        let altura = std::env::var("FURINAR_CAPTURA_ALTURA")
+            .ok()
+            .and_then(|a| a.parse().ok())
+            .unwrap_or(734u32);
+        (660u32, altura)
     };
     let janela = MinimalSoftwareWindow::new(RepaintBufferType::NewBuffer);
     slint::platform::set_platform(Box::new(Plataforma(janela.clone())))
@@ -39,7 +45,10 @@ fn captura_modo_normal() {
     janela.set_size(slint::PhysicalSize::new(largura, altura));
     let ui = MainWindow::new().expect("MainWindow");
     ui.show().expect("show");
-    aplicar_idioma("pt-br", &ui);
+    aplicar_idioma(
+        &std::env::var("FURINAR_CAPTURA_IDIOMA").unwrap_or_else(|_| "pt-br".into()),
+        &ui,
+    );
 
     let caminho = std::env::var_os("FURINAR_CAPTURA_FAIXA")
         .map(PathBuf::from)
@@ -205,7 +214,10 @@ fn captura_modo_imersivo() {
 
     let ui = MainWindow::new().expect("MainWindow");
     ui.show().expect("show");
-    aplicar_idioma("pt-br", &ui);
+    aplicar_idioma(
+        &std::env::var("FURINAR_CAPTURA_IDIOMA").unwrap_or_else(|_| "pt-br".into()),
+        &ui,
+    );
 
     let caminho = std::env::var_os("FURINAR_CAPTURA_FAIXA")
         .map(PathBuf::from)

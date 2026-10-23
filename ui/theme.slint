@@ -317,11 +317,10 @@ export component CaixaSelecao inherits Rectangle {
     in-out property <bool> marcado: false;
     callback alternado(bool);
 
-    height: 26px;
+    min-height: 26px;
 
     HorizontalLayout {
         spacing: 8px;
-        alignment: start;
         cross-axis-alignment: center;
 
         caixa := Rectangle {
@@ -344,11 +343,14 @@ export component CaixaSelecao inherits Rectangle {
             }
         }
 
+        // Quebra linha: rótulo longo (inglês) não alarga o cartão
         Text {
             text: root.rotulo;
             color: Tema.texto;
             font-size: 14px;
             vertical-alignment: center;
+            wrap: word-wrap;
+            horizontal-stretch: 1;
         }
     }
 
@@ -436,5 +438,47 @@ export component BotaoTexto inherits Rectangle {
     }
     toque := TouchArea {
         clicked => { root.clicado(); }
+    }
+}
+
+// Escolha entre poucas opções lado a lado (ex.: idioma); a atual fica cheia
+export component Segmentado inherits Rectangle {
+    in property <[string]> opcoes;
+    in property <int> atual;
+    callback escolhido(int);
+
+    height: 32px;
+    border-radius: 8px;
+    border-width: 1px;
+    border-color: Tema.borda;
+    background: Tema.neutro;
+
+    HorizontalLayout {
+        padding: 3px;
+        spacing: 3px;
+
+        for opcao[i] in root.opcoes : Rectangle {
+            border-radius: 6px;
+            background: i == root.atual
+                ? Tema.oceano
+                : (toque.has-hover ? Tema.neutro_hover : transparent);
+            animate background { duration: 120ms; }
+
+            Text {
+                text: opcao;
+                color: i == root.atual ? Tema.sobre_acento : Tema.texto;
+                font-size: 13px;
+                font-weight: i == root.atual ? 600 : 400;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+            toque := TouchArea {
+                clicked => {
+                    if (i != root.atual) {
+                        root.escolhido(i);
+                    }
+                }
+            }
+        }
     }
 }

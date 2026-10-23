@@ -143,6 +143,7 @@ pub fn pt_br() -> Translations {
     t.insert("update_downloading", "Baixando…");
     t.insert("update_button", "Atualizar");
     t.insert("update_later", "Depois");
+    t.insert("language", "Idioma");
     t.insert("update_ready_title", "Atualização pronta");
     t.insert(
         "update_ready",
@@ -305,6 +306,7 @@ pub fn en() -> Translations {
     t.insert("update_downloading", "Downloading…");
     t.insert("update_button", "Update");
     t.insert("update_later", "Later");
+    t.insert("language", "Language");
     t.insert("update_ready_title", "Update ready");
     t.insert(
         "update_ready",

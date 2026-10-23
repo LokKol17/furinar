@@ -19,10 +19,12 @@ e o projeto adere ao [Semantic Versioning](https://semver.org/).
 - O instalador do Linux (`install.sh`) instala só para o usuário, em `~/.local`, sem sudo (a não ser que faltem bibliotecas do sistema), sempre a versão mais recente, e remove a instalação antiga em `/usr/local`. Assim o Furinar passa a se atualizar sozinho também no Linux.
 - Quando o Furinar não pode se atualizar sozinho (pasta sem permissão de escrita), o aviso oferece abrir a página da release.
 - As notas de cada release vêm do CHANGELOG.
+- Idioma escolhido num seletor "English | Português" no topo das configurações, com o idioma atual destacado (antes era um botão que mostrava o outro idioma).
 
 ### Corrigido
 
 - O aviso de nova versão nunca aparecia: atualizar dependia de baixar a versão nova à mão.
+- Em inglês, o cartão de configurações vazava para fora da janela: um rótulo longo não quebrava linha e alargava todo o conteúdo.
 - O arquivo `SHA256SUMS` não era anexado às releases.
 
 ### Segurança

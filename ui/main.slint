@@ -1,4 +1,4 @@
-import { Tema, BotaoIcone, BotaoTitulo, BarraDeslizante, CampoBusca, CaixaSelecao, CampoTexto, BotaoTexto } from "theme.slint";
+import { Tema, BotaoIcone, BotaoTitulo, BarraDeslizante, CampoBusca, CaixaSelecao, CampoTexto, BotaoTexto, Segmentado } from "theme.slint";
 import { I18n } from "i18n.slint";
 import { TelaImersiva } from "imersivo.slint";
 import { LinhaPainel, CartaoAlbum } from "painel.slint";
@@ -1241,8 +1241,8 @@ export component MainWindow inherits Window {
             }
         }
 
-        Rectangle {
-            width: 420px;
+        cartao_config := Rectangle {
+            width: min(parent.width - 32px, 420px);
             height: min(parent.height - 60px, conteudo_config.preferred-height);
             x: (parent.width - self.width) / 2;
             y: (parent.height - self.height) / 2;
@@ -1261,6 +1261,8 @@ export component MainWindow inherits Window {
                 content-height: conteudo_config.preferred-height;
 
                 conteudo_config := VerticalLayout {
+                    // Largura presa ao cartão: nada empurra para os lados
+                    width: cartao_config.width;
                     padding: 16px;
                     spacing: 12px;
 
@@ -1280,6 +1282,24 @@ export component MainWindow inherits Window {
                                 config_aberta = false;
                                 atalhos.focus();
                             }
+                        }
+                    }
+
+                    HorizontalLayout {
+                        spacing: 12px;
+                        Text {
+                            text: I18n.language;
+                            color: Tema.texto;
+                            font-size: 14px;
+                            vertical-alignment: center;
+                        }
+                        // Cada idioma escrito nele mesmo: quem não lê o
+                        // atual ainda acha o seu
+                        Segmentado {
+                            horizontal-stretch: 1;
+                            opcoes: ["English", "Português"];
+                            atual: I18n.idioma == "en" ? 0 : 1;
+                            escolhido(i) => { trocar_idioma(i == 0 ? "en" : "pt-br"); }
                         }
                     }
 
@@ -1461,26 +1481,6 @@ export component MainWindow inherits Window {
                         font-size: 12px;
                         color: Tema.texto_suave;
                         wrap: word-wrap;
-                    }
-
-                    Rectangle {
-                        width: 100%;
-                        height: 32px;
-                        border-radius: 8px;
-                        background: ta_lang.has-hover ? Tema.neutro_hover : transparent;
-                        animate background { duration: 120ms; }
-
-                        ta_lang := TouchArea {
-                            clicked => { trocar_idioma(I18n.idioma == "en" ? "pt-br" : "en"); }
-                        }
-
-                        Text {
-                            text: I18n.idioma == "en" ? "Idioma: Português" : "Language: English";
-                            color: Tema.texto;
-                            font-size: 13px;
-                            horizontal-alignment: center;
-                            vertical-alignment: center;
-                        }
                     }
 
                     // Fundo do modo imersivo
