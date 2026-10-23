@@ -165,9 +165,41 @@ pub fn config_path() -> PathBuf {
             }
         }
     }
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(target_os = "windows")]
+    {
+        let exe = std::env::current_exe().ok();
+        let appdata = std::env::var_os("APPDATA").map(PathBuf::from);
+        pasta_windows(
+            exe.as_deref().and_then(std::path::Path::parent),
+            appdata.as_deref(),
+            std::path::Path::exists,
+        )
+        .join("furinar_config.json")
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "windows")))]
     {
         PathBuf::from("furinar_config.json")
+    }
+}
+
+/// Pasta dos arquivos do Furinar no Windows. Uma configuração ao lado do
+/// executável (como as versões antigas, sem instalador, salvavam) mantém o
+/// modo portátil; senão, `%APPDATA%\Furinar` — a pasta de instalação não é
+/// lugar de dados.
+#[cfg(any(target_os = "windows", test))]
+fn pasta_windows(
+    exe: Option<&std::path::Path>,
+    appdata: Option<&std::path::Path>,
+    existe: impl Fn(&std::path::Path) -> bool,
+) -> PathBuf {
+    if let Some(exe) = exe
+        && existe(&exe.join("furinar_config.json"))
+    {
+        return exe.to_path_buf();
+    }
+    match appdata {
+        Some(appdata) => appdata.join("Furinar"),
+        None => exe.map(std::path::Path::to_path_buf).unwrap_or_default(),
     }
 }
 
@@ -236,6 +268,22 @@ impl AppConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn windows_usa_appdata_ou_fica_portatil() {
+        use std::path::Path;
+        let exe = Path::new(r"C:\Users\a\AppData\Local\Programs\Furinar");
+        let appdata = Path::new(r"C:\Users\a\AppData\Roaming");
+        // Instalado (ou .exe solto novo): dados no %APPDATA%
+        assert_eq!(
+            pasta_windows(Some(exe), Some(appdata), |_| false),
+            appdata.join("Furinar")
+        );
+        // Config ao lado do .exe (versões antigas, portátil): continua lá
+        assert_eq!(pasta_windows(Some(exe), Some(appdata), |_| true), exe);
+        // Sem %APPDATA%: pasta do executável
+        assert_eq!(pasta_windows(Some(exe), None, |_| false), exe);
+    }
 
     #[test]
     fn json_sem_volume_carrega_padrao_e_preserva_o_restante() {

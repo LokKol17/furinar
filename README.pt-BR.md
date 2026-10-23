@@ -150,9 +150,11 @@ Tela de informações da faixa (`I`):
 ## 🚀 Instalação
 
 ### Windows
-1. Baixe o `furinar-windows-x86_64.exe` na página de [Releases](https://github.com/LokKol17/furinar/releases).
-2. Abra e clique em **Abrir pasta** para apontar onde estão suas músicas.
+1. Baixe o `furinar-windows-x86_64-setup.exe` na página de [Releases](https://github.com/LokKol17/furinar/releases) e execute. Ele instala só para o seu usuário (sem pedir administrador), coloca o Furinar no menu Iniciar e aparece em **Configurações → Aplicativos** para desinstalar.
+2. Abra o Furinar e clique em **Abrir pasta** para apontar onde estão suas músicas.
 3. O Furinar lembra tudo da próxima vez, e avisa quando sai versão nova (a atualização é um clique).
+
+As configurações ficam em `%APPDATA%\Furinar`. Prefere não instalar? Baixe o `furinar-windows-x86_64.exe` e é só abrir. Para deixar totalmente portátil (configurações ao lado do `.exe`, num pendrive, por exemplo), crie um `furinar_config.json` vazio ao lado dele.
 
 ### Linux
 
@@ -212,7 +214,7 @@ Tudo é opcional e só acontece quando você liga ou pede:
 Para o **Last.fm**: crie uma "API account" em [last.fm/api/account/create](https://www.last.fm/api/account/create), cole a chave e o segredo nas configurações, clique em **Conectar Last.fm**, autorize no navegador e clique em **Concluir conexão**. Para o **ListenBrainz**, basta o token de [listenbrainz.org/settings](https://listenbrainz.org/settings/).
 
 ### Arquivos
-Ficam em `~/.config/furinar/` no Linux e ao lado do executável no Windows:
+Ficam em `~/.config/furinar/` no Linux e em `%APPDATA%\Furinar` no Windows (ou ao lado do `.exe` no modo portátil):
 
 | Arquivo | Conteúdo |
 |---|---|

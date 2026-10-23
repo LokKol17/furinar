@@ -7,6 +7,18 @@ e o projeto adere ao [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Adicionado
+
+- Instalador para Windows (`furinar-windows-x86_64-setup.exe`): instala só para o usuário, sem pedir administrador, com atalho no menu Iniciar, atalho opcional na área de trabalho e desinstalador em Configurações → Aplicativos. O `.exe` portátil continua disponível.
+
+### Alterado
+
+- No Windows, as configurações passam a ficar em `%APPDATA%\Furinar`. Quem já tem um `furinar_config.json` ao lado do executável continua no modo portátil, sem perder nada.
+
+### Corrigido
+
+- O arquivo `SHA256SUMS` não era anexado às releases.
+
 ## [1.7.1] — 2026-10-22
 
 ### Adicionado

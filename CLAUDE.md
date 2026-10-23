@@ -34,7 +34,7 @@ Linux build deps: `libasound2-dev libgtk-3-dev pkg-config`.
   - Karaoke: `lrc::palavras_lrc` (enhanced LRC word times) + `lrc::progresso_linha`; `atualizar_karaoke` runs in the 33 ms immersive timer.
   - `captura.rs` (tests only) — window-less screenshots.
   Mostly pure helpers:
-  - `config.rs` — `AppConfig`, serde JSON `furinar_config.json` (XDG `~/.config/furinar/` on Linux, next to the exe on Windows). Legacy singular `pasta` field is migrated into `pastas`.
+  - `config.rs` — `AppConfig`, serde JSON `furinar_config.json` (XDG `~/.config/furinar/` on Linux; on Windows `%APPDATA%\Furinar`, or next to the exe when a `furinar_config.json` already exists there = portable mode, `pasta_windows`). The other JSON files sit beside it. Legacy singular `pasta` field is migrated into `pastas`.
   - `track.rs` — folder scanning, tag reading (lofty: title, artist, album, number, duration, ReplayGain factor, date added), accent/case-insensitive search (`normalizar_busca`, `ordem_filtrada`), sorting (`Ordem`, `ordenar`) and album grouping (`agrupar_albuns`).
   - `lrc.rs` — `.lrc` synced-lyrics parsing, embedded lyrics fallback (`letra_embutida`: SYLT, then USLT/LYRICS tried as LRC; plain text = `Letra::Livre`, shown whole without highlight) and the visible window of lines.
   - `translations.rs` — `HashMap<&str, &str>` per language (`pt_br`, `en`); default and fallback language is English (`en`); `pt`/`pt-br` select Portuguese.
@@ -58,4 +58,4 @@ Linux build deps: `libasound2-dev libgtk-3-dev pkg-config`.
 
 ## Versioning / release
 
-`Cargo.toml` version is the single source of truth (the self-updater compares against `CARGO_PKG_VERSION`). After bumping it, run `make sync-version` then `make check-version` (propagates to `pkg/debian/control`, `pkg/arch/PKGBUILD`, `pkg/fedora/furinar.spec`, `pkg/install.sh`, `pkg/furinar.metainfo.xml`) and add a `CHANGELOG.md` entry. Pushing a `vX.Y.Z` tag triggers `.github/workflows/release.yml`. Release asset names (`furinar-windows-x86_64.exe`, `furinar-linux-x86_64.tar.gz`) must not change — the updater matches on them. Details: `docs/RELEASE_CONVENTION.md`.
+`Cargo.toml` version is the single source of truth (the self-updater compares against `CARGO_PKG_VERSION`). After bumping it, run `make sync-version` then `make check-version` (propagates to `pkg/debian/control`, `pkg/arch/PKGBUILD`, `pkg/fedora/furinar.spec`, `pkg/install.sh`, `pkg/furinar.metainfo.xml`) and add a `CHANGELOG.md` entry. Pushing a `vX.Y.Z` tag triggers `.github/workflows/release.yml`. Release asset names (`furinar-windows-x86_64.exe`, `furinar-linux-x86_64.tar.gz`) must not change — the updater matches on them. The release also ships `furinar-windows-x86_64-setup.exe`, built in CI by Inno Setup from `pkg/windows/furinar.iss` (per-user install in `%LOCALAPPDATA%\Programs\Furinar`, so the self-updater can still replace the exe; never change its `AppId`). Details: `docs/RELEASE_CONVENTION.md`.

@@ -37,7 +37,8 @@ Cada release deve conter os seguintes arquivos como assets (binários anexados):
 
 | Plataforma | Nome do asset | Formato |
 |---|---|---|
-| Windows x86_64 | `furinar-windows-x86_64.exe` | Executável nativo |
+| Windows x86_64 | `furinar-windows-x86_64-setup.exe` | Instalador (Inno Setup, por usuário) |
+| Windows x86_64 | `furinar-windows-x86_64.exe` | Executável portátil — o atualizador embutido baixa este |
 | Linux x86_64 | `furinar-linux-x86_64.tar.gz` | Tarball com binário + SHA256 |
 | macOS x86_64 | `furinar-macos-x86_64.tar.gz` | Tarball *(futuro)* |
 | macOS aarch64 | `furinar-macos-aarch64.tar.gz` | Tarball *(futuro)* |
@@ -47,6 +48,10 @@ Cada release deve conter os seguintes arquivos como assets (binários anexados):
 ```bash
 make release
 ```
+
+O instalador do Windows é gerado só pelo `release.yml` (Inno Setup 6.7.3,
+`pkg/windows/furinar.iss`); para testar localmente, instale o Inno Setup
+(no Linux, num prefixo do wine) e rode o `iscc` como no cabeçalho do `.iss`.
 
 Isso gera em `dist/release/`:
 - `furinar-windows-x86_64.exe`
