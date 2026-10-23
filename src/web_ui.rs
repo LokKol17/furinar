@@ -325,6 +325,15 @@ pub(crate) fn processar_web(estado: &mut EstadoAudio, ui: &MainWindow) {
                 }
             }
             buscador::Resposta::TocandoAgora => {}
+            buscador::Resposta::CapaDiscord { chave, url } => match url {
+                Ok(url) => {
+                    estado.capas_discord.insert(chave, url);
+                }
+                // Sai do cache: a próxima vez que tocar, pede de novo
+                Err(_) => {
+                    estado.capas_discord.remove(&chave);
+                }
+            },
             buscador::Resposta::Scrobble { sobrou, erro } => {
                 estado.fila_scrobble.extend(sobrou);
                 scrobble::salvar_fila(&estado.fila_scrobble);

@@ -184,6 +184,9 @@ pub(crate) struct EstadoAudio {
     /// Status no Discord ligado, e a conexão (só existe ligado).
     pub(crate) discord_ativo: bool,
     pub(crate) discord: Option<discord::Discord>,
+    /// Capa da faixa (chave) no Deezer para o Discord: `None` = pedida e
+    /// ainda sem resposta, ou sem capa. Só em memória.
+    pub(crate) capas_discord: std::collections::HashMap<String, Option<String>>,
     /// Scrobble: contas, escutas que ainda não foram, a faixa cujo "tocando
     /// agora" já foi avisado, e a conexão do Last.fm em andamento.
     pub(crate) contas: scrobble::Contas,
@@ -264,6 +267,7 @@ impl Default for EstadoAudio {
             chave_acoustid: String::new(),
             discord_ativo: false,
             discord: None,
+            capas_discord: std::collections::HashMap::new(),
             contas: scrobble::Contas::default(),
             fila_scrobble: Vec::new(),
             avisada: None,

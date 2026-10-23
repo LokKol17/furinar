@@ -60,7 +60,10 @@ pub fn pt_br() -> Translations {
     t.insert("batch_running", "Indexando…");
     t.insert("batch_summary", "{auto} corrigidas sozinhas · {revisar} para revisar · {nada} sem resultado · {letras} letras baixadas");
     t.insert("info_error", "Erro");
-    t.insert("discord_status", "Mostrar no Discord o que está tocando");
+    t.insert(
+        "discord_status",
+        "Mostrar no Discord o que está tocando (capa buscada no Deezer)",
+    );
     t.insert("tip_mini", "Mini player (M)");
     t.insert("tip_mini_exit", "Voltar ao tamanho normal (M)");
     t.insert("scrobble_title", "Scrobble");
@@ -224,7 +227,10 @@ pub fn en() -> Translations {
     t.insert("batch_running", "Indexing…");
     t.insert("batch_summary", "{auto} fixed automatically · {revisar} to review · {nada} not found · {letras} lyrics downloaded");
     t.insert("info_error", "Error");
-    t.insert("discord_status", "Show what's playing on Discord");
+    t.insert(
+        "discord_status",
+        "Show what's playing on Discord (cover looked up on Deezer)",
+    );
     t.insert("tip_mini", "Mini player (M)");
     t.insert("tip_mini_exit", "Back to full size (M)");
     t.insert("scrobble_title", "Scrobble");

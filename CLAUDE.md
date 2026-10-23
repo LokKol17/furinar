@@ -28,7 +28,7 @@ Linux build deps: `libasound2-dev libgtk-3-dev pkg-config`.
   - `reproducao.rs` — sources/player, seek, next/previous (shuffle, history), gapless/crossfade, lyrics sync, volume, sleep timer.
   - `ponte_imersivo.rs` — bridge to the immersive mode (track shown, library drawer, up-next, preview, clock).
   - `web_ui.rs` — track info screen and tab batch (talks to `buscador`).
-  - `plataforma.rs` — MPRIS/SMTC, Windows taskbar buttons, rounded corners, Discord status (`discord.rs`: IPC thread alive only while enabled; app id is public), opening URLs.
+  - `plataforma.rs` — MPRIS/SMTC, Windows taskbar buttons, rounded corners, Discord status (`discord.rs`: IPC thread alive only while enabled; app id is public; cover URL = MusicBrainz correction → Cover Art Archive, else `deezer.rs` lookup via `buscador` `Pedido::CapaDiscord`, cached in memory in `capas_discord`, logo meanwhile), opening URLs.
   - Scrobbling: `scrobble.rs` (ListenBrainz token / Last.fm signed calls + browser auth), run through `buscador` (`Pedido::TocandoAgora`/`Scrobble`); failed listens persist in `furinar_scrobbles.json`. Triggered from `contar_reproducao` and `atualizar_scrobble` (web_ui.rs).
   - Mini player: same window shrunk to 380×112 (`modo_mini`, `ui/mini.slint`, `always-on-top`), toggled by `alternar_mini` in ponte_imersivo.rs; cover = cached thumbnail loaded on a thread.
   - Karaoke: `lrc::palavras_lrc` (enhanced LRC word times) + `lrc::progresso_linha`; `atualizar_karaoke` runs in the 33 ms immersive timer.

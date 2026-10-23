@@ -209,6 +209,7 @@ Tudo é opcional e só acontece quando você liga ou pede:
 | AcoustID | Identificar pelo som | impressão digital do áudio | Com a sua chave, quando a busca pelo nome não basta |
 | ListenBrainz / Last.fm | Scrobble | faixas ouvidas | Com token/conta configurados |
 | Discord | Status no perfil | faixa tocando (local, pela IPC do app) | "Mostrar no Discord" ligado |
+| Deezer | Capa no status do Discord | título, artista | Mesma opção, uma vez por faixa sem correção do MusicBrainz |
 | GitHub | Avisar de versão nova | — | Ao abrir (desligado em instalações por pacote) |
 
 Para o **Last.fm**: crie uma "API account" em [last.fm/api/account/create](https://www.last.fm/api/account/create), cole a chave e o segredo nas configurações, clique em **Conectar Last.fm**, autorize no navegador e clique em **Concluir conexão**. Para o **ListenBrainz**, basta o token de [listenbrainz.org/settings](https://listenbrainz.org/settings/).

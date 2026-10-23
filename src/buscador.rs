@@ -15,7 +15,7 @@ use std::time::{Duration, Instant};
 use crate::letras_web;
 use crate::metadados::{CONFIANCA_AUTOMATICA, Candidato, Consulta, Correcao};
 use crate::rede::Cliente;
-use crate::{acoustid, musicbrainz, scrobble};
+use crate::{acoustid, deezer, musicbrainz, scrobble};
 
 pub enum Pedido {
     /// Letra de uma faixa (ao tocar, ou pelo botão).
@@ -30,6 +30,13 @@ pub enum Pedido {
     },
     /// Capa de um lançamento para o cache.
     Capa { chave: String, lancamento: String },
+    /// URL de capa no Deezer para o status do Discord.
+    CapaDiscord {
+        chave: String,
+        titulo: String,
+        artista: Option<String>,
+        duracao: u64,
+    },
     /// Escreve as correções nos arquivos.
     GravarTags(Vec<(PathBuf, Correcao)>),
     /// Avisa os serviços de scrobble que a faixa começou.
@@ -71,6 +78,11 @@ pub enum Resposta {
     Capa {
         chave: String,
         ok: bool,
+    },
+    /// `Err` = falhou (rede, cota): tentar de novo depois.
+    CapaDiscord {
+        chave: String,
+        url: Result<Option<String>, String>,
     },
     Gravadas {
         ok: usize,
@@ -199,6 +211,17 @@ fn trabalhar(
                     cancelado: false,
                     erro: Some(e),
                 },
+            },
+            Pedido::CapaDiscord {
+                chave,
+                titulo,
+                artista,
+                duracao,
+            } => Resposta::CapaDiscord {
+                url: conectar(&mut conexao).and_then(|c| {
+                    deezer::capa(c, &titulo, artista.as_deref(), duracao).map_err(|e| e.to_string())
+                }),
+                chave,
             },
             Pedido::Capa { chave, lancamento } => Resposta::Capa {
                 ok: conectar(&mut conexao)

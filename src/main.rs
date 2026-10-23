@@ -8,6 +8,7 @@ mod biblioteca;
 mod buscador;
 mod capa;
 mod config;
+mod deezer;
 mod discord;
 mod estado;
 mod fundo;

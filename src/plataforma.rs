@@ -477,15 +477,34 @@ pub(crate) fn atualizar_discord(estado: &mut EstadoAudio) {
         return;
     }
     let tocando = estado.audio_player.as_ref().is_some_and(|p| !p.is_paused());
+    let mut pedir_capa = None;
     let status = tocando
         .then(|| {
             let pasta = estado.pastas.get(estado.pasta_reproducao?)?;
             let indice = estado.indice_atual?;
             let t = pasta.tracks.get(indice)?;
-            let capa = pasta
-                .chave_faixa(indice)
-                .and_then(|k| estado.metadados.correcao(&k)?.lancamento.clone())
-                .map(|l| format!("https://coverartarchive.org/release/{l}/front-250"));
+            let chave = pasta.chave_faixa(indice);
+            // Capa: a do lançamento corrigido no MusicBrainz; senão a do
+            // Deezer (pedida uma vez por faixa); até chegar, a logo
+            let capa = chave
+                .as_ref()
+                .and_then(|k| estado.metadados.correcao(k)?.lancamento.clone())
+                .map(|l| format!("https://coverartarchive.org/release/{l}/front-250"))
+                .or_else(|| {
+                    let k = chave.as_ref()?;
+                    match estado.capas_discord.get(k) {
+                        Some(url) => url.clone(),
+                        None => {
+                            pedir_capa = Some(buscador::Pedido::CapaDiscord {
+                                chave: k.clone(),
+                                titulo: t.titulo.clone(),
+                                artista: t.artista.clone(),
+                                duracao: estado.duracao_total_secs,
+                            });
+                            None
+                        }
+                    }
+                });
             Some(discord::Status {
                 titulo: t.titulo.clone(),
                 artista: t.artista.clone(),
@@ -496,6 +515,12 @@ pub(crate) fn atualizar_discord(estado: &mut EstadoAudio) {
             })
         })
         .flatten();
+    if let Some(buscador::Pedido::CapaDiscord { chave, .. }) = &pedir_capa {
+        estado.capas_discord.insert(chave.clone(), None);
+    }
+    if let Some(pedido) = pedir_capa {
+        pedir_web(estado, pedido);
+    }
     estado
         .discord
         .get_or_insert_with(discord::Discord::novo)

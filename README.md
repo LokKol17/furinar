@@ -209,6 +209,7 @@ Everything is optional and only happens when you turn it on or ask for it:
 | AcoustID | Identify by sound | audio fingerprint | With your key, when the name search isn't enough |
 | ListenBrainz / Last.fm | Scrobbling | tracks you listened to | With a token/account set up |
 | Discord | Profile status | current track (local, through the app's IPC) | "Show what's playing on Discord" on |
+| Deezer | Cover art for the Discord status | title, artist | Same option, once per track without a MusicBrainz match |
 | GitHub | New version notice | — | On startup (off for package installs) |
 
 For **Last.fm**: create an "API account" at [last.fm/api/account/create](https://www.last.fm/api/account/create), paste the key and secret in Settings, click **Connect Last.fm**, authorize in the browser, then click **Finish connecting**. For **ListenBrainz**, the token from [listenbrainz.org/settings](https://listenbrainz.org/settings/) is enough.

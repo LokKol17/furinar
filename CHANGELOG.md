@@ -7,6 +7,10 @@ e o projeto adere ao [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Adicionado
+
+- O status do Discord mostra a capa da música em vez da logo do Furinar: a do lançamento corrigido no MusicBrainz ou, se não houver, a encontrada no Deezer (título e artista, uma vez por faixa, só com a opção ligada). Sem capa encontrada, continua a logo.
+
 ## [1.7.2] — 2026-10-23
 
 ### Adicionado
