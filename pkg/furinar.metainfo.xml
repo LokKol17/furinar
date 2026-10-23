@@ -60,6 +60,11 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="1.7.2" date="2026-10-23">
+      <description>
+        <p>Windows installer (per user, no admin rights). Reliable updates: a new update notice with release notes, download progress and a "Restart now" button; every download is verified against the release checksums. The Linux install script now installs per user and keeps Furinar up to date. Fixes the settings card overflowing in English, with new language and theme selectors.</p>
+      </description>
+    </release>
     <release version="1.7.1" date="2026-10-22">
       <description>
         <p>Fixes an occasional crash (segmentation fault) on Linux while playing, searching the web or after a few minutes of use.</p>

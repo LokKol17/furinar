@@ -7,6 +7,8 @@ e o projeto adere ao [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.7.2] — 2026-10-23
+
 ### Adicionado
 
 - Instalador para Windows (`furinar-windows-x86_64-setup.exe`): instala só para o usuário, sem pedir administrador, com atalho no menu Iniciar, atalho opcional na área de trabalho e desinstalador em Configurações → Aplicativos. O `.exe` portátil continua disponível.
@@ -19,7 +21,7 @@ e o projeto adere ao [Semantic Versioning](https://semver.org/).
 - O instalador do Linux (`install.sh`) instala só para o usuário, em `~/.local`, sem sudo (a não ser que faltem bibliotecas do sistema), sempre a versão mais recente, e remove a instalação antiga em `/usr/local`. Assim o Furinar passa a se atualizar sozinho também no Linux.
 - Quando o Furinar não pode se atualizar sozinho (pasta sem permissão de escrita), o aviso oferece abrir a página da release.
 - As notas de cada release vêm do CHANGELOG.
-- Idioma escolhido num seletor "English | Português" no topo das configurações, com o idioma atual destacado (antes era um botão que mostrava o outro idioma).
+- Idioma e tema escolhidos em seletores no topo das configurações ("English | Português", "Escuro | Claro"), com a opção atual destacada. Antes eram um botão que mostrava o outro idioma e uma caixa "Tema: Escuro".
 
 ### Corrigido
 
@@ -168,7 +170,8 @@ e o projeto adere ao [Semantic Versioning](https://semver.org/).
 - Retoma última faixa e posição ao reabrir
 - Migración automática do campo `pasta` → `pastas` na config
 
-[Unreleased]: https://github.com/LokKol17/furinar/compare/v1.7.1...HEAD
+[Unreleased]: https://github.com/LokKol17/furinar/compare/v1.7.2...HEAD
+[1.7.2]: https://github.com/LokKol17/furinar/compare/v1.7.1...v1.7.2
 [1.7.1]: https://github.com/LokKol17/furinar/compare/v1.7.0...v1.7.1
 [1.7.0]: https://github.com/LokKol17/furinar/compare/v1.5.3...v1.7.0
 [1.5.3]: https://github.com/LokKol17/furinar/compare/v1.5.2...v1.5.3
