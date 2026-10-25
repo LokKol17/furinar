@@ -290,6 +290,11 @@ impl Fnv {
 
 /// `~/.cache/furinar/capas` (XDG) ou `%LOCALAPPDATA%\furinar\capas`.
 fn pasta_cache() -> Option<PathBuf> {
+    pasta_cache_furinar().map(|b| b.join("capas"))
+}
+
+/// `~/.cache/furinar` (Linux) ou `%LOCALAPPDATA%\furinar` (Windows).
+pub(crate) fn pasta_cache_furinar() -> Option<PathBuf> {
     #[cfg(target_os = "windows")]
     let base = std::env::var_os("LOCALAPPDATA").map(PathBuf::from);
     #[cfg(not(target_os = "windows"))]
@@ -297,7 +302,7 @@ fn pasta_cache() -> Option<PathBuf> {
         .filter(|v| !v.is_empty())
         .map(PathBuf::from)
         .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".cache")));
-    base.map(|b| b.join("furinar").join("capas"))
+    base.map(|b| b.join("furinar"))
 }
 
 #[cfg(test)]

@@ -115,6 +115,7 @@ pub(crate) fn escanear(
 ) -> Vec<TrackInfo> {
     let mut tracks = Vec::new();
     coletar_arquivos_audio(caminho, caminho, recursivo, &mut tracks);
+    ffmpeg::gravar_cache();
     tracks.sort_by(|a, b| a.path.cmp(&b.path));
     banco.aplicar(&mut tracks, |t| chave_faixa(caminho, &t.path));
     tracks
