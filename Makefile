@@ -115,8 +115,25 @@ sync-version:
 	@sed -i "s/^Version:.*/Version: $(VERSION)/" pkg/debian/control
 	@sed -i "s/^pkgver=.*/pkgver=$(VERSION)/" pkg/arch/PKGBUILD
 	@sed -i "s/^Version:.*/Version:        $(VERSION)/" pkg/fedora/furinar.spec
-	@# Só a primeira <release> (a mais recente); as antigas ficam como histórico
-	@sed -i '0,/<release version="[^"]*"/s//<release version="$(VERSION)"/' pkg/furinar.metainfo.xml
+	@# Metainfo: o histórico de <release> nunca é reescrito. Versão nova ganha
+	@# uma entrada no topo, com a data da seção do CHANGELOG (ou a de hoje);
+	@# a descrição em inglês fica para escrever à mão.
+	@if grep -q '<release version="$(VERSION)"' pkg/furinar.metainfo.xml; then \
+		echo "  metainfo: release $(VERSION) already listed."; \
+	else \
+		DATA=$$(grep -m1 '^## \[$(VERSION)\]' CHANGELOG.md | grep -o '[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}'); \
+		DATA=$${DATA:-$$(date +%F)}; \
+		awk -v v="$(VERSION)" -v d="$$DATA" '!feito && /<release / { \
+			match($$0, /^[ \t]*/); ind = substr($$0, 1, RLENGTH); \
+			print ind "<release version=\"" v "\" date=\"" d "\">"; \
+			print ind "  <description>"; \
+			print ind "    <p>TODO: describe this release in English.</p>"; \
+			print ind "  </description>"; \
+			print ind "</release>"; \
+			feito = 1 } { print }' pkg/furinar.metainfo.xml > pkg/furinar.metainfo.xml.tmp \
+		&& mv pkg/furinar.metainfo.xml.tmp pkg/furinar.metainfo.xml; \
+		echo "  metainfo: added release $(VERSION) ($$DATA) — write its description in pkg/furinar.metainfo.xml."; \
+	fi
 	@echo "  Done. All packaging files updated to $(VERSION)."
 
 check-version:
@@ -130,6 +147,7 @@ check-version:
 		if [ "$$SPEC_VER" != "$$VER" ]; then echo "  MISMATCH: pkg/fedora/furinar.spec has $$SPEC_VER, expected $$VER"; OK=0; fi; \
 		META_VER=$$(grep -m1 '<release version=' pkg/furinar.metainfo.xml | sed 's/.*version="//;s/".*//'); \
 		if [ "$$META_VER" != "$$VER" ]; then echo "  MISMATCH: pkg/furinar.metainfo.xml has $$META_VER, expected $$VER"; OK=0; fi; \
+		if grep -q 'TODO: describe this release' pkg/furinar.metainfo.xml; then echo "  MISSING: release description in pkg/furinar.metainfo.xml is still TODO"; OK=0; fi; \
 		if [ "$$OK" = "0" ]; then echo ""; echo "  Run 'make sync-version' to fix."; exit 1; fi;
 	@echo "  All packaging versions match: $(VERSION)"
 

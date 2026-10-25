@@ -117,9 +117,12 @@ Os artefatos gerados ficam em `dist/`.
 ### Checklist de uma release
 
 1. Atualizar versão em `Cargo.toml` (`version = "x.y.z"`)
-2. Rodar `make sync-version` para propagar a versão aos arquivos de packaging
-3. Rodar `make check-version` para confirmar que está tudo em sync
-4. Atualizar `CHANGELOG.md` com as mudanças da versão
+2. Atualizar `CHANGELOG.md` com a seção `## [x.y.z] — AAAA-MM-DD`
+3. Rodar `make sync-version` para propagar a versão aos arquivos de packaging.
+   No `pkg/furinar.metainfo.xml` ele só **acrescenta** uma `<release>` no topo
+   (com a data do CHANGELOG), sem tocar no histórico; rodar de novo não muda nada
+4. Escrever em inglês a descrição dessa `<release>` (vem com um TODO) e rodar
+   `make check-version`, que falha enquanto o TODO estiver lá
 5. Rodar `make release` (precisa de um build em cada plataforma)
 6. Criar a tag: `git tag vX.Y.Z`
 7. Criar a release no GitHub com a tag correspondente
