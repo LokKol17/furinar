@@ -136,6 +136,34 @@ pub(crate) enum Decodificado {
 pub(crate) struct VideoNativo {
     caminho: PathBuf,
     duracao: Option<Duration>,
+    /// Seek em andamento: o decodificador já na posição chega por aqui. Até
+    /// lá a fonte toca silêncio, em vez de travar a thread de áudio.
+    seek: Option<std::sync::mpsc::Receiver<Decoder<BufReader<File>>>>,
+    /// Amostras de silêncio já entregues nesse seek: descartadas do novo
+    /// decodificador, para a música não ficar atrás da posição do player.
+    silencio: u64,
+}
+
+impl VideoNativo {
+    fn novo(caminho: &Path) -> Self {
+        Self {
+            caminho: caminho.to_path_buf(),
+            duracao: track::duracao_container(caminho),
+            seek: None,
+            silencio: 0,
+        }
+    }
+}
+
+/// Avança `amostras` (arredondado aos canais, para não trocar esquerda e
+/// direita). Decodificar AAC é centenas de vezes mais rápido que tocar.
+fn pular_amostras(d: &mut Decoder<BufReader<File>>, amostras: u64) {
+    let canais = d.channels().get() as u64;
+    for _ in 0..amostras - amostras % canais {
+        if d.next().is_none() {
+            break;
+        }
+    }
 }
 
 fn abrir_nativo(caminho: &Path) -> Option<Decoder<BufReader<File>>> {
@@ -163,10 +191,7 @@ impl Decodificado {
         if !ffmpeg::so_com_ffmpeg(caminho)
             && let Some(d) = abrir_nativo(caminho)
         {
-            let video = video.then(|| VideoNativo {
-                caminho: caminho.to_path_buf(),
-                duracao: track::duracao_container(caminho),
-            });
+            let video = video.then(|| VideoNativo::novo(caminho));
             return Some(Self::Nativo { d, video });
         }
         audio_ffmpeg::FonteFfmpeg::abrir(caminho).map(Self::Ffmpeg)
@@ -178,6 +203,26 @@ impl Iterator for Decodificado {
 
     fn next(&mut self) -> Option<rodio::Sample> {
         match self {
+            Self::Nativo { d, video: Some(v) } if v.seek.is_some() => {
+                let rx = v.seek.as_ref()?;
+                match rx.try_recv() {
+                    Ok(mut novo) => {
+                        pular_amostras(&mut novo, v.silencio);
+                        *d = novo;
+                        v.seek = None;
+                        d.next()
+                    }
+                    Err(std::sync::mpsc::TryRecvError::Empty) => {
+                        v.silencio += 1;
+                        Some(0.0)
+                    }
+                    // Não reabriu: segue de onde estava
+                    Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                        v.seek = None;
+                        d.next()
+                    }
+                }
+            }
             Self::Nativo { d, .. } => d.next(),
             Self::Ffmpeg(f) => f.next(),
         }
@@ -217,23 +262,23 @@ impl rodio::Source for Decodificado {
     fn try_seek(&mut self, pos: Duration) -> Result<(), rodio::source::SeekError> {
         match self {
             Self::Nativo { d, video: Some(v) } => {
-                // Do começo, decodificando até a posição (AAC decodifica
-                // centenas de vezes mais rápido que o tempo real)
-                let mut novo = abrir_nativo(&v.caminho).ok_or_else(|| {
-                    rodio::source::SeekError::Other(std::sync::Arc::new(std::io::Error::other(
-                        "não reabriu",
-                    )))
-                })?;
-                let por_segundo = novo.sample_rate().get() as u128 * novo.channels().get() as u128;
-                let pular = pos.as_nanos() * por_segundo / 1_000_000_000;
-                // Múltiplo do número de canais: não troca esquerda e direita
-                let pular = pular - pular % novo.channels().get() as u128;
-                for _ in 0..pular {
-                    if novo.next().is_none() {
-                        break;
-                    }
-                }
-                *d = novo;
+                // Reabre do começo e decodifica até a posição numa thread
+                // (o try_seek roda na thread de áudio)
+                let por_segundo = d.sample_rate().get() as u128 * d.channels().get() as u128;
+                let pular = (pos.as_nanos() * por_segundo / 1_000_000_000) as u64;
+                let caminho = v.caminho.clone();
+                let (tx, rx) = std::sync::mpsc::sync_channel(1);
+                std::thread::Builder::new()
+                    .name("furinar-seek".into())
+                    .spawn(move || {
+                        if let Some(mut novo) = abrir_nativo(&caminho) {
+                            pular_amostras(&mut novo, pular);
+                            let _ = tx.send(novo);
+                        }
+                    })
+                    .map_err(|e| rodio::source::SeekError::Other(std::sync::Arc::new(e)))?;
+                v.seek = Some(rx);
+                v.silencio = 0;
                 Ok(())
             }
             Self::Nativo { d, .. } => d.try_seek(pos),
@@ -1331,15 +1376,19 @@ mod tests {
             if ext == "mp4" {
                 let mut nativo = Decodificado::Nativo {
                     d: abrir_nativo(&caminho).unwrap(),
-                    video: Some(VideoNativo {
-                        caminho: caminho.clone(),
-                        duracao: track::duracao_container(&caminho),
-                    }),
+                    video: Some(VideoNativo::novo(&caminho)),
                 };
                 let total = nativo.total_duration().unwrap().as_secs_f64();
                 assert!((total - 2.0).abs() < 0.1, "nativo: duração {total} s");
-                nativo.try_seek(Duration::from_millis(1500)).unwrap();
                 let taxa = nativo.sample_rate().get() as f64 * nativo.channels().get() as f64;
+                // O seek decodifica numa thread; a fonte toca silêncio até
+                // ele chegar e depois desconta esse silêncio. 4800 amostras
+                // de silêncio + o resto = os mesmos 0,5 s
+                nativo.try_seek(Duration::from_millis(1500)).unwrap();
+                for _ in 0..4800 {
+                    assert_eq!(nativo.next(), Some(0.0));
+                }
+                std::thread::sleep(Duration::from_millis(300));
                 let resto = nativo.count() as f64 / taxa;
                 assert!(
                     (resto - 0.5).abs() < 0.1,
