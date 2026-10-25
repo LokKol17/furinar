@@ -12,10 +12,12 @@ Linux build deps: `libasound2-dev libgtk-3-dev pkg-config`.
 
 - Run: `cargo run` · Release build: `cargo build --release`
 - Format check: `cargo fmt --all --check`
+- Toolchain pinned in `rust-toolchain.toml` (same Rust locally and in CI; CI installs it with `rustup toolchain install`). Bump it on purpose and fix what the new clippy asks.
 - Lint (CI runs both with `-D warnings`; the codebase has no `#[allow]` — keep it at zero warnings):
   - `cargo clippy --all-targets --all-features -- -D warnings`
   - `cargo clippy --all-targets --no-default-features -- -D warnings`
-  - Windows-only code (`cfg(target_os = "windows")`) is checked locally with `--target x86_64-pc-windows-gnu`.
+  - Windows-only code (`cfg(target_os = "windows")`) is checked locally with `--target x86_64-pc-windows-gnu` (`rustup target add x86_64-pc-windows-gnu` once per pinned toolchain).
+- Release workflow calls `ci.yml` (`workflow_call`) first; the builds only run if lint + tests pass.
 - Tests: `cargo test --all-features` and `cargo test --no-default-features`
 - Single test: `cargo test <name>` (e.g. `cargo test m4a_permite_seek`). Tests are inline `#[cfg(test)] mod tests` in each module; audio fixtures live in `tests/fixtures/` (loaded via `CARGO_MANIFEST_DIR`).
 - Packaging: `make deb | rpm | tarball | release` (`make help` lists all).
@@ -32,7 +34,7 @@ Linux build deps: `libasound2-dev libgtk-3-dev pkg-config`.
   - Scrobbling: `scrobble.rs` (ListenBrainz token / Last.fm signed calls + browser auth), run through `buscador` (`Pedido::TocandoAgora`/`Scrobble`); failed listens persist in `furinar_scrobbles.json`. Triggered from `contar_reproducao` and `atualizar_scrobble` (web_ui.rs).
   - Mini player: same window shrunk to 380×112 (`modo_mini`, `ui/mini.slint`, `always-on-top`), toggled by `alternar_mini` in ponte_imersivo.rs; cover = cached thumbnail loaded on a thread.
   - Karaoke: `lrc::palavras_lrc` (enhanced LRC word times) + `lrc::progresso_linha`; `atualizar_karaoke` runs in the 33 ms immersive timer.
-  - Videos as tracks: `ffmpeg.rs` (system `ffmpeg`/`ffprobe`: `disponivel` cached in a `OnceLock`, `sondar` duration/tags, `quadro_jpeg` cover frame, `comando` without console window on Windows; `EXT_VIDEO_NATIVO` mp4/m4v/mov decode via symphonia, `EXT_VIDEO_FFMPEG` mkv/webm/avi only listed with ffmpeg). `reproducao::Decodificado` = symphonia `Nativo` or `audio_ffmpeg::FonteFfmpeg` (PCM f32 pipe → thread → bounded channel; `next` returns silence instead of blocking the audio thread; seek respawns ffmpeg). Video duration comes from tags (symphonia gets it wrong for MP4 with a video track). In the immersive mode the track video is the background via `fundo::Reprodutor::abrir_faixa` (synced to `Player::get_pos`, reopens on jumps > 1.5 s).
+  - Videos as tracks: `ffmpeg.rs` (system `ffmpeg`/`ffprobe`: `disponivel` cached in a `OnceLock`, `sondar` duration/tags, `quadro_jpeg` cover frame, `comando` without console window on Windows; `EXT_VIDEO_NATIVO` mp4/m4v/mov decode via symphonia, `EXT_VIDEO_FFMPEG` mkv/webm/avi only listed with ffmpeg). `reproducao::Decodificado` = symphonia `Nativo` or `audio_ffmpeg::FonteFfmpeg` (PCM f32 pipe → thread → bounded channel; `next` returns silence instead of blocking the audio thread; seek respawns ffmpeg). Video duration comes from tags (symphonia gets it wrong for MP4 with a video track). `ffmpeg::sondar` results are cached on disk (`~/.cache/furinar/sondas.json`, key = path + size + mtime; saved at the end of each scan) because scanning runs on the UI thread. With ffmpeg, all videos decode through it (rodio's symphonia path takes duration from the video track and clamps seek to it); without, `VideoNativo` uses the container duration and seeks by reopening + discarding on a helper thread (silence meanwhile, then that silence is discarded too). AcoustID fingerprints videos via `audio_ffmpeg::PcmBloqueante`. In the immersive mode the track video is the background via `fundo::Reprodutor::abrir_faixa` (synced to `Player::get_pos`, reopens on jumps > 1.5 s).
   - `captura.rs` (tests only) — window-less screenshots.
   Mostly pure helpers:
   - `config.rs` — `AppConfig`, serde JSON `furinar_config.json` (XDG `~/.config/furinar/` on Linux; on Windows `%APPDATA%\Furinar`, or next to the exe when a `furinar_config.json` already exists there = portable mode, `pasta_windows`). The other JSON files sit beside it. Legacy singular `pasta` field is migrated into `pastas`.

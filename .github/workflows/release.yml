@@ -12,16 +12,19 @@ permissions:
   contents: write
 
 jobs:
+  # Lint (clippy, fmt) e testes nos dois sistemas antes de compilar qualquer
+  # coisa: a 1.8.0 e a 1.9.0 saíram com o CI vermelho por um lint novo
+  ci:
+    uses: ./.github/workflows/ci.yml
+
   build-windows:
+    needs: ci
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Test
-        run: cargo test --all-features
+        run: rustup toolchain install
 
       - name: Build
         run: cargo build --release
@@ -65,18 +68,16 @@ jobs:
             dist/furinar-windows-x86_64-setup.exe
 
   build-linux:
+    needs: ci
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+        run: rustup toolchain install
 
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y libasound2-dev libgtk-3-dev pkg-config
-
-      - name: Test
-        run: cargo test --all-features
 
       - name: Build
         run: cargo build --release

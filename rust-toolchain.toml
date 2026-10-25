@@ -1,0 +1,7 @@
+# Mesma versão do Rust aqui e no CI: lint novo de uma versão mais recente do
+# clippy aparecia só depois do push (o CI pegava o stable do dia). Atualizar
+# de propósito, trocando a versão aqui e corrigindo o que o clippy novo pedir.
+[toolchain]
+channel = "1.99.1"
+components = ["rustfmt", "clippy"]
+profile = "minimal"
