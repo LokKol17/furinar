@@ -31,9 +31,14 @@ jobs:
       - name: Install Rust
         run: rustup toolchain install
 
+      # Pacotes do apt em cache: o apt-get update + install levava de 20 s a
+      # 5 min conforme o espelho, mais que o resto do job com cache quente
       - name: Install dependencies
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libasound2-dev libgtk-3-dev pkg-config
+        uses: awalsh128/cache-apt-pkgs-action@v1
+        with:
+          packages: libasound2-dev libgtk-3-dev pkg-config
+          version: 1
 
       # Um cache por sistema, salvo só pelo master: com um por job e por
       # branch (dev, master, tags) passava dos 10 GB do GitHub e era despejado
