@@ -7,6 +7,10 @@ e o projeto adere ao [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Alterado
+
+- Metadados AppStream (`furinar.metainfo.xml`) passam a ser licenciados em CC0-1.0, como pedem o Flathub e as lojas de apps do Linux; o código continua BSD-3-Clause.
+
 ## [1.7.3] — 2026-10-23
 
 ### Adicionado
