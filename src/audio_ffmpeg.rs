@@ -108,10 +108,8 @@ fn ler_pipe(mut saida: impl Read, tx: &mpsc::SyncSender<Vec<f32>>) {
         };
         let total = sobra + lidos;
         let inteiros = total / 4 * 4;
-        let bloco: Vec<f32> = bruto[..inteiros]
-            .chunks_exact(4)
-            .map(|b| f32::from_le_bytes([b[0], b[1], b[2], b[3]]))
-            .collect();
+        let (amostras, _) = bruto[..inteiros].as_chunks::<4>();
+        let bloco: Vec<f32> = amostras.iter().map(|b| f32::from_le_bytes(*b)).collect();
         bruto.copy_within(inteiros..total, 0);
         sobra = total - inteiros;
         if !bloco.is_empty() && tx.send(bloco).is_err() {
