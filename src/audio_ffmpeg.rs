@@ -39,9 +39,12 @@ impl FonteFfmpeg {
         if !ffmpeg::disponivel() {
             return None;
         }
-        let duracao = ffmpeg::sondar(caminho)
-            .map(|s| s.duracao)
-            .filter(|d| !d.is_zero());
+        // Lofty primeiro (MP4/MOV, sem subir processo); ffprobe para o resto
+        let duracao = crate::track::duracao_container(caminho).or_else(|| {
+            ffmpeg::sondar(caminho)
+                .map(|s| s.duracao)
+                .filter(|d| !d.is_zero())
+        });
         let (filho, rx) = iniciar(caminho, Duration::ZERO)?;
         let mut fonte = Self {
             caminho: caminho.to_path_buf(),

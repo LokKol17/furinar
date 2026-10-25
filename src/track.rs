@@ -153,6 +153,15 @@ pub fn ler_tags(caminho: &std::path::Path) -> Tags {
     }
 }
 
+/// Duração exata pelo cabeçalho do container (sem tags nem capa).
+pub fn duracao_container(caminho: &std::path::Path) -> Option<std::time::Duration> {
+    let opcoes = ParseOptions::new().read_cover_art(false).read_tags(false);
+    let arquivo = Probe::open(caminho)
+        .and_then(|p| p.options(opcoes).read())
+        .ok()?;
+    Some(arquivo.properties().duration()).filter(|d| !d.is_zero())
+}
+
 /// "-7.31 dB", "+1.2 dB" ou "0.988" → número. Os picos não têm unidade.
 fn parse_decibeis(texto: &str) -> Option<f32> {
     let limpo = texto.trim();

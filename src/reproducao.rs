@@ -121,25 +121,53 @@ pub(crate) type Fonte = visualizador::Espiao<transicao::Transicao<Decodificado>>
 /// Decodificador da faixa: o symphonia, ou o `ffmpeg` do sistema para o que
 /// ele não abre (vídeos MKV/WebM/AVI, Opus...).
 pub(crate) enum Decodificado {
-    Nativo(Decoder<BufReader<File>>),
+    /// `video`: MP4/MOV com vídeo tocado sem ffmpeg (ver `VideoNativo`)
+    Nativo {
+        d: Decoder<BufReader<File>>,
+        video: Option<VideoNativo>,
+    },
     Ffmpeg(audio_ffmpeg::FonteFfmpeg),
 }
 
+/// MP4 com trilha de vídeo pelo symphonia: o rodio pega a trilha padrão do
+/// container (a de vídeo) para calcular a duração e limita o seek a ela —
+/// num clipe de 2 s dava 0,46 s, e todo seek parava ali. Aqui a duração vem
+/// do cabeçalho (lofty) e o seek reabre o arquivo e descarta até a posição.
+pub(crate) struct VideoNativo {
+    caminho: PathBuf,
+    duracao: Option<Duration>,
+}
+
+fn abrir_nativo(caminho: &Path) -> Option<Decoder<BufReader<File>>> {
+    let extensao = caminho
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+    let arquivo = File::open(caminho).ok()?;
+    let byte_len = arquivo.metadata().ok()?.len();
+    criar_decodificador(BufReader::new(arquivo), &extensao, byte_len).ok()
+}
+
 impl Decodificado {
-    /// Abre a faixa pelo symphonia; se ele não abrir, pelo `ffmpeg` (quando
-    /// houver um no PATH).
+    /// Abre a faixa. Vídeo vai pelo `ffmpeg` quando há um no PATH (seek e
+    /// duração exatos); o resto pelo symphonia, com o `ffmpeg` de reserva.
     pub(crate) fn abrir(caminho: &Path) -> Option<Self> {
-        let extensao = caminho
-            .extension()
-            .and_then(|e| e.to_str())
-            .unwrap_or("")
-            .to_lowercase();
-        if !ffmpeg::so_com_ffmpeg(caminho) {
-            let arquivo = File::open(caminho).ok()?;
-            let byte_len = arquivo.metadata().ok()?.len();
-            if let Ok(d) = criar_decodificador(BufReader::new(arquivo), &extensao, byte_len) {
-                return Some(Self::Nativo(d));
-            }
+        let video = ffmpeg::e_video(caminho);
+        if video
+            && ffmpeg::disponivel()
+            && let Some(f) = audio_ffmpeg::FonteFfmpeg::abrir(caminho)
+        {
+            return Some(Self::Ffmpeg(f));
+        }
+        if !ffmpeg::so_com_ffmpeg(caminho)
+            && let Some(d) = abrir_nativo(caminho)
+        {
+            let video = video.then(|| VideoNativo {
+                caminho: caminho.to_path_buf(),
+                duracao: track::duracao_container(caminho),
+            });
+            return Some(Self::Nativo { d, video });
         }
         audio_ffmpeg::FonteFfmpeg::abrir(caminho).map(Self::Ffmpeg)
     }
@@ -150,7 +178,7 @@ impl Iterator for Decodificado {
 
     fn next(&mut self) -> Option<rodio::Sample> {
         match self {
-            Self::Nativo(d) => d.next(),
+            Self::Nativo { d, .. } => d.next(),
             Self::Ffmpeg(f) => f.next(),
         }
     }
@@ -159,35 +187,56 @@ impl Iterator for Decodificado {
 impl rodio::Source for Decodificado {
     fn current_span_len(&self) -> Option<usize> {
         match self {
-            Self::Nativo(d) => d.current_span_len(),
+            Self::Nativo { d, .. } => d.current_span_len(),
             Self::Ffmpeg(f) => f.current_span_len(),
         }
     }
 
     fn channels(&self) -> rodio::ChannelCount {
         match self {
-            Self::Nativo(d) => d.channels(),
+            Self::Nativo { d, .. } => d.channels(),
             Self::Ffmpeg(f) => f.channels(),
         }
     }
 
     fn sample_rate(&self) -> rodio::SampleRate {
         match self {
-            Self::Nativo(d) => d.sample_rate(),
+            Self::Nativo { d, .. } => d.sample_rate(),
             Self::Ffmpeg(f) => f.sample_rate(),
         }
     }
 
     fn total_duration(&self) -> Option<Duration> {
         match self {
-            Self::Nativo(d) => d.total_duration(),
+            Self::Nativo { video: Some(v), .. } => v.duracao,
+            Self::Nativo { d, .. } => d.total_duration(),
             Self::Ffmpeg(f) => f.total_duration(),
         }
     }
 
     fn try_seek(&mut self, pos: Duration) -> Result<(), rodio::source::SeekError> {
         match self {
-            Self::Nativo(d) => d.try_seek(pos),
+            Self::Nativo { d, video: Some(v) } => {
+                // Do começo, decodificando até a posição (AAC decodifica
+                // centenas de vezes mais rápido que o tempo real)
+                let mut novo = abrir_nativo(&v.caminho).ok_or_else(|| {
+                    rodio::source::SeekError::Other(std::sync::Arc::new(std::io::Error::other(
+                        "não reabriu",
+                    )))
+                })?;
+                let por_segundo = novo.sample_rate().get() as u128 * novo.channels().get() as u128;
+                let pular = pos.as_nanos() * por_segundo / 1_000_000_000;
+                // Múltiplo do número de canais: não troca esquerda e direita
+                let pular = pular - pular % novo.channels().get() as u128;
+                for _ in 0..pular {
+                    if novo.next().is_none() {
+                        break;
+                    }
+                }
+                *d = novo;
+                Ok(())
+            }
+            Self::Nativo { d, .. } => d.try_seek(pos),
             Self::Ffmpeg(f) => f.try_seek(pos),
         }
     }
@@ -228,10 +277,6 @@ pub(crate) fn abrir_fonte(
     // Seek na mesma faixa: a duração já é conhecida
     let total_secs = if estado.duracao_de.as_deref() == Some(caminho) {
         estado.duracao_total_secs
-    } else if ffmpeg::e_video(caminho) {
-        // O symphonia dá a duração errada em MP4 com faixa de vídeo
-        // (0,46 s num clipe de 2 s); o cabeçalho do container acerta
-        track::ler_tags(caminho).duracao as u64
     } else if extensao == "mp3" {
         mp3_duration::from_path(caminho)
             .map(|d| d.as_secs())
@@ -1261,28 +1306,46 @@ mod tests {
     }
 
     #[test]
-    fn mp4_toca_nativo_e_webm_pelo_ffmpeg() {
+    fn videos_tocam_com_duracao_e_seek_certos() {
         let casos = [
-            ("mp4", &["-c:v", "mpeg4", "-c:a", "aac"][..], true),
-            ("webm", &["-c:v", "libvpx", "-c:a", "libopus"][..], false),
+            ("mp4", &["-c:v", "mpeg4", "-c:a", "aac"][..]),
+            ("webm", &["-c:v", "libvpx", "-c:a", "libopus"][..]),
         ];
-        for (ext, codecs, nativo) in casos {
+        for (ext, codecs) in casos {
             let Some(caminho) = video_de_teste(ext, codecs) else {
                 eprintln!("sem ffmpeg/codificador para {ext}: pulado");
                 continue;
             };
+            // Com ffmpeg, vídeo sempre vai por ele
             let fonte = Decodificado::abrir(&caminho).expect("vídeo deve abrir");
-            assert_eq!(matches!(fonte, Decodificado::Nativo(_)), nativo, "{ext}");
-            // Áudio inteiro (o nativo dá para contar: não espera por pipe)
-            if let Decodificado::Nativo(d) = fonte {
-                let taxa = d.sample_rate().get() as f64 * d.channels().get() as f64;
-                let segundos = d.count() as f64 / taxa;
-                assert!((segundos - 2.0).abs() < 0.2, "{ext}: {segundos} s");
-            }
+            assert!(matches!(fonte, Decodificado::Ffmpeg(_)), "{ext}");
+            let total = fonte.total_duration().unwrap().as_secs_f64();
+            assert!((total - 2.0).abs() < 0.1, "{ext}: duração {total} s");
 
             let tags = track::ler_tags(&caminho);
             assert_eq!(tags.titulo, "Clipe", "{ext}");
             assert_eq!(tags.duracao, 2, "{ext}");
+
+            // Sem ffmpeg, o MP4 vai pelo symphonia: duração do container e
+            // seek reabrindo (o do rodio parava em 0,46 s)
+            if ext == "mp4" {
+                let mut nativo = Decodificado::Nativo {
+                    d: abrir_nativo(&caminho).unwrap(),
+                    video: Some(VideoNativo {
+                        caminho: caminho.clone(),
+                        duracao: track::duracao_container(&caminho),
+                    }),
+                };
+                let total = nativo.total_duration().unwrap().as_secs_f64();
+                assert!((total - 2.0).abs() < 0.1, "nativo: duração {total} s");
+                nativo.try_seek(Duration::from_millis(1500)).unwrap();
+                let taxa = nativo.sample_rate().get() as f64 * nativo.channels().get() as f64;
+                let resto = nativo.count() as f64 / taxa;
+                assert!(
+                    (resto - 0.5).abs() < 0.1,
+                    "nativo: depois do seek {resto} s"
+                );
+            }
             let _ = std::fs::remove_file(caminho);
         }
     }
