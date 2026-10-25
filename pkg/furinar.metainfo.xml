@@ -60,6 +60,11 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="1.9.0" date="2026-10-25">
+      <description>
+        <p>Video-only view in the immersive mode (V key): no text, controls or dimming over the video. Video tracks get their own icon in the track lists. Fixed the duration and seeking of MP4 files with video.</p>
+      </description>
+    </release>
     <release version="1.8.0" date="2026-10-25">
       <description>
         <p>Videos play as tracks: MP4/MOV/M4V natively, MKV/WebM/AVI through the system ffmpeg. The normal window plays only the audio; in the immersive mode the video itself becomes the background, in sync with the music.</p>

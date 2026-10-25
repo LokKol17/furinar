@@ -7,6 +7,18 @@ e o projeto adere ao [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.9.0] — 2026-10-25
+
+### Adicionado
+
+- Modo "só o vídeo" no modo imersivo (tecla `V` ou botão de vídeo, só em faixa de vídeo): esconde título, letra, controles e o véu escuro, deixando o vídeo inteiro em brilho normal. Mexer o mouse mostra só um botão para voltar; `Esc` também sai.
+- Faixas de vídeo têm um ícone próprio na lista da janela normal e um selo na capa no painel da biblioteca do modo imersivo.
+
+### Corrigido
+
+- Duração e seek de MP4 com vídeo: o decodificador calculava a duração pela trilha de vídeo (um clipe de 2 s aparecia com 0,46 s) e todo seek parava nesse ponto, o que também dessincronizava o vídeo de fundo. Com `ffmpeg` no sistema o áudio de vídeos passa por ele (seek exato); sem ele, a duração vem do cabeçalho do arquivo e o seek reabre a faixa e avança até a posição.
+- `make sync-version` reescrevia a última entrada de release do metainfo AppStream com a versão nova; agora só acrescenta uma entrada nova (com a data do CHANGELOG) e nunca mexe no histórico, e o `make check-version` cobra a descrição dela.
+
 ## [1.8.0] — 2026-10-25
 
 ### Adicionado
