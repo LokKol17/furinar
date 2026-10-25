@@ -7,6 +7,19 @@ e o projeto adere ao [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.9.1] — 2026-10-25
+
+### Corrigido
+
+- Varrer pastas com MKV/WebM não congela mais a janela a cada vídeo: duração e tags lidas pelo `ffprobe` ficam num cache em disco (`sondas.json`, ao lado do cache de capas), refeito só para arquivo novo ou modificado.
+- Sem `ffmpeg`, o seek em MP4 com vídeo não trava mais o áudio: o arquivo é reaberto e avançado numa thread à parte, com silêncio enquanto isso, sem desalinhar a posição.
+- Identificação pelo som (AcoustID) funciona em vídeos: MKV/WebM (e MP4 com vídeo) têm o áudio lido pelo `ffmpeg` para a impressão digital, com a duração certa.
+
+### Alterado
+
+- Release só é compilada depois que o CI (lint e testes, Linux e Windows) passa no commit da tag; a 1.8.0 e a 1.9.0 saíram com um aviso do clippy novo, sem problema no app.
+- Versão do Rust fixada em `rust-toolchain.toml`, a mesma localmente e no CI.
+
 ## [1.9.0] — 2026-10-25
 
 ### Adicionado

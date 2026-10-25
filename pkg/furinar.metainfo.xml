@@ -60,6 +60,11 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="1.9.1" date="2026-10-25">
+      <description>
+        <p>Scanning folders with MKV/WebM videos no longer freezes the window (probe results are cached). Seeking MP4 videos without ffmpeg no longer stalls the audio. Sound-based identification (AcoustID) now works for videos.</p>
+      </description>
+    </release>
     <release version="1.9.0" date="2026-10-25">
       <description>
         <p>Video-only view in the immersive mode (V key): no text, controls or dimming over the video. Video tracks get their own icon in the track lists. Fixed the duration and seeking of MP4 files with video.</p>
