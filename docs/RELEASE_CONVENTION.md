@@ -124,10 +124,12 @@ Os artefatos gerados ficam em `dist/`.
 4. Escrever em inglês a descrição dessa `<release>` (vem com um TODO) e rodar
    `make check-version`, que falha enquanto o TODO estiver lá
 5. Rodar `make release` (precisa de um build em cada plataforma)
-6. Criar a tag: `git tag vX.Y.Z`
-7. Criar a release no GitHub com a tag correspondente
-8. Copiar o título do CHANGELOG como descrição da release
-9. Upload dos assets gerados
+6. Mandar `dev` e `master` (`git push origin dev dev:master`) e esperar o CI
+   do `master` ficar verde: a release reaproveita esse resultado e não roda o
+   CI de novo (se não houver CI verde no commit, ela roda antes de compilar)
+7. Criar e mandar a tag (`git tag -a vX.Y.Z -m vX.Y.Z && git push origin vX.Y.Z`):
+   o workflow de release compila Linux e Windows, monta o instalador, gera o
+   `SHA256SUMS` e publica a release com as notas da seção do CHANGELOG
 
 ---
 

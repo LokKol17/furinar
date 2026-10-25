@@ -10,15 +10,37 @@ on:
 
 permissions:
   contents: write
+  # gh run list: procurar o CI do commit da tag
+  actions: read
 
 jobs:
-  # Lint (clippy, fmt) e testes nos dois sistemas antes de compilar qualquer
-  # coisa: a 1.8.0 e a 1.9.0 saíram com o CI vermelho por um lint novo
+  # Nada é compilado sem lint e testes verdes (a 1.8.0 e a 1.9.0 saíram com
+  # o CI vermelho). O commit da tag normalmente já passou no CI do master:
+  # então não roda de novo, só confere.
+  verificar:
+    runs-on: ubuntu-latest
+    outputs:
+      ci_ok: ${{ steps.ci.outputs.ok }}
+    steps:
+      - id: ci
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          n=$(gh run list -R "$GITHUB_REPOSITORY" --workflow ci.yml --commit "$GITHUB_SHA" --status success --json databaseId -q 'length')
+          echo "CI verde neste commit: $n execução(ões)"
+          if [ "$n" -gt 0 ]; then echo "ok=true" >> "$GITHUB_OUTPUT"; else echo "ok=false" >> "$GITHUB_OUTPUT"; fi
+
+  # Sem CI verde no commit (tag em commit que não passou pelo master, ou CI
+  # ainda rodando): roda aqui
   ci:
+    needs: verificar
+    if: needs.verificar.outputs.ci_ok != 'true'
     uses: ./.github/workflows/ci.yml
 
   build-windows:
-    needs: ci
+    needs: [verificar, ci]
+    # ci pulado (já estava verde) conta como ok; falhou, não compila
+    if: ${{ !cancelled() && !failure() }}
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -68,7 +90,9 @@ jobs:
             dist/furinar-windows-x86_64-setup.exe
 
   build-linux:
-    needs: ci
+    needs: [verificar, ci]
+    # ci pulado (já estava verde) conta como ok; falhou, não compila
+    if: ${{ !cancelled() && !failure() }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -95,7 +119,8 @@ jobs:
 
   release:
     needs: [build-windows, build-linux]
-    if: startsWith(github.ref, 'refs/tags/')
+    # !failure(): sem isso o ci pulado lá atrás pularia este também
+    if: ${{ !cancelled() && !failure() && startsWith(github.ref, 'refs/tags/') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

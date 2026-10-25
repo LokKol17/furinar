@@ -17,7 +17,8 @@ Linux build deps: `libasound2-dev libgtk-3-dev pkg-config`.
   - `cargo clippy --all-targets --all-features -- -D warnings`
   - `cargo clippy --all-targets --no-default-features -- -D warnings`
   - Windows-only code (`cfg(target_os = "windows")`) is checked locally with `--target x86_64-pc-windows-gnu` (`rustup target add x86_64-pc-windows-gnu` once per pinned toolchain).
-- Release workflow calls `ci.yml` (`workflow_call`) first; the builds only run if lint + tests pass.
+- CI (`ci.yml`): one job per OS (fmt, both clippy variants, both test variants), runs on push to `master` and on PRs only — `dev` reaches `master` by fast-forward, so push both together. `rust-cache` is saved only from `master` (the default branch; its cache is readable by PRs and tags) to stay under GitHub's 10 GB cache limit.
+- Release (`release.yml`): `verificar` looks for a green `ci.yml` run on the tag's commit; only if there is none does it call `ci.yml` (`workflow_call`). Builds run only if CI passed or was skipped as already green. So: push `dev` + `master`, wait for CI, then tag.
 - Tests: `cargo test --all-features` and `cargo test --no-default-features`
 - Single test: `cargo test <name>` (e.g. `cargo test m4a_permite_seek`). Tests are inline `#[cfg(test)] mod tests` in each module; audio fixtures live in `tests/fixtures/` (loaded via `CARGO_MANIFEST_DIR`).
 - Packaging: `make deb | rpm | tarball | release` (`make help` lists all).
