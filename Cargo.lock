@@ -1553,7 +1553,7 @@ dependencies = [
 
 [[package]]
 name = "furinar"
-version = "1.7.3"
+version = "1.8.0"
 dependencies = [
  "base64 0.22.1",
  "chrono",

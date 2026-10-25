@@ -60,6 +60,11 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="1.8.0" date="2026-10-25">
+      <description>
+        <p>Videos play as tracks: MP4/MOV/M4V natively, MKV/WebM/AVI through the system ffmpeg. The normal window plays only the audio; in the immersive mode the video itself becomes the background, in sync with the music.</p>
+      </description>
+    </release>
     <release version="1.7.3" date="2026-10-23">
       <description>
         <p>The Discord status shows the album cover of the current track instead of the Furinar logo (from the MusicBrainz match, or looked up on Deezer).</p>

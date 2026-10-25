@@ -7,6 +7,13 @@ e o projeto adere ao [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.8.0] — 2026-10-25
+
+### Adicionado
+
+- Vídeos como faixas: MP4/MOV/M4V entram na biblioteca e tocam direto; MKV/WebM/AVI (áudio Opus etc.) tocam com o `ffmpeg` do sistema, e sem ele nem aparecem na lista. Na janela normal e no mini player toca só o áudio, sem decodificar vídeo. No modo imersivo, o próprio vídeo vira o fundo, em sincronia com a música: pausa junto e acompanha o seek.
+- Vídeo sem capa embutida ganha como capa um quadro dele mesmo (via `ffmpeg`, guardado no cache de miniaturas). Título, artista e duração de MKV/WebM vêm do `ffprobe`.
+
 ### Alterado
 
 - Metadados AppStream (`furinar.metainfo.xml`) passam a ser licenciados em CC0-1.0, como pedem o Flathub e as lojas de apps do Linux; o código continua BSD-3-Clause.
