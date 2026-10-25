@@ -29,6 +29,7 @@ pub(crate) fn atualizar_lista(estado: &mut EstadoAudio, ui: &MainWindow) {
                 favorita: pasta
                     .chave_faixa(i)
                     .is_some_and(|k| estado.biblioteca.e_favorita(&k)),
+                video: ffmpeg::e_video(Path::new(&pasta.tracks[i].path)),
             })
             .collect(),
         None => Vec::new(),

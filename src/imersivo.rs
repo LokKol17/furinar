@@ -122,6 +122,7 @@ impl EstadoImersivo {
     pub fn trocar_faixa(&mut self, ui: &MainWindow, faixa: Option<Faixa>) {
         let Some(faixa) = faixa else {
             self.faixa = None;
+            ui.set_imv_e_video(false);
             limpar_faixa(ui);
             return;
         };
@@ -133,9 +134,11 @@ impl EstadoImersivo {
         if let Some(video) = Reprodutor::abrir_faixa(&faixa.caminho) {
             self.fundo = Some(video);
             self.fundo_novo = true;
+            ui.set_imv_e_video(true);
             self.mostrar_dados(ui, faixa);
             return;
         }
+        ui.set_imv_e_video(false);
 
         // Mesmo fundo da faixa anterior (mesma pasta): continua tocando sem
         // reiniciar. Vídeo sem ffmpeg no PATH não abre e cai para a capa.
@@ -310,6 +313,8 @@ pub fn limpar_ui(ui: &MainWindow) {
     ui.set_imv_barras(slint::ModelRc::default());
     ui.set_imv_painel_aberto(false);
     ui.set_imv_so_letra(false);
+    ui.set_imv_e_video(false);
+    ui.set_imv_so_video(false);
     ui.set_imv_config_aberta(false);
     ui.set_imv_relogio(SharedString::new());
     ui.set_imv_proxima(SharedString::new());

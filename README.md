@@ -147,6 +147,7 @@ Track info screen (`I`):
 | `Esc` | Closes whatever is open; in immersive mode, layer by layer until it leaves |
 | `L` / `/` | Immersive: library drawer / search |
 | `H` | Immersive: lyrics only |
+| `V` | Immersive, video track: video only (no text, controls or dimming) |
 
 ## 🚀 Installation
 

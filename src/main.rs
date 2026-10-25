@@ -165,6 +165,7 @@ fn aplicar_idioma(idioma: &str, ui: &MainWindow) {
     i18n.set_up_next(g("up_next"));
     i18n.set_up_next_empty(g("up_next_empty"));
     i18n.set_tip_lyrics_only(g("tip_lyrics_only"));
+    i18n.set_tip_video_only(g("tip_video_only"));
     i18n.set_tip_sleep(g("tip_sleep"));
     i18n.set_tip_info(g("tip_info"));
     i18n.set_info_tab_track(g("info_tab_track"));

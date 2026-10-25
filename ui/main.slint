@@ -9,6 +9,8 @@ import { MiniPlayer } from "mini.slint";
 export struct LinhaLista {
     texto: string,
     favorita: bool,
+    /// Arquivo de vídeo (toca o vídeo no fundo do modo imersivo)
+    video: bool,
 }
 
 export component MainWindow inherits Window {
@@ -168,6 +170,8 @@ export component MainWindow inherits Window {
     private property <int> imv_pedido_rolar: 0;
     private property <int> imv_pedido_busca: 0;
     in-out property <bool> imv_so_letra: false;
+    in property <bool> imv_e_video: false;
+    in-out property <bool> imv_so_video: false;
     in-out property <bool> imv_config_aberta: false;
     /// Controles escondidos por inatividade
     in-out property <bool> imv_ocioso: false;
@@ -269,6 +273,8 @@ export component MainWindow inherits Window {
                     imv_config_aberta = false;
                 } else if (imv_painel_aberto) {
                     imv_painel_aberto = false;
+                } else if (imv_so_video && imv_e_video) {
+                    imv_so_video = false;
                 } else if (imv_so_letra) {
                     imv_so_letra = false;
                 } else {
@@ -290,6 +296,9 @@ export component MainWindow inherits Window {
                 return accept;
             } else if (modo_imersivo && (event.text == "h" || event.text == "H")) {
                 imv_so_letra = !imv_so_letra;
+                return accept;
+            } else if (modo_imersivo && imv_e_video && (event.text == "v" || event.text == "V")) {
+                imv_so_video = !imv_so_video;
                 return accept;
             } else if (modo_imersivo && !imv_painel_aberto && (event.text == Key.UpArrow || event.text == Key.DownArrow || event.text == Key.Return)) {
                 // Sem o painel não há lista à vista para navegar
@@ -805,13 +814,21 @@ export component MainWindow inherits Window {
                                 background: Tema.dourado;
                             }
 
+                            if musica.video : Image {
+                                x: 14px;
+                                y: (parent.height - self.height) / 2;
+                                width: 14px;
+                                height: 14px;
+                                source: @image-url("icons/video.svg");
+                                colorize: Tema.texto_suave;
+                            }
                             Text {
                                 text: musica.texto;
                                 color: Tema.texto;
                                 font-size: 13px;
                                 vertical-alignment: center;
-                                x: 14px;
-                                width: parent.width - 52px;
+                                x: musica.video ? 36px : 14px;
+                                width: parent.width - self.x - 38px;
                                 overflow: elide;
                             }
 
@@ -1014,6 +1031,8 @@ export component MainWindow inherits Window {
         pedido_rolar: imv_pedido_rolar;
         pedido_busca: imv_pedido_busca;
         so_letra <=> imv_so_letra;
+        e_video: imv_e_video;
+        so_video <=> imv_so_video;
         relogio: imv_relogio;
         sono: sono_texto;
         letra_livre: letra_livre;

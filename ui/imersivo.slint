@@ -218,6 +218,10 @@ export component TelaImersiva inherits Rectangle {
 
     /// Só a letra sobre o fundo (tecla H)
     in-out property <bool> so_letra: false;
+    /// A faixa é um vídeo e ele está no fundo
+    in property <bool> e_video: false;
+    /// Só o vídeo (tecla V): sem texto, controles nem véu escurecendo
+    in-out property <bool> so_video: false;
     in property <string> relogio: "";
     /// Indicador do temporizador de sono ("" = desligado)
     in property <string> sono: "";
@@ -313,9 +317,14 @@ export component TelaImersiva inherits Rectangle {
     property <length> y_cartao: root.y_visualizador - 18px - root.lado_capa;
     // Largura que sobra à esquerda do painel; segue a gaveta enquanto ela anima
     property <length> largura_util: painel.x;
-    /// Cartão, visualizador e controles somem no modo só letra
-    property <float> opacidade_extras: root.so_letra ? 0 : 1;
+    /// Modo só vídeo valendo (a faixa pode ter deixado de ser vídeo)
+    property <bool> limpo: root.so_video && root.e_video;
+    /// Cartão, visualizador e controles somem no modo só letra e no só vídeo
+    property <float> opacidade_extras: root.so_letra || root.limpo ? 0 : 1;
     animate opacidade_extras { duration: 450ms; easing: ease-in-out; }
+    /// Letra e véu: somem só no modo só vídeo
+    property <float> opacidade_texto: root.limpo ? 0 : 1;
+    animate opacidade_texto { duration: 450ms; easing: ease-in-out; }
 
     changed painel_aberto => {
         root.acordar();
@@ -340,7 +349,7 @@ export component TelaImersiva inherits Rectangle {
 
     // Fundo (capa desfocada, imagem, GIF ou vídeo). Cresce um pouco com o
     // pulso, a partir do centro.
-    property <float> zoom: 1 + root.pulso * 0.035;
+    property <float> zoom: root.limpo ? 1 : 1 + root.pulso * 0.035;
     Image {
         visible: root.tem_fundo && self.opacity > 0;
         width: root.width * root.zoom;
@@ -370,7 +379,8 @@ export component TelaImersiva inherits Rectangle {
     // uma parada no meio o renderer de software deixa uma linha na emenda.
     Rectangle {
         background: @linear-gradient(180deg, #00000059 0%, #000000d0 100%);
-        opacity: 1 - root.pulso * 0.3;
+        visible: root.opacidade_texto > 0;
+        opacity: (1 - root.pulso * 0.3) * root.opacidade_texto;
     }
 
     // Área inteira: mouse se mexendo acorda os controles. Fica embaixo dos
@@ -397,6 +407,8 @@ export component TelaImersiva inherits Rectangle {
         height: (root.so_letra ? root.height * 0.94 : root.y_cartao - 24px) - self.y;
         animate height { duration: 450ms; easing: ease-in-out; }
         clip: true;
+        visible: root.opacidade_texto > 0;
+        opacity: root.opacidade_texto;
 
         // Desloca o bloco para a linha atual ficar no centro
         property <length> desloc: self.height / 2 - (max(0, root.letra_indice) + 0.5) * root.altura_linha;
@@ -639,7 +651,7 @@ export component TelaImersiva inherits Rectangle {
 
     // Prévia da próxima: aparece por cima do cartão nos últimos segundos
     previa := Rectangle {
-        property <bool> ativa: root.texto_proxima != "" && !root.so_letra;
+        property <bool> ativa: root.texto_proxima != "" && !root.so_letra && !root.limpo;
         x: root.margem;
         y: root.y_cartao - 46px + (self.ativa ? 0px : 12px);
         width: min(root.largura_util - 2 * root.margem, previa_texto.preferred-width + 34px);
@@ -669,6 +681,27 @@ export component TelaImersiva inherits Rectangle {
             font-weight: 600;
             vertical-alignment: center;
             overflow: elide;
+        }
+    }
+
+    // Só vídeo: um botão só para voltar, que aparece ao mexer o mouse
+    // (com fundo próprio: sem o véu, o vídeo pode ser claro atrás dele)
+    if root.limpo : Rectangle {
+        x: 18px;
+        y: 18px;
+        width: 36px;
+        height: 36px;
+        border-radius: 18px;
+        background: #00000080;
+        opacity: root.ocioso ? 0 : 1;
+        animate opacity { duration: 450ms; easing: ease-in-out; }
+
+        BotaoImersivo {
+            icone: @image-url("icons/video.svg");
+            dica: I18n.tip_video_only;
+            ativo: true;
+            cor: root.destaque;
+            clicado => { root.so_video = false; }
         }
     }
 
@@ -791,6 +824,12 @@ export component TelaImersiva inherits Rectangle {
                 icone: @image-url("icons/letra.svg");
                 dica: I18n.tip_lyrics_only;
                 clicado => { root.so_letra = true; }
+            }
+            if root.e_video : BotaoImersivo {
+                y: (parent.height - self.height) / 2;
+                icone: @image-url("icons/video.svg");
+                dica: I18n.tip_video_only;
+                clicado => { root.so_video = true; }
             }
             BotaoImersivo {
                 y: (parent.height - self.height) / 2;

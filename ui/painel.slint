@@ -18,6 +18,8 @@ export struct LinhaPainel {
     tem_capa: bool,
     tocando: bool,
     favorita: bool,
+    /// Arquivo de vídeo: selo no canto da capa
+    video: bool,
 }
 
 export struct CartaoAlbum {
@@ -68,6 +70,25 @@ component Linha inherits Rectangle {
             x: (parent.width - self.width) / 2;
             y: (parent.height - self.height) / 2;
             colorize: #ffffff80;
+        }
+
+        // Vídeo: selo no canto da capa (some enquanto toca, sob o equalizador)
+        if root.dados.video && !root.dados.tocando : Rectangle {
+            x: parent.width - self.width - 2px;
+            y: parent.height - self.height - 2px;
+            width: 18px;
+            height: 14px;
+            border-radius: 3px;
+            background: #000000b0;
+
+            Image {
+                width: 11px;
+                height: 11px;
+                x: (parent.width - self.width) / 2;
+                y: (parent.height - self.height) / 2;
+                source: @image-url("icons/video.svg");
+                colorize: #ffffff;
+            }
         }
 
         // Tocando: mini equalizador sobre a capa, puxado do visualizador

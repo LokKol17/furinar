@@ -147,6 +147,7 @@ Tela de informações da faixa (`I`):
 | `Esc` | Fecha o que estiver aberto; no imersivo, em camadas até sair |
 | `L` / `/` | Imersivo: painel da biblioteca / busca |
 | `H` | Imersivo: só a letra |
+| `V` | Imersivo, faixa de vídeo: só o vídeo (sem texto, controles nem escurecer) |
 
 ## 🚀 Instalação
 

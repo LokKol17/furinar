@@ -21,6 +21,7 @@ pub fn pt_br() -> Translations {
     t.insert("up_next", "A seguir");
     t.insert("up_next_empty", "Nada na fila.");
     t.insert("tip_lyrics_only", "Só a letra (H)");
+    t.insert("tip_video_only", "Só o vídeo (V)");
     t.insert("tip_sleep", "Temporizador de sono");
     t.insert("sleep_end", "Fim da faixa");
     t.insert("tip_info", "Informações da faixa (I)");
@@ -188,6 +189,7 @@ pub fn en() -> Translations {
     t.insert("up_next", "Up next");
     t.insert("up_next_empty", "Nothing queued.");
     t.insert("tip_lyrics_only", "Lyrics only (H)");
+    t.insert("tip_video_only", "Video only (V)");
     t.insert("tip_sleep", "Sleep timer");
     t.insert("sleep_end", "End of track");
     t.insert("tip_info", "Track info (I)");

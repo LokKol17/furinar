@@ -335,6 +335,10 @@ fn captura_modo_imersivo() {
     if std::env::var_os("FURINAR_CAPTURA_OCIOSO").is_some() {
         ui.set_imv_ocioso(true);
     }
+    // FURINAR_CAPTURA_SO_VIDEO=1 (com faixa de vídeo): modo só vídeo
+    if std::env::var_os("FURINAR_CAPTURA_SO_VIDEO").is_some() {
+        ui.set_imv_so_video(true);
+    }
     // Faixa de vídeo: a "música" fica parada aos 5 s, o quadro de lá aparece
     for _ in 0..40 {
         let posicao = Some(Duration::from_secs(5));

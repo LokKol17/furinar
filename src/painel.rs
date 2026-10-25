@@ -349,6 +349,7 @@ fn linha(item: &Item, info: Option<&Info>) -> LinhaPainel {
         capa: capa.unwrap_or_default(),
         tocando: item.tocando,
         favorita: item.favorita,
+        video: crate::ffmpeg::e_video(&item.caminho),
     }
 }
 
