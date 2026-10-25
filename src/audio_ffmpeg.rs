@@ -66,14 +66,18 @@ impl FonteFfmpeg {
     }
 }
 
-/// Sobe o `ffmpeg` a partir de `inicio` e a thread que lê o pipe.
-fn iniciar(caminho: &Path, inicio: Duration) -> Option<(Child, Receiver<Vec<f32>>)> {
-    let mut filho = ffmpeg::comando("ffmpeg")
-        .args(["-v", "error", "-nostdin", "-ss"])
+/// `ffmpeg` mandando PCM f32 estéreo 48 kHz pelo stdout, de `inicio` até o
+/// fim (ou só `limite`).
+fn subir_pcm(caminho: &Path, inicio: Duration, limite: Option<Duration>) -> Option<Child> {
+    let mut cmd = ffmpeg::comando("ffmpeg");
+    cmd.args(["-v", "error", "-nostdin", "-ss"])
         .arg(format!("{:.3}", inicio.as_secs_f64()))
         .arg("-i")
-        .arg(caminho)
-        .args(["-vn", "-sn", "-f", "f32le", "-ac"])
+        .arg(caminho);
+    if let Some(l) = limite {
+        cmd.arg("-t").arg(format!("{:.3}", l.as_secs_f64()));
+    }
+    cmd.args(["-vn", "-sn", "-f", "f32le", "-ac"])
         .arg(CANAIS.to_string())
         .arg("-ar")
         .arg(TAXA.to_string())
@@ -82,7 +86,59 @@ fn iniciar(caminho: &Path, inicio: Duration) -> Option<(Child, Receiver<Vec<f32>
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
         .spawn()
-        .ok()?;
+        .ok()
+}
+
+/// PCM lido direto do pipe, esperando o `ffmpeg`: para quem não toca em
+/// tempo real (impressão digital do AcoustID, numa thread própria).
+pub struct PcmBloqueante {
+    filho: Child,
+    leitor: std::io::BufReader<std::process::ChildStdout>,
+}
+
+impl PcmBloqueante {
+    /// Os primeiros `limite` do áudio. `None` sem `ffmpeg`.
+    pub fn abrir(caminho: &Path, limite: Duration) -> Option<Self> {
+        if !ffmpeg::disponivel() {
+            return None;
+        }
+        let mut filho = subir_pcm(caminho, Duration::ZERO, Some(limite))?;
+        let saida = filho.stdout.take()?;
+        Some(Self {
+            filho,
+            leitor: std::io::BufReader::with_capacity(BLOCO * 4, saida),
+        })
+    }
+
+    pub fn taxa(&self) -> u32 {
+        TAXA
+    }
+
+    pub fn canais(&self) -> u32 {
+        CANAIS as u32
+    }
+}
+
+impl Iterator for PcmBloqueante {
+    type Item = f32;
+
+    fn next(&mut self) -> Option<f32> {
+        let mut b = [0u8; 4];
+        self.leitor.read_exact(&mut b).ok()?;
+        Some(f32::from_le_bytes(b))
+    }
+}
+
+impl Drop for PcmBloqueante {
+    fn drop(&mut self) {
+        let _ = self.filho.kill();
+        let _ = self.filho.wait();
+    }
+}
+
+/// Sobe o `ffmpeg` a partir de `inicio` e a thread que lê o pipe.
+fn iniciar(caminho: &Path, inicio: Duration) -> Option<(Child, Receiver<Vec<f32>>)> {
+    let mut filho = subir_pcm(caminho, inicio, None)?;
     let saida = filho.stdout.take()?;
     let (tx, rx) = mpsc::sync_channel(BLOCOS_NO_CANAL);
     let lancou = std::thread::Builder::new()

@@ -8,6 +8,7 @@
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
+use std::time::Duration;
 
 use base64::Engine;
 use rodio::Source;
@@ -24,18 +25,7 @@ const SEGUNDOS: u64 = 120;
 /// Impressão digital comprimida (base64, como o `fpcalc` gera) e a duração
 /// da faixa em segundos.
 pub fn impressao(caminho: &Path) -> Option<(String, u32)> {
-    let arquivo = File::open(caminho).ok()?;
-    let byte_len = arquivo.metadata().ok()?.len();
-    let extensao = caminho
-        .extension()
-        .and_then(|e| e.to_str())
-        .unwrap_or("")
-        .to_lowercase();
-    let decodificador =
-        crate::criar_decodificador(BufReader::new(arquivo), &extensao, byte_len).ok()?;
-    let taxa = decodificador.sample_rate().get();
-    let canais = decodificador.channels().get() as u32;
-    let duracao = decodificador.total_duration().map(|d| d.as_secs() as u32);
+    let (amostras, taxa, canais, duracao) = abrir_pcm(caminho)?;
 
     let config = Configuration::preset_test2();
     let mut fp = Fingerprinter::new(&config);
@@ -43,7 +33,7 @@ pub fn impressao(caminho: &Path) -> Option<(String, u32)> {
     let limite = (SEGUNDOS * taxa as u64 * canais as u64) as usize;
     let mut lote = Vec::with_capacity(8192);
     let mut lidas = 0usize;
-    for amostra in decodificador {
+    for amostra in amostras {
         lote.push((amostra.clamp(-1.0, 1.0) * i16::MAX as f32) as i16);
         lidas += 1;
         if lote.len() == lote.capacity() {
@@ -63,6 +53,55 @@ pub fn impressao(caminho: &Path) -> Option<(String, u32)> {
     let texto = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(comprimida);
     let duracao = duracao.unwrap_or((lidas as u64 / (taxa as u64 * canais as u64).max(1)) as u32);
     Some((texto, duracao))
+}
+
+/// Amostras, taxa, canais e duração (s). Vídeo vai pelo `ffmpeg` quando há
+/// um (o symphonia erra a duração de MP4 com vídeo, e MKV/WebM ele nem
+/// abre); o resto pelo symphonia, com o `ffmpeg` de reserva.
+type Pcm = (Box<dyn Iterator<Item = f32>>, u32, u32, Option<u32>);
+
+fn abrir_pcm(caminho: &Path) -> Option<Pcm> {
+    let video = crate::ffmpeg::e_video(caminho);
+    let pelo_ffmpeg = || {
+        let pcm =
+            crate::audio_ffmpeg::PcmBloqueante::abrir(caminho, Duration::from_secs(SEGUNDOS))?;
+        let duracao = crate::track::duracao_container(caminho)
+            .or_else(|| crate::ffmpeg::sondar(caminho).map(|s| s.duracao))
+            .map(|d| d.as_secs() as u32);
+        let (taxa, canais) = (pcm.taxa(), pcm.canais());
+        Some((
+            Box::new(pcm) as Box<dyn Iterator<Item = f32>>,
+            taxa,
+            canais,
+            duracao,
+        ))
+    };
+    if video && let Some(pcm) = pelo_ffmpeg() {
+        return Some(pcm);
+    }
+    if !crate::ffmpeg::so_com_ffmpeg(caminho) {
+        let nativo = File::open(caminho).ok().and_then(|arquivo| {
+            let byte_len = arquivo.metadata().ok()?.len();
+            let extensao = caminho
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or("")
+                .to_lowercase();
+            crate::criar_decodificador(BufReader::new(arquivo), &extensao, byte_len).ok()
+        });
+        if let Some(d) = nativo {
+            let taxa = d.sample_rate().get();
+            let canais = d.channels().get() as u32;
+            let duracao = if video {
+                crate::track::duracao_container(caminho)
+            } else {
+                d.total_duration()
+            };
+            let duracao = duracao.map(|d| d.as_secs() as u32);
+            return Some((Box::new(d), taxa, canais, duracao));
+        }
+    }
+    pelo_ffmpeg()
 }
 
 #[derive(Debug, Deserialize)]
@@ -139,6 +178,34 @@ fn notas(resultados: Vec<Resultado>, duracao: u32) -> Vec<(String, u8)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// WebM com Opus (o symphonia não abre): a impressão vem pelo ffmpeg.
+    #[test]
+    fn impressao_de_video_webm_pelo_ffmpeg() {
+        if !crate::ffmpeg::disponivel() {
+            eprintln!("sem ffmpeg: teste pulado");
+            return;
+        }
+        let caminho = std::env::temp_dir().join(format!(
+            "furinar-teste-acoustid-{}.webm",
+            std::process::id()
+        ));
+        let gerou = crate::ffmpeg::comando("ffmpeg")
+            .args(["-v", "error", "-y", "-f", "lavfi", "-i"])
+            .arg("anoisesrc=d=12:c=pink:a=0.3,tremolo=f=3")
+            .args(["-c:a", "libopus"])
+            .arg(&caminho)
+            .status()
+            .is_ok_and(|s| s.success());
+        if !gerou {
+            eprintln!("sem libopus: teste pulado");
+            return;
+        }
+        let (texto, duracao) = impressao(&caminho).expect("deve gerar impressão");
+        assert!(!texto.is_empty());
+        assert_eq!(duracao, 12);
+        let _ = std::fs::remove_file(caminho);
+    }
 
     /// WAV mono 16 bits com notas trocando a cada meio segundo (as fixtures
     /// são curtas demais para uma impressão).
