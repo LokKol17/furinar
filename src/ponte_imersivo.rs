@@ -314,8 +314,16 @@ pub(crate) fn ligar(ui: &MainWindow, estado: &Rc<RefCell<EstadoAudio>>) {
                 let mut e = estado.borrow_mut();
                 let e = &mut *e;
                 let tocando = e.audio_player.as_ref().is_some_and(|p| !p.is_paused());
+                let posicao = e.audio_player.as_ref().map(|p| p.get_pos());
                 if let Some(imv) = e.imersivo.as_mut() {
-                    imv.tick(&ui, &e.idioma, &e.captura, tocando, e.fundo_reativo);
+                    imv.tick(
+                        &ui,
+                        &e.idioma,
+                        &e.captura,
+                        tocando,
+                        e.fundo_reativo,
+                        posicao,
+                    );
                 }
                 atualizar_karaoke(e, &ui);
             });

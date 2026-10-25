@@ -7,7 +7,7 @@
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::mpsc::{self, Receiver, Sender};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use slint::{Image, Model, ModelRc, SharedString, VecModel};
 
@@ -129,6 +129,14 @@ impl EstadoImersivo {
             return;
         }
 
+        // Faixa que é vídeo: ele mesmo é o fundo, em sincronia com a música
+        if let Some(video) = Reprodutor::abrir_faixa(&faixa.caminho) {
+            self.fundo = Some(video);
+            self.fundo_novo = true;
+            self.mostrar_dados(ui, faixa);
+            return;
+        }
+
         // Mesmo fundo da faixa anterior (mesma pasta): continua tocando sem
         // reiniciar. Vídeo sem ffmpeg no PATH não abre e cai para a capa.
         let pasta_faixa = faixa.caminho.parent().unwrap_or(&faixa.pasta_raiz);
@@ -180,6 +188,7 @@ impl EstadoImersivo {
         captura: &Captura,
         tocando: bool,
         reativo: bool,
+        posicao: Option<Duration>,
     ) {
         if let Some(barras) = self.analisador.quadro(captura, tocando) {
             for (i, b) in barras.into_iter().enumerate() {
@@ -211,9 +220,13 @@ impl EstadoImersivo {
             p.tick();
         }
 
-        let quadro = self.fundo.as_mut().and_then(|r| r.proximo(Instant::now()));
+        let quadro = self
+            .fundo
+            .as_mut()
+            .and_then(|r| r.proximo(Instant::now(), posicao));
         if let Some(q) = quadro {
-            let pixelado = q.pixels.width() <= fundo::LARGURA_PIXEL_ART;
+            // Vídeo da faixa pequeno é só vídeo de baixa resolução, não pixel art
+            let pixelado = q.pts.is_none() && q.pixels.width() <= fundo::LARGURA_PIXEL_ART;
             let imagem = Image::from_rgba8(q.pixels);
             if self.fundo_novo {
                 self.fundo_novo = false;

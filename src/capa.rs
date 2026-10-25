@@ -50,7 +50,9 @@ pub struct Carregado {
 pub fn carregar(caminho: &Path, web: Option<&Path>) -> Carregado {
     let (detalhes, embutida) = ler_tags(caminho);
 
+    // Vídeo sem capa embutida: um quadro dele vem antes do cover.jpg da pasta
     let bytes = embutida
+        .or_else(|| crate::ffmpeg::quadro_jpeg(caminho, LADO_CAPA))
         .or_else(|| capa_da_pasta(caminho))
         .or_else(|| std::fs::read(web?).ok());
     let imagem = bytes

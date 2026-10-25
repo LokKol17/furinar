@@ -124,6 +124,16 @@ pub fn ler_tags(caminho: &std::path::Path) -> Tags {
         }
     }
 
+    // Vídeo que o lofty não lê (MKV/WebM/AVI): duração e tags pelo ffprobe
+    if duracao == 0
+        && crate::ffmpeg::e_video(caminho)
+        && let Some(sonda) = crate::ffmpeg::sondar(caminho)
+    {
+        duracao = sonda.duracao.as_secs() as u32;
+        titulo = titulo.or(sonda.titulo);
+        artista = artista.or(sonda.artista);
+    }
+
     // Fallback: nome do arquivo sem extensão
     let titulo = titulo.unwrap_or_else(|| {
         caminho
@@ -203,10 +213,12 @@ pub fn nome_da_pasta(caminho: &std::path::Path) -> String {
 
 pub fn e_arquivo_audio(caminho: &std::path::Path) -> bool {
     if let Some(ext) = caminho.extension().and_then(|e| e.to_str()) {
-        matches!(
-            ext.to_lowercase().as_str(),
-            "mp3" | "wav" | "flac" | "ogg" | "m4a"
-        )
+        let ext = ext.to_lowercase();
+        matches!(ext.as_str(), "mp3" | "wav" | "flac" | "ogg" | "m4a")
+            || crate::ffmpeg::EXT_VIDEO_NATIVO.contains(&ext.as_str())
+            // Sem ffmpeg o áudio desses não sai: nem entram na lista
+            || (crate::ffmpeg::EXT_VIDEO_FFMPEG.contains(&ext.as_str())
+                && crate::ffmpeg::disponivel())
     } else {
         false
     }
@@ -568,9 +580,16 @@ mod tests {
 
     #[test]
     fn e_arquivo_audio_reconhece_as_extensoes_tocaveis() {
-        for nome in ["a.mp3", "a.wav", "a.flac", "a.ogg", "a.m4a", "A.M4A"] {
+        for nome in [
+            "a.mp3", "a.wav", "a.flac", "a.ogg", "a.m4a", "A.M4A", "v.mp4", "v.MOV", "v.m4v",
+        ] {
             assert!(e_arquivo_audio(Path::new(nome)), "{nome} deveria ser áudio");
         }
+        // MKV/WebM só entram com o ffmpeg, que decodifica o áudio deles
+        assert_eq!(
+            e_arquivo_audio(Path::new("v.webm")),
+            crate::ffmpeg::disponivel()
+        );
         for nome in ["a.txt", "a.mp3.bak", "sem_extensao"] {
             assert!(
                 !e_arquivo_audio(Path::new(nome)),

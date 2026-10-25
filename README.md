@@ -35,6 +35,7 @@ The palette — deep navy, cyan, and gold (or baby blue and pearl white in light
 
 ### Playback
 - MP3, WAV, FLAC, OGG/Vorbis, and M4A
+- Videos as tracks: MP4/MOV/M4V play natively; MKV/WebM/AVI need `ffmpeg` on the PATH. The normal window plays just the audio; in the immersive mode the video itself fills the background, in sync with the music
 - Always **gapless**, plus optional **crossfade** of 3, 6 or 10 s — consecutive tracks from the same album join without crossfading, so live albums stay intact
 - **ReplayGain**: uses the gain stored in the tags so every track plays at the same loudness
 - Loop (off / track / list) and two shuffles: **smart** (every track once before repeating) and **random**; "previous" in shuffle goes back to what actually played
@@ -184,7 +185,7 @@ cd dist/furinar-*/
 
 **System dependencies:**
 
-| Distro | Required | Optional (video backgrounds) |
+| Distro | Required | Optional (videos, video backgrounds) |
 |---|---|---|
 | Debian/Ubuntu | `sudo apt install libasound2 libgtk-3-0` | `ffmpeg` |
 | Fedora | `sudo dnf install alsa-lib gtk3` | `ffmpeg` |

@@ -4,6 +4,7 @@
 slint::include_modules!();
 
 mod acoustid;
+mod audio_ffmpeg;
 mod biblioteca;
 mod buscador;
 mod capa;
@@ -11,6 +12,7 @@ mod config;
 mod deezer;
 mod discord;
 mod estado;
+mod ffmpeg;
 mod fundo;
 mod imersivo;
 mod letras_web;

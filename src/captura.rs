@@ -335,8 +335,10 @@ fn captura_modo_imersivo() {
     if std::env::var_os("FURINAR_CAPTURA_OCIOSO").is_some() {
         ui.set_imv_ocioso(true);
     }
+    // Faixa de vídeo: a "música" fica parada aos 5 s, o quadro de lá aparece
     for _ in 0..40 {
-        imv.tick(&ui, "pt-br", &captura, true, true);
+        let posicao = Some(Duration::from_secs(5));
+        imv.tick(&ui, "pt-br", &captura, true, true, posicao);
         slint::platform::update_timers_and_animations();
         std::thread::sleep(Duration::from_millis(50));
     }

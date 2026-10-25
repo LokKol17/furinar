@@ -35,6 +35,7 @@ A paleta — azul-marinho, ciano e dourado (ou azul-bebê e branco pérola no te
 
 ### Reprodução
 - MP3, WAV, FLAC, OGG/Vorbis e M4A
+- Vídeos como faixas: MP4/MOV/M4V tocam direto; MKV/WebM/AVI precisam do `ffmpeg` no PATH. A janela normal toca só o áudio; no modo imersivo o próprio vídeo vira o fundo, em sincronia com a música
 - **Gapless** sempre, e **crossfade** opcional de 3, 6 ou 10 s — faixas seguidas do mesmo álbum emendam sem crossfade, para não estragar disco ao vivo
 - **ReplayGain**: usa o ganho gravado nas tags para todas as faixas tocarem no mesmo volume
 - Loop (desligado / faixa / lista) e dois shuffles: **inteligente** (cada faixa uma vez antes de repetir) e **aleatório**; "anterior" no shuffle volta ao que tocou de verdade
@@ -184,7 +185,7 @@ cd dist/furinar-*/
 
 **Dependências do sistema:**
 
-| Distro | Obrigatórias | Opcional (fundos em vídeo) |
+| Distro | Obrigatórias | Opcional (vídeos, fundos em vídeo) |
 |---|---|---|
 | Debian/Ubuntu | `sudo apt install libasound2 libgtk-3-0` | `ffmpeg` |
 | Fedora | `sudo dnf install alsa-lib gtk3` | `ffmpeg` |

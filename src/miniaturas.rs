@@ -163,6 +163,7 @@ pub fn carregar(caminho: &Path, web: Option<&Path>, cache: Option<&Path>) -> Cap
             capa::capa_da_tag(tag)
         });
     let reduzida = embutida
+        .or_else(|| crate::ffmpeg::quadro_jpeg(caminho, LADO * 2))
         .or_else(|| capa::capa_da_pasta(caminho))
         .or_else(|| std::fs::read(web?).ok())
         .and_then(|b| image::load_from_memory(&b).ok())
