@@ -197,7 +197,7 @@ fn pasta_de_musica() -> Option<PathBuf> {
 
 /// O `XDG_MUSIC_DIR` de um user-dirs.dirs. Apontar para a própria home é o
 /// jeito de desligar a pasta: aí não vale.
-#[cfg(any(not(target_os = "windows"), test))]
+#[cfg(not(target_os = "windows"))]
 fn musica_xdg(conteudo: &str, home: &std::path::Path) -> Option<PathBuf> {
     let valor = conteudo
         .lines()
@@ -325,6 +325,7 @@ impl AppConfig {
 mod tests {
     use super::*;
 
+    #[cfg(not(target_os = "windows"))]
     #[test]
     fn pasta_de_musica_do_user_dirs() {
         use std::path::Path;
