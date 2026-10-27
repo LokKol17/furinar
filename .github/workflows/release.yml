@@ -48,7 +48,10 @@ jobs:
       - name: Install Rust
         run: rustup toolchain install
 
+      # Chave de aplicativo do AcoustID: só no binário da release, nunca no repo
       - name: Build
+        env:
+          FURINAR_ACOUSTID_CHAVE: ${{ secrets.ACOUSTID_CHAVE }}
         run: cargo build --release
 
       - name: Rename binary
@@ -103,7 +106,10 @@ jobs:
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y libasound2-dev libgtk-3-dev pkg-config
 
+      # Chave de aplicativo do AcoustID: só no binário da release, nunca no repo
       - name: Build
+        env:
+          FURINAR_ACOUSTID_CHAVE: ${{ secrets.ACOUSTID_CHAVE }}
         run: cargo build --release
 
       - name: Package tarball

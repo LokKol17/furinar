@@ -90,7 +90,7 @@ Fullscreen button, `F11` or `furinar --imersivo`.
 
 ### Web metadata
 Track info screen (`I`):
-- Identifies the track on [MusicBrainz](https://musicbrainz.org) by name — or **by sound**, with a free [AcoustID](https://acoustid.org) key
+- Identifies the track on [MusicBrainz](https://musicbrainz.org) by name — or **by sound**, with [AcoustID](https://acoustid.org) (official builds ship with a key; you can use your own)
 - Shows the candidates with a confidence score; you apply the right one
 - Downloads cover art from the [Cover Art Archive](https://coverartarchive.org) when the track and folder have none
 - **Indexes a whole tab**: matches of 90% or more are applied automatically, the rest waits for your review
@@ -208,7 +208,7 @@ Everything is optional and only happens when you turn it on or ask for it:
 |---|---|---|---|
 | LRCLIB | Lyrics | title, artist, album, duration | "Fetch lyrics from the internet" on, or the "Get lyrics" button |
 | MusicBrainz / Cover Art Archive | Metadata and covers | title, artist, duration | "Search the web" or "Index this tab" |
-| AcoustID | Identify by sound | audio fingerprint | With your key, when the name search isn't enough |
+| AcoustID | Identify by sound | audio fingerprint | When the name search isn't enough (built-in key in official builds, or yours) |
 | ListenBrainz / Last.fm | Scrobbling | tracks you listened to | With a token/account set up |
 | Discord | Profile status | current track (local, through the app's IPC) | "Show what's playing on Discord" on |
 | Deezer | Cover art for the Discord status | title, artist | Same option, once per track without a MusicBrainz match |

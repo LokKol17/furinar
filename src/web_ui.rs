@@ -31,7 +31,7 @@ pub(crate) fn linha_candidato(c: &metadados::Candidato, pelo_som: &str) -> Candi
 
 /// Manda um pedido ao buscador, criando-o se for o primeiro.
 pub(crate) fn pedir_web(estado: &mut EstadoAudio, pedido: buscador::Pedido) {
-    let chave = Some(estado.chave_acoustid.trim().to_string()).filter(|c| !c.is_empty());
+    let chave = acoustid::chave_efetiva(&estado.chave_acoustid);
     estado
         .buscador
         .get_or_insert_with(|| buscador::Buscador::novo(chave))

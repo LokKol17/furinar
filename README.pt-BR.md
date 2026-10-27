@@ -90,7 +90,7 @@ Botão de tela cheia, `F11` ou `furinar --imersivo`.
 
 ### Metadados da web
 Tela de informações da faixa (`I`):
-- Identifica a faixa no [MusicBrainz](https://musicbrainz.org) pelo nome — ou **pelo som**, com uma chave grátis do [AcoustID](https://acoustid.org)
+- Identifica a faixa no [MusicBrainz](https://musicbrainz.org) pelo nome — ou **pelo som**, com o [AcoustID](https://acoustid.org) (a versão oficial já vem com uma chave; dá para usar a sua)
 - Mostra os candidatos com nota de confiança; você aplica o que estiver certo
 - Baixa a capa do [Cover Art Archive](https://coverartarchive.org) quando a faixa e a pasta não têm uma
 - **Indexa a aba inteira**: o que tem 90% de confiança ou mais entra sozinho, o resto fica para você revisar
@@ -208,7 +208,7 @@ Tudo é opcional e só acontece quando você liga ou pede:
 |---|---|---|---|
 | LRCLIB | Letras | título, artista, álbum, duração | "Buscar letras na internet" ligado, ou botão "Baixar letra" |
 | MusicBrainz / Cover Art Archive | Metadados e capas | título, artista, duração | Botão "Buscar na web" ou "Indexar esta aba" |
-| AcoustID | Identificar pelo som | impressão digital do áudio | Com a sua chave, quando a busca pelo nome não basta |
+| AcoustID | Identificar pelo som | impressão digital do áudio | Quando a busca pelo nome não basta (chave embutida na versão oficial, ou a sua) |
 | ListenBrainz / Last.fm | Scrobble | faixas ouvidas | Com token/conta configurados |
 | Discord | Status no perfil | faixa tocando (local, pela IPC do app) | "Mostrar no Discord" ligado |
 | Deezer | Capa no status do Discord | título, artista | Mesma opção, uma vez por faixa sem correção do MusicBrainz |

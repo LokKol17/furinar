@@ -2,8 +2,9 @@
 //! consulta ao AcoustID, que devolve os MBIDs das gravações.
 //!
 //! Precisa de uma chave de aplicativo do AcoustID (grátis, em
-//! acoustid.org/new-application), informada nas configurações. Calcular a
-//! impressão decodifica os primeiros 2 minutos da faixa: ~1-2 s de CPU.
+//! acoustid.org/new-application): a do usuário, nas configurações, ou a do
+//! Furinar, embutida nos builds da release. Calcular a impressão decodifica
+//! os primeiros 2 minutos da faixa: ~1-2 s de CPU.
 
 use std::fs::File;
 use std::io::BufReader;
@@ -17,6 +18,18 @@ use serde::Deserialize;
 
 use crate::metadados::proximidade_duracao;
 use crate::rede::{Cliente, Erro};
+
+/// Chave de aplicativo do Furinar: vem do secret `ACOUSTID_CHAVE` no CI da
+/// release (nunca no repositório). Builds locais saem sem ela.
+const CHAVE_EMBUTIDA: Option<&str> = option_env!("FURINAR_ACOUSTID_CHAVE");
+
+/// A chave do usuário, se preenchida; senão a embutida.
+pub fn chave_efetiva(do_usuario: &str) -> Option<String> {
+    Some(do_usuario.trim())
+        .filter(|c| !c.is_empty())
+        .or(CHAVE_EMBUTIDA.map(str::trim).filter(|c| !c.is_empty()))
+        .map(str::to_string)
+}
 
 const HOST: &str = "api.acoustid.org";
 /// O AcoustID usa os 120 primeiros segundos.
@@ -178,6 +191,13 @@ fn notas(resultados: Vec<Resultado>, duracao: u32) -> Vec<(String, u8)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn chave_do_usuario_tem_prioridade_sobre_a_embutida() {
+        assert_eq!(chave_efetiva("  minha ").as_deref(), Some("minha"));
+        let embutida = CHAVE_EMBUTIDA.map(str::trim).filter(|c| !c.is_empty());
+        assert_eq!(chave_efetiva("   ").as_deref(), embutida);
+    }
 
     /// WebM com Opus (o symphonia não abre): a impressão vem pelo ffmpeg.
     #[test]

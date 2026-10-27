@@ -53,7 +53,7 @@ pub fn pt_br() -> Translations {
     t.insert("acoustid_key", "Chave do AcoustID (opcional)");
     t.insert(
         "acoustid_desc",
-        "Identifica pelo som faixas sem tag. Chave grátis em acoustid.org/new-application.",
+        "Identifica pelo som faixas sem tag. A versão oficial já vem com uma chave; a sua (grátis em acoustid.org/new-application) tem prioridade.",
     );
     t.insert("info_lyrics_ok", "tem");
     t.insert("info_lyrics_missing_web", "a web não tem");
@@ -221,7 +221,7 @@ pub fn en() -> Translations {
     t.insert("acoustid_key", "AcoustID key (optional)");
     t.insert(
         "acoustid_desc",
-        "Identifies untagged tracks by their sound. Free key at acoustid.org/new-application.",
+        "Identifies untagged tracks by their sound. Official builds ship with a key; yours (free at acoustid.org/new-application) takes precedence.",
     );
     t.insert("info_lyrics_ok", "available");
     t.insert("info_lyrics_missing_web", "not on the web");
