@@ -60,6 +60,18 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="1.10.0" date="2026-10-26">
+      <description>
+        <p>Opening files and first run made easy:</p>
+        <ul>
+          <li>"Open with" and double-click play the file; with Furinar already open, files go to it instead of a second player</li>
+          <li>First run already shows your Music folder, with subfolders</li>
+          <li>Lyrics lookup on by default in new installs; tracks with no artist or duration only after AcoustID identifies them</li>
+          <li>Identify by sound with no setup: official builds ship with an AcoustID key</li>
+          <li>Windows installer can download FFmpeg for MKV/WebM/AVI and the immersive video; settings say when FFmpeg is missing</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.9.1" date="2026-10-25">
       <description>
         <p>Scanning folders with MKV/WebM videos no longer freezes the window (probe results are cached). Seeking MP4 videos without ffmpeg no longer stalls the audio. Sound-based identification (AcoustID) now works for videos.</p>

@@ -7,6 +7,8 @@ e o projeto adere ao [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.10.0] — 2026-10-26
+
 ### Adicionado
 
 - Identificação pelo som (AcoustID) sem configurar nada: os builds oficiais já vêm com a chave de aplicativo do Furinar. Uma chave própria nas configurações continua tendo prioridade.
