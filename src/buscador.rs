@@ -14,12 +14,15 @@ use std::time::{Duration, Instant};
 
 use crate::letras_web;
 use crate::metadados::{CONFIANCA_AUTOMATICA, Candidato, Consulta, Correcao};
-use crate::rede::Cliente;
+use crate::rede::{Cliente, Erro};
 use crate::{acoustid, deezer, musicbrainz, scrobble};
 
 pub enum Pedido {
-    /// Letra de uma faixa (ao tocar, ou pelo botão).
-    Letra(Consulta),
+    /// Letra de uma faixa: ao tocar (`automatica`) ou pelo botão.
+    Letra {
+        consulta: Consulta,
+        automatica: bool,
+    },
     /// Candidatos para uma faixa (tela de informações).
     Identificar(Consulta),
     /// A aba inteira: identifica cada faixa e, com `letras`, baixa as letras
@@ -189,10 +192,14 @@ fn trabalhar(
 
     for pedido in rx.iter() {
         let resposta = match pedido {
-            Pedido::Letra(consulta) => Resposta::Letra {
+            Pedido::Letra {
+                consulta,
+                automatica,
+            } => Resposta::Letra {
                 chave: consulta.chave.clone(),
-                resultado: conectar(&mut conexao)
-                    .and_then(|c| letras_web::buscar(c, &consulta).map_err(|e| e.to_string())),
+                resultado: conectar(&mut conexao).and_then(|c| {
+                    buscar_letra(c, &consulta, automatica, chave).map_err(|e| e.to_string())
+                }),
             },
             Pedido::Identificar(consulta) => {
                 let (lista, erro) = match conectar(&mut conexao) {
@@ -280,6 +287,45 @@ fn conectar(conexao: &mut Option<Cliente>) -> Result<&mut Cliente, String> {
         *conexao = Some(Cliente::novo().map_err(|e| e.to_string())?);
     }
     conexao.as_mut().ok_or_else(|| "sem cliente".to_string())
+}
+
+/// Letra no LRCLIB. Na busca automática, faixa sem artista (nem na tag, nem
+/// no nome do arquivo) ou sem duração só vai se a impressão digital disser
+/// com confiança o que ela é: com título genérico ("Intro", "Faixa 1") a busca
+/// aberta acharia a letra de outra música. O botão busca sempre.
+fn buscar_letra(
+    cliente: &mut Cliente,
+    consulta: &Consulta,
+    automatica: bool,
+    chave_acoustid: Option<&str>,
+) -> Result<letras_web::Resultado, Erro> {
+    if !automatica || !letra_duvidosa(consulta) {
+        return letras_web::buscar(cliente, consulta);
+    }
+    let Some(chave) = chave_acoustid else {
+        return Ok(letras_web::Resultado::NaoEncontrada);
+    };
+    let ids = acoustid::consultar(cliente, chave, &consulta.caminho)?;
+    let identificada = musicbrainz::buscar_ids(cliente, consulta, &ids)?
+        .into_iter()
+        .next()
+        .filter(|c| c.confianca >= CONFIANCA_AUTOMATICA);
+    let Some(c) = identificada else {
+        return Ok(letras_web::Resultado::NaoEncontrada);
+    };
+    let mut certa = consulta.clone();
+    certa.titulo = c.titulo;
+    certa.artista = Some(c.artista);
+    certa.album = c.album;
+    if certa.duracao == 0 {
+        certa.duracao = c.duracao;
+    }
+    letras_web::buscar(cliente, &certa)
+}
+
+/// Pouco para o LRCLIB acertar sozinho: sem artista ou sem duração.
+fn letra_duvidosa(consulta: &Consulta) -> bool {
+    consulta.termos().1.is_none() || consulta.duracao == 0
 }
 
 /// Texto primeiro; se não bastar e houver chave, a impressão digital. As
@@ -376,6 +422,23 @@ fn lote(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn letra_automatica_sem_artista_ou_duracao_e_duvidosa() {
+        let c = |titulo: &str, artista: Option<&str>, duracao| Consulta {
+            chave: "/m/a.mp3".into(),
+            caminho: "/m/a.mp3".into(),
+            titulo: titulo.into(),
+            artista: artista.map(Into::into),
+            album: None,
+            duracao,
+        };
+        assert!(!letra_duvidosa(&c("Vento", Some("Fulano"), 200)));
+        // O artista do nome do arquivo conta
+        assert!(!letra_duvidosa(&c("Fulano - Vento", None, 200)));
+        assert!(letra_duvidosa(&c("Intro", None, 200)));
+        assert!(letra_duvidosa(&c("Vento", Some("Fulano"), 0)));
+    }
 
     /// Contra os serviços de verdade (precisa de internet). Manual:
     /// `cargo test web_ao_vivo -- --ignored --nocapture`

@@ -6,6 +6,7 @@ Architecture: amd64
 Maintainer: Furinar Dev <dev@furinar.dev>
 Homepage: https://github.com/LokKol17/furinar
 Depends: libasound2, libgtk-3-0 | libgtk-3-0t64
+Recommends: ffmpeg
 Description: A light, fast, and beautiful audio player
  Furinar is a lightweight audio player inspired by the Hydro Archon.
  It opens in milliseconds and uses only 2-10 MB of RAM while covering

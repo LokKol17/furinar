@@ -201,11 +201,11 @@ Type=Application
 Name=Furinar
 GenericName=Music Player
 Comment=A light, fast, and beautiful audio player
-Exec="$BIN_DIR/furinar" %f
+Exec="$BIN_DIR/furinar" %F
 Icon=furinar
 Terminal=false
-Categories=Audio;Music;Player;
-MimeType=audio/mpeg;audio/x-flac;audio/ogg;audio/wav;audio/mp4;
+Categories=AudioVideo;Audio;Music;Player;
+MimeType=audio/mpeg;audio/flac;audio/x-flac;audio/ogg;audio/x-vorbis+ogg;audio/wav;audio/x-wav;audio/mp4;audio/x-m4a;audio/webm;video/mp4;video/quicktime;video/x-m4v;video/x-matroska;video/webm;video/x-msvideo;
 Keywords=music;player;audio;mp3;flac;ogg;
 StartupWMClass=furinar
 DESKTOP
@@ -223,6 +223,21 @@ DESKTOP
         *) warn "$BIN_DIR is not in your PATH. The app menu entry works; to run 'furinar' from a terminal, add it to PATH." ;;
     esac
     info "Furinar now updates itself: when a new version is out, it offers the update inside the app."
+    ffmpeg_hint
+}
+
+# MKV/WebM/AVI and the track video in the immersive mode need ffmpeg. Only a
+# hint: through "curl | bash" there is no terminal to ask
+ffmpeg_hint() {
+    command -v ffmpeg &>/dev/null && command -v ffprobe &>/dev/null && return 0
+    local cmd=""
+    case "$DISTRO_FAMILY" in
+        debian) cmd="sudo apt install ffmpeg" ;;
+        arch) cmd="sudo pacman -S ffmpeg" ;;
+        fedora) cmd="sudo dnf install ffmpeg-free" ;;
+        suse) cmd="sudo zypper install ffmpeg" ;;
+    esac
+    warn "Optional: install ffmpeg for MKV/WebM/AVI and the video in the immersive mode${cmd:+: $cmd}"
 }
 
 # ---------------------------------------------------------------------------

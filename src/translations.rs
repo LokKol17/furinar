@@ -90,6 +90,7 @@ pub fn pt_br() -> Translations {
     t.insert("tags_writing", "Gravando…");
     t.insert("tab_favorites", "Favoritas");
     t.insert("tab_most_played", "Mais tocadas");
+    t.insert("tab_opened", "Abertos");
     t.insert(
         "favorites_empty",
         "Nenhuma favorita ainda. Marque faixas com a estrela (ou F).",
@@ -133,6 +134,15 @@ pub fn pt_br() -> Translations {
     t.insert("bg_count", "{n} fundos — trocam a cada faixa");
     t.insert("bg_clear", "Limpar");
     t.insert("bg_none", "Capa desfocada (padrão)");
+    t.insert(
+        "ffmpeg_missing",
+        "FFmpeg não encontrado: MKV/WebM/AVI e o vídeo no modo imersivo ficam desligados. Instale o pacote ffmpeg da sua distribuição e reabra o Furinar.",
+    );
+    t.insert(
+        "ffmpeg_missing_windows",
+        "FFmpeg não encontrado: MKV/WebM/AVI e o vídeo no modo imersivo ficam desligados. Rode o instalador de novo marcando \"Baixar o FFmpeg\".",
+    );
+    t.insert("ffmpeg_get", "Baixar o FFmpeg");
     t.insert("search_placeholder", "Buscar por título ou artista...");
     t.insert("no_lyrics", "Sem letra disponível para esta faixa.");
     t.insert("config_title", "Configurações");
@@ -258,6 +268,7 @@ pub fn en() -> Translations {
     t.insert("tags_writing", "Writing…");
     t.insert("tab_favorites", "Favorites");
     t.insert("tab_most_played", "Most played");
+    t.insert("tab_opened", "Opened");
     t.insert(
         "favorites_empty",
         "No favorites yet. Star tracks (or press F).",
@@ -301,6 +312,15 @@ pub fn en() -> Translations {
     t.insert("bg_count", "{n} backgrounds — one per track");
     t.insert("bg_clear", "Clear");
     t.insert("bg_none", "Blurred cover (default)");
+    t.insert(
+        "ffmpeg_missing",
+        "FFmpeg not found: MKV/WebM/AVI and the video in the immersive mode are off. Install your distribution's ffmpeg package and reopen Furinar.",
+    );
+    t.insert(
+        "ffmpeg_missing_windows",
+        "FFmpeg not found: MKV/WebM/AVI and the video in the immersive mode are off. Run the installer again with \"Download FFmpeg\" checked.",
+    );
+    t.insert("ffmpeg_get", "Get FFmpeg");
     t.insert("search_placeholder", "Search by title or artist...");
     t.insert("no_lyrics", "No lyrics available for this track.");
     t.insert("config_title", "Settings");

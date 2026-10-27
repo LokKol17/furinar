@@ -54,7 +54,7 @@ A paleta — azul-marinho, ciano e dourado (ou azul-bebê e branco pérola no te
 - `.lrc` ao lado da faixa, rolando com a música — clique numa linha para pular até ela
 - Letra embutida nas tags (SYLT, USLT, LYRICS) quando não há `.lrc`
 - **Estilo karaokê** na tela cheia: a linha atual enche no ritmo do canto (palavra por palavra com LRC estendido, `<mm:ss.xx>`)
-- Download opcional do [LRCLIB](https://lrclib.net) para faixas sem letra
+- Download do [LRCLIB](https://lrclib.net) para faixas sem letra (ligado por padrão; dá para desligar)
 
 <div align="center">
 
@@ -152,8 +152,8 @@ Tela de informações da faixa (`I`):
 ## 🚀 Instalação
 
 ### Windows
-1. Baixe o `furinar-windows-x86_64-setup.exe` na página de [Releases](https://github.com/LokKol17/furinar/releases) e execute. Ele instala só para o seu usuário (sem pedir administrador), coloca o Furinar no menu Iniciar e aparece em **Configurações → Aplicativos** para desinstalar.
-2. Abra o Furinar e clique em **Abrir pasta** para apontar onde estão suas músicas.
+1. Baixe o `furinar-windows-x86_64-setup.exe` na página de [Releases](https://github.com/LokKol17/furinar/releases) e execute. Ele instala só para o seu usuário (sem pedir administrador), coloca o Furinar no menu Iniciar e no **Abrir com** de arquivos de áudio e vídeo, e aparece em **Configurações → Aplicativos** para desinstalar. Marque **Baixar o FFmpeg** (~115 MB) se quiser MKV/WebM/AVI e o vídeo no modo imersivo.
+2. Abra o Furinar: na primeira vez ele já mostra a sua pasta **Músicas** (com as subpastas). **Abrir pasta** adiciona outras.
 3. O Furinar lembra tudo da próxima vez, e avisa quando sai versão nova (a atualização é um clique).
 
 As configurações ficam em `%APPDATA%\Furinar`. Prefere não instalar? Baixe o `furinar-windows-x86_64.exe` e é só abrir. Para deixar totalmente portátil (configurações ao lado do `.exe`, num pendrive, por exemplo), crie um `furinar_config.json` vazio ao lado dele.
@@ -202,11 +202,11 @@ Quase tudo se ajusta pela própria interface (ícone de engrenagem, no modo norm
 - Formatos: png, jpg, bmp, gif, webp; vídeo (mp4, webm, mkv, mov, avi) precisa do `ffmpeg` no PATH. Pixel art pequena é ampliada sem borrar.
 
 ### Serviços online
-Tudo é opcional e só acontece quando você liga ou pede:
+Tudo pode ser desligado; só a busca de letras já vem ligada em instalações novas:
 
 | Serviço | Para quê | O que é enviado | Quando |
 |---|---|---|---|
-| LRCLIB | Letras | título, artista, álbum, duração | "Buscar letras na internet" ligado, ou botão "Baixar letra" |
+| LRCLIB | Letras | título, artista, álbum, duração | "Buscar letras na internet" (ligado por padrão em instalações novas; faixa sem artista ou sem duração só vai depois do AcoustID identificá-la), ou botão "Baixar letra" |
 | MusicBrainz / Cover Art Archive | Metadados e capas | título, artista, duração | Botão "Buscar na web" ou "Indexar esta aba" |
 | AcoustID | Identificar pelo som | impressão digital do áudio | Quando a busca pelo nome não basta (chave embutida na versão oficial, ou a sua) |
 | ListenBrainz / Last.fm | Scrobble | faixas ouvidas | Com token/conta configurados |

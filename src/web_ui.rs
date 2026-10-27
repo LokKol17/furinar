@@ -82,7 +82,13 @@ pub(crate) fn pedir_letra(estado: &mut EstadoAudio, forcar: bool) {
     } else if !estado.metadados.buscar_letra(&consulta.chave) {
         return;
     }
-    pedir_web(estado, buscador::Pedido::Letra(consulta));
+    pedir_web(
+        estado,
+        buscador::Pedido::Letra {
+            consulta,
+            automatica: !forcar,
+        },
+    );
 }
 
 /// Põe a correção no banco e nas listas carregadas, e pede a capa.

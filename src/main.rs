@@ -15,6 +15,7 @@ mod estado;
 mod ffmpeg;
 mod fundo;
 mod imersivo;
+mod instancia;
 mod letras_web;
 mod listas;
 mod lrc;
@@ -58,7 +59,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use web_ui::*;
 
-use biblioteca::{Biblioteca, chave_faixa};
+use biblioteca::{Biblioteca, chave_caminho, chave_faixa};
 use config::AppConfig;
 use lrc::{caminho_lrc, indice_letra, janela_letra, parse_lrc};
 use rand::seq::SliceRandom;
@@ -222,6 +223,11 @@ fn aplicar_idioma(idioma: &str, ui: &MainWindow) {
     i18n.set_bg_choose(g("bg_choose"));
     i18n.set_bg_clear(g("bg_clear"));
     i18n.set_bg_none(g("bg_none"));
+    #[cfg(target_os = "windows")]
+    i18n.set_ffmpeg_missing(g("ffmpeg_missing_windows"));
+    #[cfg(not(target_os = "windows"))]
+    i18n.set_ffmpeg_missing(g("ffmpeg_missing"));
+    i18n.set_ffmpeg_get(g("ffmpeg_get"));
     i18n.set_search_placeholder(g("search_placeholder"));
     i18n.set_no_lyrics(g("no_lyrics"));
     i18n.set_config_title(g("config_title"));
@@ -295,6 +301,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // SAFETY: só ajusta um parâmetro do alocador, antes de qualquer thread
     unsafe {
         libc::mallopt(libc::M_ARENA_MAX, 2);
+    }
+
+    // "Abrir com" com o Furinar já aberto: os arquivos vão para ele
+    let externos = instancia::caminhos_dos_argumentos();
+    if !externos.is_empty() && instancia::enviar(&externos) {
+        return Ok(());
     }
 
     // Canal dos cliques nos botões da miniatura da taskbar
@@ -724,6 +736,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // código e das fontes mapeados não é mais tocada.
     Timer::single_shot(Duration::from_secs(5), memoria::aparar);
 
+    // Arquivos das próximas execuções ("Abrir com" de novo) chegam por aqui
+    {
+        let ui_fraca = ui.as_weak();
+        instancia::escutar(move |caminhos| {
+            let _ = ui_fraca.upgrade_in_event_loop(move |ui| {
+                ui.invoke_abrir_externos(juntar_linhas(&caminhos))
+            });
+        });
+    }
+    if !externos.is_empty() {
+        let ui_fraca = ui.as_weak();
+        Timer::single_shot(Duration::ZERO, move || {
+            if let Some(ui) = ui_fraca.upgrade() {
+                ui.invoke_abrir_externos(juntar_linhas(&externos));
+            }
+        });
+    }
+
     // `furinar --imersivo` já abre em tela cheia (atalho de desktop, kiosk)
     if std::env::args().any(|a| a == "--imersivo") {
         let ui_fraca = ui.as_weak();
@@ -740,6 +770,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     salvar_configuracao(&estado.borrow());
 
     Ok(())
+}
+
+/// Caminhos um por linha, para passar pelo callback da UI.
+fn juntar_linhas(caminhos: &[PathBuf]) -> SharedString {
+    caminhos
+        .iter()
+        .map(|p| p.to_string_lossy())
+        .collect::<Vec<_>>()
+        .join("\n")
+        .into()
 }
 
 // ---------------------------------------------------------------------

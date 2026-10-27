@@ -14,6 +14,8 @@ BuildRequires:  gtk3-devel
 
 Requires:       alsa-lib
 Requires:       gtk3
+# MKV/WebM/AVI e o vídeo no modo imersivo (ffmpeg ou ffmpeg-free)
+Recommends:     /usr/bin/ffmpeg
 
 %description
 Furinar is a lightweight audio player inspired by the Hydro Archon.

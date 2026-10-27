@@ -320,17 +320,26 @@ pub(crate) fn abrir_album(estado: &mut EstadoAudio, ui: &MainWindow, grupo: &tra
         Tipo::Album { origem } => origem.clone(),
         _ => origem.chave(),
     };
-    let mut pasta = PastaMusical::especial(
-        Tipo::Album {
-            origem: chave_origem,
-        },
-        Ordem::Padrao,
-    );
-    pasta.nome = grupo.nome.clone();
+    abrir_aba_temporaria(estado, ui, chave_origem, grupo.nome.clone(), tracks, 0);
+    ui.set_imv_guia(0);
+}
+
+/// Põe (ou troca) a aba temporária, sempre a última e nunca salva, com estas
+/// faixas (caminhos absolutos em `path`), e toca a de índice `inicio`.
+fn abrir_aba_temporaria(
+    estado: &mut EstadoAudio,
+    ui: &MainWindow,
+    origem: String,
+    nome: String,
+    tracks: Vec<TrackInfo>,
+    inicio: usize,
+) {
+    let mut pasta = PastaMusical::especial(Tipo::Album { origem }, Ordem::Padrao);
+    pasta.nome = nome;
     pasta.tracks = tracks;
     pasta.carregada = true;
 
-    // Uma aba de álbum só, sempre a última
+    // Uma aba temporária só, sempre a última
     let pos = match estado
         .pastas
         .iter()
@@ -356,8 +365,79 @@ pub(crate) fn abrir_album(estado: &mut EstadoAudio, ui: &MainWindow, grupo: &tra
     ui.set_texto_busca(SharedString::new());
     atualizar_abas(estado, ui);
     atualizar_lista(estado, ui);
-    tocar_faixa(estado, ui, pos, 0);
-    ui.set_imv_guia(0);
+    tocar_faixa(estado, ui, pos, inicio);
+}
+
+/// Arquivos e pastas abertos de fora ("Abrir com", duplo clique, outra
+/// execução): pasta vira aba; um arquivo toca na aba que já o contém ou numa
+/// aba temporária com a pasta dele; vários arquivos, numa aba só com eles.
+pub(crate) fn abrir_externos(estado: &mut EstadoAudio, ui: &MainWindow, caminhos: Vec<PathBuf>) {
+    let (pastas, arquivos): (Vec<PathBuf>, Vec<PathBuf>) =
+        caminhos.into_iter().partition(|p| p.is_dir());
+    for pasta in pastas {
+        abrir_pasta(estado, ui, pasta);
+    }
+    let [primeiro, ..] = arquivos.as_slice() else {
+        return;
+    };
+    if arquivos.len() == 1 && tocar_onde_esta(estado, ui, primeiro) {
+        return;
+    }
+    let (chaves, nome, origem) = match primeiro.parent() {
+        Some(pai) if arquivos.len() == 1 => {
+            let mut irmaos = Vec::new();
+            coletar_arquivos_audio(pai, pai, false, &mut irmaos);
+            irmaos.sort_by(|a, b| a.path.cmp(&b.path));
+            let chaves: Vec<String> = irmaos.iter().map(|t| chave_faixa(pai, &t.path)).collect();
+            let nome = pai.file_name().map_or_else(
+                || pai.to_string_lossy().into_owned(),
+                |n| n.to_string_lossy().into_owned(),
+            );
+            (chaves, nome, chave_caminho(pai))
+        }
+        _ => {
+            let chaves: Vec<String> = arquivos.iter().map(|p| chave_caminho(p)).collect();
+            let lang = translations::get_translations(&estado.idioma);
+            let nome = lang.get("tab_opened").copied().unwrap_or("Opened");
+            (chaves, nome.to_string(), String::new())
+        }
+    };
+    let tracks = faixas_por_chave(&estado.pastas, &chaves, &estado.metadados);
+    let alvo = chave_caminho(primeiro);
+    let inicio = tracks.iter().position(|t| t.path == alvo).unwrap_or(0);
+    if tracks.is_empty() {
+        return;
+    }
+    abrir_aba_temporaria(estado, ui, origem, nome, tracks, inicio);
+}
+
+/// Toca `arquivo` numa aba de pasta que já o tem. `false` se nenhuma tem.
+fn tocar_onde_esta(estado: &mut EstadoAudio, ui: &MainWindow, arquivo: &Path) -> bool {
+    let alvo = chave_caminho(arquivo);
+    let candidatas: Vec<usize> = (0..estado.pastas.len())
+        .filter(|&i| {
+            let p = &estado.pastas[i];
+            p.tipo == Tipo::Pasta
+                && arquivo.starts_with(&p.caminho)
+                && (estado.escanear_subpastas || arquivo.parent() == Some(p.caminho.as_path()))
+        })
+        .collect();
+    for idx in candidatas {
+        garantir_pasta_carregada(estado, idx);
+        let Some(i) = (0..estado.pastas[idx].tracks.len())
+            .find(|&i| estado.pastas[idx].chave_faixa(i).as_deref() == Some(alvo.as_str()))
+        else {
+            continue;
+        };
+        estado.aba_visivel = idx;
+        estado.filtro.clear();
+        ui.set_texto_busca(SharedString::new());
+        atualizar_abas(estado, ui);
+        atualizar_lista(estado, ui);
+        tocar_faixa(estado, ui, idx, i);
+        return true;
+    }
+    false
 }
 
 /// Reescaneia todas as pastas (a opção de subpastas é global) e reposiciona a
@@ -438,6 +518,19 @@ pub(crate) fn chave_atual(estado: &EstadoAudio) -> Option<String> {
 
 /// Liga os callbacks da UI desta área.
 pub(crate) fn ligar(ui: &MainWindow, estado: &Rc<RefCell<EstadoAudio>>) {
+    {
+        let estado = estado.clone();
+        let ui_fraca = ui.as_weak();
+        ui.on_abrir_externos(move |linhas| {
+            let Some(ui) = ui_fraca.upgrade() else {
+                return;
+            };
+            // Vindo de outra execução, a janela pode estar minimizada
+            ui.window().set_minimized(false);
+            let caminhos = linhas.lines().map(PathBuf::from).collect();
+            abrir_externos(&mut estado.borrow_mut(), &ui, caminhos);
+        });
+    }
     {
         let estado = estado.clone();
         let ui_fraca = ui.as_weak();

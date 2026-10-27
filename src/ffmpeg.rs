@@ -56,12 +56,21 @@ pub fn comando(programa: &str) -> Command {
     Command::new(programa)
 }
 
-/// `Command` sem janela de console piscando.
+/// `Command` sem janela de console piscando. O instalador pode ter baixado
+/// o FFmpeg para `ffmpeg\` ao lado do exe: esse vem antes do PATH.
 #[cfg(target_os = "windows")]
 pub fn comando(programa: &str) -> Command {
     use std::os::windows::process::CommandExt;
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-    let mut cmd = Command::new(programa);
+    static LOCAL: OnceLock<Option<std::path::PathBuf>> = OnceLock::new();
+    let local = LOCAL.get_or_init(|| {
+        let pasta = std::env::current_exe().ok()?.parent()?.join("ffmpeg");
+        pasta.join("ffmpeg.exe").is_file().then_some(pasta)
+    });
+    let mut cmd = match local {
+        Some(pasta) => Command::new(pasta.join(format!("{programa}.exe"))),
+        None => Command::new(programa),
+    };
     cmd.creation_flags(CREATE_NO_WINDOW);
     cmd
 }

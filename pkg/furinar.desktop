@@ -3,10 +3,10 @@ Type=Application
 Name=Furinar
 GenericName=Music Player
 Comment=A light, fast, and beautiful audio player
-Exec=env WINIT_UNIX_BACKEND=x11 furinar %f
+Exec=env WINIT_UNIX_BACKEND=x11 furinar %F
 Icon=furinar
 Terminal=false
-Categories=Audio;Music;Player;
-MimeType=audio/mpeg;audio/x-flac;audio/ogg;audio/wav;audio/mp4;audio/x-wav;audio/x-m4a;
+Categories=AudioVideo;Audio;Music;Player;
+MimeType=audio/mpeg;audio/flac;audio/x-flac;audio/ogg;audio/x-vorbis+ogg;audio/wav;audio/x-wav;audio/mp4;audio/x-m4a;audio/webm;video/mp4;video/quicktime;video/x-m4v;video/x-matroska;video/webm;video/x-msvideo;
 Keywords=music;player;audio;mp3;flac;ogg;
 StartupWMClass=furinar

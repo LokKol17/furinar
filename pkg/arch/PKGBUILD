@@ -7,6 +7,7 @@ arch=('x86_64')
 url='https://github.com/LokKol17/furinar'
 license=('BSD-3-Clause')
 depends=('alsa-lib' 'gtk3')
+optdepends=('ffmpeg: MKV/WebM/AVI and the video in the immersive mode')
 makedepends=('cargo')
 source=("$pkgname-$pkgver.tar.gz::https://github.com/LokKol17/furinar/archive/v$pkgver.tar.gz")
 sha256sums=('SKIP')

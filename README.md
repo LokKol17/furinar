@@ -54,7 +54,7 @@ The palette — deep navy, cyan, and gold (or baby blue and pearl white in light
 - `.lrc` next to the track, scrolling with the music — click a line to jump there
 - Lyrics embedded in the tags (SYLT, USLT, LYRICS) when there's no `.lrc`
 - **Karaoke-style** in fullscreen: the current line fills as it's sung (word by word with enhanced LRC, `<mm:ss.xx>`)
-- Optional download from [LRCLIB](https://lrclib.net) for tracks without lyrics
+- Download from [LRCLIB](https://lrclib.net) for tracks without lyrics (on by default; can be turned off)
 
 <div align="center">
 
@@ -152,8 +152,8 @@ Track info screen (`I`):
 ## 🚀 Installation
 
 ### Windows
-1. Download `furinar-windows-x86_64-setup.exe` from the [Releases](https://github.com/LokKol17/furinar/releases) page and run it. It installs for your user only (no admin prompt), adds Furinar to the Start menu and shows up in **Settings → Apps** to uninstall.
-2. Open Furinar and click **Open folder** to point it at your music.
+1. Download `furinar-windows-x86_64-setup.exe` from the [Releases](https://github.com/LokKol17/furinar/releases) page and run it. It installs for your user only (no admin prompt), adds Furinar to the Start menu and to **Open with** for audio and video files, and shows up in **Settings → Apps** to uninstall. Check **Download FFmpeg** (~115 MB) if you want MKV/WebM/AVI and the video in the immersive mode.
+2. Open Furinar: on the first run it already shows your **Music** folder (subfolders included). **Open folder** adds others.
 3. Furinar remembers everything next time, and tells you when a new version is out (updating is one click).
 
 Settings live in `%APPDATA%\Furinar`. Prefer no installation? Grab `furinar-windows-x86_64.exe` instead and just run it. To keep it fully portable (settings next to the `.exe`, e.g. on a USB stick), create an empty `furinar_config.json` beside it.
@@ -202,11 +202,11 @@ Almost everything is set from the app itself (gear icon, in normal mode and in f
 - Formats: png, jpg, bmp, gif, webp; video (mp4, webm, mkv, mov, avi) needs `ffmpeg` on the PATH. Small pixel art is scaled up without blurring.
 
 ### Online services
-Everything is optional and only happens when you turn it on or ask for it:
+Everything can be turned off; only the lyrics lookup starts on in new installs:
 
 | Service | What for | What is sent | When |
 |---|---|---|---|
-| LRCLIB | Lyrics | title, artist, album, duration | "Fetch lyrics from the internet" on, or the "Get lyrics" button |
+| LRCLIB | Lyrics | title, artist, album, duration | "Fetch lyrics from the internet" (on by default in new installs; a track with no artist or duration only goes after AcoustID identifies it), or the "Get lyrics" button |
 | MusicBrainz / Cover Art Archive | Metadata and covers | title, artist, duration | "Search the web" or "Index this tab" |
 | AcoustID | Identify by sound | audio fingerprint | When the name search isn't enough (built-in key in official builds, or yours) |
 | ListenBrainz / Last.fm | Scrobbling | tracks you listened to | With a token/account set up |

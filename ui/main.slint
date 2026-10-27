@@ -159,6 +159,9 @@ export component MainWindow inherits Window {
     in property <string> fundo_global_nome: "";
     callback escolher_fundo();
     callback limpar_fundo();
+    /// Sem ffmpeg/ffprobe no sistema (conferido numa thread ao abrir).
+    in property <bool> ffmpeg_ausente: false;
+    callback abrir_pagina_ffmpeg();
     callback letra_completa_clicada(int);
     // Painel da biblioteca do imersivo (lista virtualizada: só uma janela de
     // linhas a partir de `imv_painel_primeira`)
@@ -193,6 +196,8 @@ export component MainWindow inherits Window {
     callback alternar_sono();
 
     callback abrir_pasta();
+    /// Caminhos vindos de fora ("Abrir com", outra execução), um por linha.
+    callback abrir_externos(string);
     callback anterior();
     callback play_pause();
     callback parar();
@@ -1553,6 +1558,38 @@ export component MainWindow inherits Window {
                             }
                             Text {
                                 text: botao;
+                                color: Tema.texto;
+                                font-size: 13px;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+
+                    // Sem FFmpeg: o que fica de fora e onde conseguir
+                    if ffmpeg_ausente: Text {
+                        text: I18n.ffmpeg_missing;
+                        font-size: 12px;
+                        color: Tema.texto_suave;
+                        wrap: word-wrap;
+                    }
+                    if ffmpeg_ausente: HorizontalLayout {
+                        alignment: start;
+
+                        Rectangle {
+                            width: texto_ffmpeg.preferred-width + 24px;
+                            height: 30px;
+                            border-radius: 8px;
+                            border-width: 1px;
+                            border-color: Tema.borda;
+                            background: ta_ffmpeg.has-hover ? Tema.neutro_hover : Tema.neutro;
+                            animate background { duration: 120ms; }
+
+                            ta_ffmpeg := TouchArea {
+                                clicked => { abrir_pagina_ffmpeg(); }
+                            }
+                            texto_ffmpeg := Text {
+                                text: I18n.ffmpeg_get;
                                 color: Tema.texto;
                                 font-size: 13px;
                                 horizontal-alignment: center;

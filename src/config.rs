@@ -53,8 +53,8 @@ pub struct AppConfig {
     /// Crossfade em segundos (0 = só gapless).
     #[serde(default)]
     pub crossfade: u8,
-    /// Buscar a letra na web (LRCLIB) quando a faixa não tem. Desligado
-    /// até o usuário ligar: manda título/artista a um serviço de fora.
+    /// Buscar a letra na web (LRCLIB) quando a faixa não tem. Ligado em
+    /// instalações novas; configurações antigas sem o campo ficam desligadas.
     #[serde(default)]
     pub letras_web: bool,
     /// Chave de aplicativo do AcoustID (impressão digital).
@@ -116,7 +116,7 @@ impl Default for AppConfig {
             fila_shuffle: Vec::new(),
             ordens: HashMap::new(),
             crossfade: 0,
-            letras_web: false,
+            letras_web: true,
             chave_acoustid: String::new(),
             discord: false,
             listenbrainz_token: String::new(),
@@ -182,6 +182,49 @@ pub fn config_path() -> PathBuf {
     }
 }
 
+/// Pasta de música do usuário: `XDG_MUSIC_DIR` (user-dirs.dirs), ou `~/Music`.
+#[cfg(not(target_os = "windows"))]
+fn pasta_de_musica() -> Option<PathBuf> {
+    let home = PathBuf::from(std::env::var_os("HOME")?);
+    let configuracao = std::env::var_os("XDG_CONFIG_HOME")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| home.join(".config"));
+    fs::read_to_string(configuracao.join("user-dirs.dirs"))
+        .ok()
+        .and_then(|conteudo| musica_xdg(&conteudo, &home))
+        .or_else(|| Some(home.join("Music")))
+}
+
+/// O `XDG_MUSIC_DIR` de um user-dirs.dirs. Apontar para a própria home é o
+/// jeito de desligar a pasta: aí não vale.
+#[cfg(any(not(target_os = "windows"), test))]
+fn musica_xdg(conteudo: &str, home: &std::path::Path) -> Option<PathBuf> {
+    let valor = conteudo
+        .lines()
+        .find_map(|l| l.trim().strip_prefix("XDG_MUSIC_DIR="))?
+        .trim()
+        .trim_matches('"');
+    let caminho = match valor.strip_prefix("$HOME") {
+        Some(resto) => home.join(resto.trim_start_matches('/')),
+        None => PathBuf::from(valor),
+    };
+    (caminho.is_absolute() && caminho != home).then_some(caminho)
+}
+
+/// A pasta Música do Windows (pode ter sido movida, para o OneDrive etc.).
+#[cfg(target_os = "windows")]
+fn pasta_de_musica() -> Option<PathBuf> {
+    use windows::Win32::System::Com::CoTaskMemFree;
+    use windows::Win32::UI::Shell::{FOLDERID_Music, KNOWN_FOLDER_FLAG, SHGetKnownFolderPath};
+    // SAFETY: o PWSTR devolvido é lido uma vez e liberado com CoTaskMemFree
+    unsafe {
+        let caminho = SHGetKnownFolderPath(&FOLDERID_Music, KNOWN_FOLDER_FLAG(0), None).ok()?;
+        let texto = caminho.to_string().ok();
+        CoTaskMemFree(Some(caminho.0 as *const _));
+        texto.map(PathBuf::from)
+    }
+}
+
 /// Pasta dos arquivos do Furinar no Windows. Uma configuração ao lado do
 /// executável (como as versões antigas, sem instalador, salvavam) mantém o
 /// modo portátil; senão, `%APPDATA%\Furinar` — a pasta de instalação não é
@@ -209,10 +252,23 @@ impl AppConfig {
         if let Some(parent) = config_path.parent() {
             let _ = fs::create_dir_all(parent);
         }
-        let mut config = fs::read_to_string(&config_path)
-            .map(|conteudo| Self::desde_json(&conteudo))
-            .unwrap_or_default();
+        let mut config = match fs::read_to_string(&config_path) {
+            Ok(conteudo) => Self::desde_json(&conteudo),
+            Err(_) if !config_path.exists() => Self::primeira_execucao(),
+            Err(_) => Self::default(),
+        };
         config.migrar();
+        config
+    }
+
+    /// Sem configuração ainda: já abre a pasta de música do sistema, com as
+    /// subpastas (é onde costumam ficar artista/álbum).
+    fn primeira_execucao() -> Self {
+        let mut config = Self::default();
+        if let Some(musica) = pasta_de_musica().filter(|p| p.is_dir()) {
+            config.pastas.push(musica.to_string_lossy().into_owned());
+            config.escanear_subpastas = true;
+        }
         config
     }
 
@@ -268,6 +324,22 @@ impl AppConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn pasta_de_musica_do_user_dirs() {
+        use std::path::Path;
+        let home = Path::new("/home/a");
+        let conteudo =
+            "# comentário\nXDG_DESKTOP_DIR=\"$HOME/Desktop\"\nXDG_MUSIC_DIR=\"$HOME/Músicas\"\n";
+        assert_eq!(musica_xdg(conteudo, home), Some(home.join("Músicas")));
+        assert_eq!(
+            musica_xdg("XDG_MUSIC_DIR=\"/mnt/musica\"", home),
+            Some(PathBuf::from("/mnt/musica"))
+        );
+        // Desligada (aponta para a home) ou ausente
+        assert_eq!(musica_xdg("XDG_MUSIC_DIR=\"$HOME/\"", home), None);
+        assert_eq!(musica_xdg("XDG_VIDEOS_DIR=\"$HOME/V\"", home), None);
+    }
 
     #[test]
     fn windows_usa_appdata_ou_fica_portatil() {

@@ -10,6 +10,19 @@ e o projeto adere ao [Semantic Versioning](https://semver.org/).
 ### Adicionado
 
 - Identificação pelo som (AcoustID) sem configurar nada: os builds oficiais já vêm com a chave de aplicativo do Furinar. Uma chave própria nas configurações continua tendo prioridade.
+- "Abrir com o Furinar" e duplo clique em arquivos de áudio/vídeo: a faixa toca na aba que já a contém ou numa aba temporária com a pasta dela (vários arquivos: uma aba só com eles). Com o Furinar já aberto, os arquivos vão para ele em vez de abrir outro player. No Windows o instalador registra o Furinar no "Abrir com" (sem trocar o player padrão).
+- Primeira execução: a pasta de música do sistema (`XDG_MUSIC_DIR` / Músicas do Windows) já entra como aba, com subpastas.
+- Instalador do Windows: opção de baixar o FFmpeg (conferido por SHA-256) para MKV/WebM/AVI e o vídeo no modo imersivo; ele fica na pasta do Furinar e sai na desinstalação.
+- Sem FFmpeg, as configurações dizem o que fica desligado e onde conseguir.
+- Pacotes: `ffmpeg` como dependência opcional (deb `Recommends`, rpm `Recommends`, Arch `optdepends`); o `install.sh` avisa quando falta.
+
+### Alterado
+
+- Busca de letras no LRCLIB ligada por padrão em instalações novas. Na busca automática, faixa sem artista (nem na tag, nem no nome do arquivo) ou sem duração só vai se o AcoustID identificá-la com confiança, para não salvar a letra de outra música com título genérico ("Intro", "Faixa 1"). O botão "Baixar letra" continua buscando sempre.
+
+### Corrigido
+
+- O `.desktop` declarava os tipos de áudio, mas o Furinar ignorava o arquivo recebido; agora aceita vários (`%F`), inclui vídeos e passa no `desktop-file-validate` (categoria `AudioVideo`).
 
 ## [1.9.1] — 2026-10-25
 

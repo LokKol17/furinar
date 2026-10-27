@@ -368,6 +368,23 @@ pub(crate) fn ligar(ui: &MainWindow, estado: &Rc<RefCell<EstadoAudio>>) {
         });
     }
 
+    // Conferir o ffmpeg sobe dois processos: fora da thread da UI
+    {
+        let ui_fraca = ui.as_weak();
+        std::thread::spawn(move || {
+            let ausente = !ffmpeg::disponivel();
+            let _ = ui_fraca.upgrade_in_event_loop(move |ui| ui.set_ffmpeg_ausente(ausente));
+        });
+        // No Windows o instalador baixa o FFmpeg; no Linux é o pacote da distro
+        ui.on_abrir_pagina_ffmpeg(|| {
+            abrir_no_navegador(if cfg!(target_os = "windows") {
+                "https://github.com/LokKol17/furinar/releases/latest"
+            } else {
+                "https://ffmpeg.org/download.html"
+            });
+        });
+    }
+
     {
         let estado = estado.clone();
         let ui_fraca = ui.as_weak();
