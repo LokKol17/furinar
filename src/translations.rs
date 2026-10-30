@@ -101,6 +101,10 @@ pub fn pt_br() -> Translations {
     t.insert("info_by_sound", "identificada pelo som");
     t.insert("info_nothing", "Nada encontrado.");
     t.insert("info_result_one", "1 resultado");
+    t.insert(
+        "info_nothing_no_key",
+        "Nada encontrado pelo nome. A busca pelo som precisa de uma chave do AcoustID: preencha em Configurações.",
+    );
     t.insert("info_results", "{n} resultados — escolha um");
     t.insert("info_searching", "Buscando…");
     t.insert("tags_written", "{n} arquivos atualizados");
@@ -306,6 +310,10 @@ pub fn en() -> Translations {
     t.insert("info_by_sound", "matched by sound");
     t.insert("info_nothing", "Nothing found.");
     t.insert("info_result_one", "1 result");
+    t.insert(
+        "info_nothing_no_key",
+        "Nothing found by name. Matching by sound needs an AcoustID key: add one in Settings.",
+    );
     t.insert("info_results", "{n} results — pick one");
     t.insert("info_searching", "Searching…");
     t.insert("tags_written", "{n} files updated");

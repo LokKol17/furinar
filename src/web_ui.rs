@@ -274,6 +274,11 @@ pub(crate) fn processar_web(estado: &mut EstadoAudio, ui: &MainWindow) {
                 }
                 let texto = match (&erro, lista.len()) {
                     (Some(e), 0) => format!("{}: {e}", t("info_error")),
+                    // Sem chave a busca pelo som nem roda: dizer, em vez de
+                    // só "nada encontrado" (builds locais saem sem a embutida)
+                    (_, 0) if acoustid::chave_efetiva(&estado.chave_acoustid).is_none() => {
+                        t("info_nothing_no_key")
+                    }
                     (_, 0) => t("info_nothing"),
                     (_, 1) => t("info_result_one"),
                     (_, n) => t("info_results").replace("{n}", &n.to_string()),
