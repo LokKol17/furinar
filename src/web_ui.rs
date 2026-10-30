@@ -513,6 +513,12 @@ pub(crate) fn ligar(ui: &MainWindow, estado: &Rc<RefCell<EstadoAudio>>) {
             let Some(chave) = chave_atual(&e) else {
                 return;
             };
+            // Outra faixa (ou o buscador já foi embora): a busca que estava
+            // em andamento era de outra tela e a resposta dela será
+            // descartada, então nada mais devolveria os botões
+            if e.info_chave.as_deref() != Some(chave.as_str()) || e.buscador.is_none() {
+                ui.set_info_ocupado(false);
+            }
             if e.info_chave.as_deref() != Some(chave.as_str()) {
                 e.info_candidatos.clear();
                 ui.set_info_estado(SharedString::new());

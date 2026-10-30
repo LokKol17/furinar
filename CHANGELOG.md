@@ -14,6 +14,7 @@ e o projeto adere ao [Semantic Versioning](https://semver.org/).
 ### Corrigido
 
 - "Buscar na web" às vezes terminava em "erro HTTP 400": o AcoustID recusa (com 400) impressão de áudio curto demais e duração 0, que o Furinar mandava quando o arquivo não informa a duração (MP3 sem cabeçalho Xing, M4A fragmentado de download). Agora usa a duração do áudio decodificado e não consulta com menos de 10 s. Erros de serviço mostram o motivo que ele deu (ex.: "HTTP 400: invalid fingerprint").
+- Botões "Procurar na internet" e "Baixar letra" ficavam desabilitados para sempre ao abrir a tela de informações em outra faixa com uma busca ainda em andamento.
 - Erros de rede dizem qual serviço falhou e o que fazer ("Não deu para falar com MusicBrainz. Confira a conexão com a internet.", "LRCLIB está sobrecarregado agora…", chave recusada → "Confira a chave ou o login nas Configurações"), no idioma do app, em vez do erro técnico em português.
 - Faixa que não abre (arquivo apagado/movido, formato que precisa do FFmpeg, arquivo danificado, nenhuma saída de áudio) mostra um aviso com o nome e o motivo; antes o clique não fazia nada.
 - Falha ao gravar tags diz se é falta de permissão ou arquivo aberto em outro programa, com o nome do arquivo.
