@@ -208,6 +208,15 @@ pub struct Correcao {
     /// Lançamento cuja capa foi baixada (`capa_web`).
     #[serde(default)]
     pub lancamento: Option<String>,
+    /// Artista do álbum e gênero: só a edição à mão preenche.
+    #[serde(default)]
+    pub artista_album: Option<String>,
+    #[serde(default)]
+    pub genero: Option<String>,
+    /// Feita à mão: o que está vazio apaga (na lista e nas tags), em vez de
+    /// deixar o que as tags dizem.
+    #[serde(default)]
+    pub manual: bool,
 }
 
 impl From<&Candidato> for Correcao {
@@ -220,6 +229,7 @@ impl From<&Candidato> for Correcao {
             numero: c.numero,
             gravacao: Some(c.gravacao.clone()),
             lancamento: c.lancamento.clone(),
+            ..Default::default()
         }
     }
 }
@@ -229,10 +239,10 @@ impl Correcao {
     pub fn aplicar(&self, t: &mut TrackInfo) {
         t.titulo = self.titulo.clone();
         t.artista = Some(self.artista.clone()).filter(|a| !a.is_empty());
-        if self.album.is_some() {
-            t.album = self.album.clone();
+        if self.album.is_some() || self.manual {
+            t.album = self.album.clone().filter(|a| !a.is_empty());
         }
-        if self.numero > 0 {
+        if self.numero > 0 || self.manual {
             t.numero = self.numero;
         }
     }
@@ -385,6 +395,41 @@ impl FalhaTags {
     }
 }
 
+/// O que a lista não guarda, lido das tags para a edição à mão.
+#[derive(Debug, Default, PartialEq)]
+pub struct Extras {
+    pub artista_album: Option<String>,
+    pub genero: Option<String>,
+    pub ano: Option<u16>,
+}
+
+pub fn ler_extras(caminho: &Path) -> Extras {
+    use lofty::prelude::*;
+
+    let Ok(arquivo) = lofty::read_from_path(caminho) else {
+        return Extras::default();
+    };
+    let Some(tag) = arquivo.primary_tag().or_else(|| arquivo.first_tag()) else {
+        return Extras::default();
+    };
+    let texto = |v: Option<&str>| v.map(str::trim).filter(|v| !v.is_empty()).map(String::from);
+    // "2004", "2004-05-12"…: só os quatro primeiros dígitos
+    let ano = tag
+        .date()
+        .map(|d| d.year)
+        .or_else(|| {
+            tag.get_string(ItemKey::Year)
+                .and_then(|v| v.get(..4))
+                .and_then(|a| a.parse().ok())
+        })
+        .filter(|&a| a > 0);
+    Extras {
+        artista_album: texto(tag.get_string(ItemKey::AlbumArtist)),
+        genero: texto(tag.genre().as_deref()),
+        ano,
+    }
+}
+
 /// Escreve a correção (e a capa, se houver e o arquivo não tiver uma) nas
 /// tags do arquivo. Mexe no arquivo de música: só sob pedido explícito.
 pub fn gravar_tags(caminho: &Path, c: &Correcao) -> Result<(), FalhaTags> {
@@ -404,21 +449,53 @@ pub fn gravar_tags(caminho: &Path, c: &Correcao) -> Result<(), FalhaTags> {
     let Some(tag) = arquivo.primary_tag_mut() else {
         return Err(FalhaTags::Outra("sem tag".into()));
     };
+    // Vazio: na edição à mão apaga; vindo da web, deixa o que já tem
+    let preenchido = |v: Option<&String>| v.filter(|v| !v.is_empty()).cloned();
     tag.set_title(c.titulo.clone());
-    if !c.artista.is_empty() {
-        tag.set_artist(c.artista.clone());
+    match preenchido(Some(&c.artista)) {
+        Some(artista) => tag.set_artist(artista),
+        None if c.manual => tag.remove_artist(),
+        None => {}
     }
-    if let Some(album) = &c.album {
-        tag.set_album(album.clone());
+    match preenchido(c.album.as_ref()) {
+        Some(album) => tag.set_album(album),
+        None if c.manual => tag.remove_album(),
+        None => {}
     }
-    if c.numero > 0 {
-        tag.set_track(c.numero % 1000);
-        if c.numero >= 1000 {
-            tag.set_disk(c.numero / 1000);
+    match preenchido(c.artista_album.as_ref()) {
+        Some(artista) => {
+            tag.insert_text(ItemKey::AlbumArtist, artista);
         }
+        None if c.manual => tag.remove_key(ItemKey::AlbumArtist),
+        None => {}
+    }
+    match preenchido(c.genero.as_ref()) {
+        Some(genero) => tag.set_genre(genero),
+        None if c.manual => tag.remove_genre(),
+        None => {}
+    }
+    let (disco, faixa) = (c.numero / 1000, c.numero % 1000);
+    if faixa > 0 {
+        tag.set_track(faixa);
+    } else if c.manual {
+        tag.remove_track();
+    }
+    if disco > 0 {
+        tag.set_disk(disco);
+    } else if c.manual {
+        tag.remove_disk();
+    }
+    if c.ano.is_some() || c.manual {
+        // A data completa antiga mandaria mais que o ano novo na leitura
+        tag.remove_date();
+        tag.remove_key(ItemKey::Year);
     }
     if let Some(ano) = c.ano {
-        tag.insert_text(ItemKey::Year, ano.to_string());
+        // Data de gravação (TDRC no ID3v2.4, que não tem "ano" à parte)
+        tag.set_date(lofty::tag::items::Timestamp {
+            year: ano,
+            ..Default::default()
+        });
     }
     let sem_capa = tag.pictures().is_empty();
     if sem_capa
@@ -527,6 +604,18 @@ mod tests {
         // Sem álbum na correção: fica o das tags
         assert_eq!(t.album.as_deref(), Some("Velho"));
         assert_eq!(t.numero, 3);
+
+        // À mão, vazio apaga
+        let manual = Correcao {
+            titulo: "Vento".into(),
+            album: Some(String::new()),
+            manual: true,
+            ..Default::default()
+        };
+        manual.aplicar(&mut t);
+        assert_eq!(t.album, None);
+        assert_eq!(t.artista, None);
+        assert_eq!(t.numero, 0);
     }
 
     #[test]
@@ -544,6 +633,43 @@ mod tests {
         assert!(capa_web("96e5dc55-fa8b-483e-a673-e04e1f4cfd2b").is_some());
         assert!(capa_web("../../etc/passwd").is_none());
         assert!(capa_web("").is_none());
+    }
+
+    #[test]
+    fn edicao_manual_tambem_vale_no_m4a() {
+        let dir = std::env::temp_dir().join(format!("furinar-teste-m4a-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let faixa = dir.join("tone.m4a");
+        fs::copy(
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/tone.m4a"),
+            &faixa,
+        )
+        .unwrap();
+        let manual = Correcao {
+            titulo: "Outro".into(),
+            artista: "Banda".into(),
+            artista_album: Some("Vários".into()),
+            genero: Some("Rock".into()),
+            ano: Some(2004),
+            numero: 2003,
+            manual: true,
+            ..Default::default()
+        };
+        gravar_tags(&faixa, &manual).unwrap();
+        let lido = crate::track::ler_tags(&faixa);
+        assert_eq!(lido.titulo, "Outro");
+        assert_eq!(lido.artista.as_deref(), Some("Banda"));
+        assert_eq!(lido.numero, 2003);
+        assert_eq!(
+            ler_extras(&faixa),
+            Extras {
+                artista_album: Some("Vários".into()),
+                genero: Some("Rock".into()),
+                ano: Some(2004),
+            }
+        );
+        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]
@@ -571,6 +697,31 @@ mod tests {
         assert_eq!(lido.artista.as_deref(), Some("Banda"));
         assert_eq!(lido.album.as_deref(), Some("Disco"));
         assert_eq!(lido.numero, 1004);
+
+        // À mão: preenche os extras e o que vem vazio apaga
+        let manual = Correcao {
+            titulo: "Outro".into(),
+            artista_album: Some("Vários".into()),
+            genero: Some("Rock".into()),
+            ano: Some(2004),
+            numero: 7,
+            manual: true,
+            ..Default::default()
+        };
+        gravar_tags(&faixa, &manual).unwrap();
+        let lido = crate::track::ler_tags(&faixa);
+        assert_eq!(lido.titulo, "Outro");
+        assert_eq!(lido.artista, None);
+        assert_eq!(lido.album, None);
+        assert_eq!(lido.numero, 7);
+        assert_eq!(
+            ler_extras(&faixa),
+            Extras {
+                artista_album: Some("Vários".into()),
+                genero: Some("Rock".into()),
+                ano: Some(2004),
+            }
+        );
 
         // Só leitura: diz que é permissão, não o erro cru do sistema
         let original = fs::metadata(&faixa).unwrap().permissions();

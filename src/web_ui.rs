@@ -187,6 +187,81 @@ pub(crate) fn publicar_info(estado: &EstadoAudio, ui: &MainWindow) {
     ui.set_info_candidatos(ModelRc::new(VecModel::from(linhas)));
 }
 
+/// Campos da edição à mão: a lista (já corrigida) e, do que ela não
+/// guarda, a correção à mão ou as tags do arquivo.
+pub(crate) fn publicar_edicao(estado: &EstadoAudio, ui: &MainWindow) {
+    let Some(chave) = estado.info_chave.as_deref() else {
+        return;
+    };
+    let Some((p, i)) = achar_faixa(estado, chave) else {
+        return;
+    };
+    let faixa = &estado.pastas[p].tracks[i];
+    let caminho = estado.pastas[p].caminho.join(&faixa.path);
+    let extras = match estado.metadados.correcao(chave) {
+        Some(c) if c.manual => metadados::Extras {
+            artista_album: c.artista_album.clone(),
+            genero: c.genero.clone(),
+            ano: c.ano,
+        },
+        c => {
+            let mut lido = metadados::ler_extras(&caminho);
+            lido.ano = c.and_then(|c| c.ano).or(lido.ano);
+            lido
+        }
+    };
+    let numero = |n: u32| {
+        if n > 0 { n.to_string() } else { String::new() }
+    };
+    ui.set_info_edicao(EdicaoInfo {
+        titulo: faixa.titulo.as_str().into(),
+        artista: faixa.artista.as_deref().unwrap_or("").into(),
+        album: faixa.album.as_deref().unwrap_or("").into(),
+        artista_album: extras.artista_album.unwrap_or_default().into(),
+        genero: extras.genero.unwrap_or_default().into(),
+        ano: extras.ano.map(|a| a.to_string()).unwrap_or_default().into(),
+        faixa: numero(faixa.numero % 1000).into(),
+        disco: numero(faixa.numero / 1000).into(),
+        arquivo: caminho.display().to_string().into(),
+    });
+}
+
+/// Campo numérico da edição: vazio = 0, `None` = inválido.
+fn numero_campo(texto: &str, maximo: u32) -> Option<u32> {
+    let texto = texto.trim();
+    if texto.is_empty() {
+        return Some(0);
+    }
+    texto.parse::<u32>().ok().filter(|&n| n <= maximo)
+}
+
+/// A edição à mão vira uma correção (`None` = número inválido). Mantém a
+/// gravação e a capa de uma correção da web que já havia.
+fn correcao_da_edicao(
+    dados: &EdicaoInfo,
+    anterior: Option<&metadados::Correcao>,
+) -> Option<metadados::Correcao> {
+    let texto = |s: &SharedString| {
+        let s = s.trim();
+        (!s.is_empty()).then(|| s.to_string())
+    };
+    let ano = numero_campo(&dados.ano, 9999)?;
+    let faixa = numero_campo(&dados.faixa, 999)?;
+    let disco = numero_campo(&dados.disco, 999)?;
+    Some(metadados::Correcao {
+        titulo: dados.titulo.trim().to_string(),
+        artista: dados.artista.trim().to_string(),
+        album: Some(dados.album.trim().to_string()),
+        ano: u16::try_from(ano).ok().filter(|&a| a > 0),
+        numero: disco * 1000 + faixa,
+        gravacao: anterior.and_then(|c| c.gravacao.clone()),
+        lancamento: anterior.and_then(|c| c.lancamento.clone()),
+        artista_album: texto(&dados.artista_album),
+        genero: texto(&dados.genero),
+        manual: true,
+    })
+}
+
 /// Revisão do lote e resumo na tela.
 pub(crate) fn publicar_lote(estado: &EstadoAudio, ui: &MainWindow) {
     let lang = translations::get_translations(&estado.idioma);
@@ -526,6 +601,7 @@ pub(crate) fn ligar(ui: &MainWindow, estado: &Rc<RefCell<EstadoAudio>>) {
             e.info_chave = Some(chave);
             ui.set_tags_texto(SharedString::new());
             publicar_info(&e, &ui);
+            publicar_edicao(&e, &ui);
             publicar_lote(&e, &ui);
             ui.set_info_aberta(true);
         });
@@ -590,10 +666,56 @@ pub(crate) fn ligar(ui: &MainWindow, estado: &Rc<RefCell<EstadoAudio>>) {
             ui.set_info_estado(SharedString::new());
             renovar_vistas(&mut e, &ui);
             atualizar_painel(&mut e, &ui);
+            publicar_edicao(&e, &ui);
             // Com os nomes certos, a letra pode aparecer
             if e.letra_atual.is_empty() && chave_atual(&e).as_deref() == Some(chave.as_str()) {
                 pedir_letra(&mut e, true);
             }
+        });
+    }
+
+    {
+        let estado = estado.clone();
+        let ui_fraca = ui.as_weak();
+        ui.on_info_salvar_edicao(move |dados, gravar| {
+            let Some(ui) = ui_fraca.upgrade() else {
+                return;
+            };
+            let mut e = estado.borrow_mut();
+            let Some(chave) = e.info_chave.clone() else {
+                return;
+            };
+            let lang = translations::get_translations(&e.idioma);
+            let t = |k: &str| lang.get(k).copied().unwrap_or("").to_string();
+            if dados.titulo.trim().is_empty() {
+                return;
+            }
+            let Some(correcao) = correcao_da_edicao(&dados, e.metadados.correcao(&chave)) else {
+                avisar(&ui, &t("edit_bad_number"));
+                return;
+            };
+            if e.gravar_tags_info != gravar {
+                e.gravar_tags_info = gravar;
+                salvar_configuracao(&e);
+            }
+            let nome = correcao.titulo.clone();
+            aplicar_correcao(&mut e, &chave, correcao.clone());
+            e.metadados.salvar();
+            ui.set_tags_texto(SharedString::new());
+            if gravar
+                && let Some((p, i)) = achar_faixa(&e, &chave)
+                && let Some(caminho) = e.pastas[p].caminho_faixa(i)
+            {
+                ui.set_tags_texto(t("tags_writing").into());
+                pedir_web(
+                    &mut e,
+                    buscador::Pedido::GravarTags(vec![(caminho, correcao)]),
+                );
+            }
+            renovar_vistas(&mut e, &ui);
+            atualizar_painel(&mut e, &ui);
+            publicar_edicao(&e, &ui);
+            avisar(&ui, &t("edit_saved").replace("{nome}", &nome));
         });
     }
 
@@ -610,6 +732,7 @@ pub(crate) fn ligar(ui: &MainWindow, estado: &Rc<RefCell<EstadoAudio>>) {
                 e.metadados.salvar();
                 renovar_vistas(&mut e, &ui);
                 atualizar_painel(&mut e, &ui);
+                publicar_edicao(&e, &ui);
             }
         });
     }
@@ -837,5 +960,49 @@ pub(crate) fn ligar(ui: &MainWindow, estado: &Rc<RefCell<EstadoAudio>>) {
                 publicar_lastfm(&e, &ui);
             }
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn edicao(ano: &str, faixa: &str, disco: &str) -> EdicaoInfo {
+        EdicaoInfo {
+            titulo: " Vento ".into(),
+            artista: "Banda".into(),
+            genero: "  ".into(),
+            ano: ano.into(),
+            faixa: faixa.into(),
+            disco: disco.into(),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn edicao_vira_correcao_manual() {
+        let anterior = metadados::Correcao {
+            lancamento: Some("mbid".into()),
+            ..Default::default()
+        };
+        let c = correcao_da_edicao(&edicao("2004", "7", "2"), Some(&anterior)).unwrap();
+        assert!(c.manual);
+        assert_eq!(c.titulo, "Vento");
+        assert_eq!(c.album.as_deref(), Some(""));
+        assert_eq!(c.genero, None);
+        assert_eq!(c.ano, Some(2004));
+        assert_eq!(c.numero, 2007);
+        // A capa baixada antes continua
+        assert_eq!(c.lancamento.as_deref(), Some("mbid"));
+
+        let vazia = correcao_da_edicao(&edicao("", "", ""), None).unwrap();
+        assert_eq!((vazia.ano, vazia.numero), (None, 0));
+    }
+
+    #[test]
+    fn numero_invalido_recusa_a_edicao() {
+        assert!(correcao_da_edicao(&edicao("dois mil", "", ""), None).is_none());
+        assert!(correcao_da_edicao(&edicao("", "1000", ""), None).is_none());
+        assert!(correcao_da_edicao(&edicao("", "", "-1"), None).is_none());
     }
 }

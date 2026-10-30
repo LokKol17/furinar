@@ -159,6 +159,24 @@ pub fn pt_br() -> Translations {
         "playlist_save_failed",
         "Não deu para salvar a playlist “{nome}”",
     );
+    t.insert("info_tab_edit", "Editar");
+    t.insert(
+        "edit_desc",
+        "Corrija os dados à mão. Campo vazio fica sem a informação.",
+    );
+    t.insert("edit_title", "Título");
+    t.insert("edit_album_artist", "Artista do álbum");
+    t.insert("edit_genre", "Gênero");
+    t.insert("edit_year", "Ano");
+    t.insert("edit_track", "Faixa nº");
+    t.insert("edit_disc", "Disco nº");
+    t.insert("edit_undo", "Desfazer");
+    t.insert("edit_save", "Salvar");
+    t.insert("edit_saved", "Dados de “{nome}” salvos");
+    t.insert(
+        "edit_bad_number",
+        "Ano, faixa ou disco inválido: use só números (ano até 9999, faixa e disco até 999)",
+    );
     t.insert("info_result_one", "1 resultado");
     t.insert(
         "net_timeout",
@@ -469,6 +487,24 @@ pub fn en() -> Translations {
     t.insert(
         "playlist_save_failed",
         "Couldn't save the playlist “{nome}”",
+    );
+    t.insert("info_tab_edit", "Edit");
+    t.insert(
+        "edit_desc",
+        "Fix the details by hand. An empty field clears that information.",
+    );
+    t.insert("edit_title", "Title");
+    t.insert("edit_album_artist", "Album artist");
+    t.insert("edit_genre", "Genre");
+    t.insert("edit_year", "Year");
+    t.insert("edit_track", "Track no.");
+    t.insert("edit_disc", "Disc no.");
+    t.insert("edit_undo", "Undo");
+    t.insert("edit_save", "Save");
+    t.insert("edit_saved", "Saved details for “{nome}”");
+    t.insert(
+        "edit_bad_number",
+        "Invalid year, track or disc: use numbers only (year up to 9999, track and disc up to 999)",
     );
     t.insert("info_result_one", "1 result");
     t.insert(

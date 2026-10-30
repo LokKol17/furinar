@@ -71,12 +71,14 @@ fn captura_modo_normal() {
     e.pasta_reproducao = Some(ESPECIAIS);
     e.arquivo_atual = e.pastas[ESPECIAIS].tracks.get(2).map(|t| t.path.clone());
     e.indice_atual = Some(2);
-    // Uma playlist (só a aba; o arquivo não precisa existir)
+    // Uma playlist (só a aba; o arquivo não precisa existir). A pasta vai
+    // para depois dela
     listas::inserir_aba(
         &mut e,
         ESPECIAIS,
         PastaMusical::playlist(PathBuf::from("/tmp/Para correr.m3u8")),
     );
+    let pasta = ESPECIAIS + 1;
     atualizar_abas(&e, &ui);
     atualizar_lista(&mut e, &ui);
     ui.set_sono_texto("14:59".into());
@@ -116,10 +118,10 @@ fn captura_modo_normal() {
     }
     if mini {
         ui.set_modo_mini(true);
-        let t = &e.pastas[ESPECIAIS].tracks[2];
+        let t = &e.pastas[pasta].tracks[2];
         ui.set_mini_titulo(t.titulo.as_str().into());
         ui.set_mini_artista(t.artista.as_deref().unwrap_or("").into());
-        if let Some(c) = e.pastas[ESPECIAIS].caminho_faixa(2)
+        if let Some(c) = e.pastas[pasta].caminho_faixa(2)
             && let Some(buf) = miniaturas::miniatura(&c, None)
         {
             ui.set_mini_capa(slint::Image::from_rgba8(buf));
@@ -143,7 +145,7 @@ fn captura_modo_normal() {
         ui.set_update_estado(estado);
     }
 
-    // FURINAR_CAPTURA_INFO=1 (ou =2 para a guia do lote): informações
+    // FURINAR_CAPTURA_INFO=1 (=2 guia do lote, =3 edição à mão): informações
     if let Some(guia) = std::env::var_os("FURINAR_CAPTURA_INFO") {
         let candidato = |titulo: &str, confianca, fonte| metadados::Candidato {
             gravacao: "x".into(),
@@ -162,11 +164,11 @@ fn captura_modo_normal() {
             candidato("Bohemian Rhapsody (Live)", 83, metadados::Fonte::Texto),
             candidato("Bohemian Rhapsody", 61, metadados::Fonte::ImpressaoDigital),
         ];
-        e.info_chave = e.pastas[ESPECIAIS].chave_faixa(2);
+        e.info_chave = e.pastas[pasta].chave_faixa(2);
         publicar_info(&e, &ui);
         ui.set_info_estado("3 resultados — escolha um".into());
         if guia == "2" {
-            let consulta = consulta_de(&e, ESPECIAIS, 2).expect("consulta");
+            let consulta = consulta_de(&e, pasta, 2).expect("consulta");
             e.revisao = vec![
                 (
                     consulta.clone(),
@@ -185,6 +187,10 @@ fn captura_modo_normal() {
             };
             publicar_lote(&e, &ui);
             ui.set_info_guia(1);
+        }
+        publicar_edicao(&e, &ui);
+        if guia == "3" {
+            ui.set_info_guia(2);
         }
         ui.set_info_aberta(true);
     }

@@ -191,6 +191,16 @@ fn aplicar_idioma(idioma: &str, ui: &MainWindow) {
     i18n.set_info_conf_high(g("info_conf_high"));
     i18n.set_info_conf_mid(g("info_conf_mid"));
     i18n.set_info_conf_low(g("info_conf_low"));
+    i18n.set_info_tab_edit(g("info_tab_edit"));
+    i18n.set_edit_desc(g("edit_desc"));
+    i18n.set_edit_title(g("edit_title"));
+    i18n.set_edit_album_artist(g("edit_album_artist"));
+    i18n.set_edit_genre(g("edit_genre"));
+    i18n.set_edit_year(g("edit_year"));
+    i18n.set_edit_track(g("edit_track"));
+    i18n.set_edit_disc(g("edit_disc"));
+    i18n.set_edit_undo(g("edit_undo"));
+    i18n.set_edit_save(g("edit_save"));
     i18n.set_playlist_add_to(g("playlist_add_to"));
     i18n.set_playlist_new(g("playlist_new"));
     i18n.set_playlist_remove(g("playlist_remove"));

@@ -11,6 +11,7 @@ e o projeto adere ao [Semantic Versioning](https://semver.org/).
 
 - Filtro "Só áudio" / "Só vídeo" no menu de ordenação (modo normal e painel da biblioteca do imersivo), por aba e salvo. Aparece só em abas que têm vídeo; a navegação e o shuffle seguem o filtro.
 - Playlists. Cada uma vira uma aba depois de Favoritas e Mais tocadas. Para adicionar uma música: clique direito na faixa (modo normal e painel da biblioteca do imersivo), o "+" que aparece ao passar o mouse ou o botão "+ playlist" da faixa tocando no imersivo. Também dá para criar a playlist na hora. Em aba de playlist, o clique direito remove a faixa ou a move para cima/baixo; na aba, renomeia ou apaga a playlist (as músicas não são apagadas). O botão "+" das abas abre pasta, cria playlist ou importa um `.m3u`/`.m3u8`. São arquivos `.m3u8` na pasta `playlists` ao lado da configuração, que abrem em outros players.
+- Guia "Editar" na tela de informações da faixa: título, artista, álbum, artista do álbum, gênero, ano, faixa e disco à mão. Campo vazio apaga a informação. Fica como correção do Furinar (desfeita por "Restaurar" na guia Faixa) ou, com "Também salvar no arquivo", vai para as tags.
 
 ### Alterado
 

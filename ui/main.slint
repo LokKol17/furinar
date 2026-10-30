@@ -2,7 +2,7 @@ import { Tema, Barras, BotaoIcone, BotaoTitulo, BarraDeslizante, CampoBusca, Cai
 import { I18n } from "i18n.slint";
 import { TelaImersiva } from "imersivo.slint";
 import { LinhaPainel, CartaoAlbum } from "painel.slint";
-import { JanelaInfo, CandidatoInfo, ItemRevisao } from "info.slint";
+import { JanelaInfo, CandidatoInfo, ItemRevisao, EdicaoInfo } from "info.slint";
 import { MiniPlayer } from "mini.slint";
 
 /// Linha da playlist do modo normal.
@@ -144,6 +144,8 @@ export component MainWindow inherits Window {
     callback abrir_info();
     callback info_buscar();
     callback info_aplicar(int, bool);
+    in property <EdicaoInfo> info_edicao;
+    callback info_salvar_edicao(EdicaoInfo, bool);
     callback info_restaurar();
     callback info_baixar_letra();
     callback lote_iniciar();
@@ -1408,6 +1410,8 @@ export component MainWindow inherits Window {
         lote_cancelar => { lote_cancelar(); }
         revisao_decidir(i, aceitar) => { revisao_decidir(i, aceitar); }
         gravar_tags_aba => { gravar_tags_aba(); }
+        edicao: info_edicao;
+        salvar_edicao(dados, gravar) => { info_salvar_edicao(dados, gravar); }
         changed aberta => {
             if (!self.aberta) {
                 atalhos.focus();
@@ -2011,4 +2015,4 @@ export component MainWindow inherits Window {
     }
 }
 
-export { I18n, LinhaPainel, CartaoAlbum, CandidatoInfo, ItemRevisao }
+export { I18n, LinhaPainel, CartaoAlbum, CandidatoInfo, ItemRevisao, EdicaoInfo }

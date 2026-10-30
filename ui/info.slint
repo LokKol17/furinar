@@ -2,9 +2,9 @@
 // Informações da faixa (busca na web)
 //
 // Cartão sobre a janela, nos dois modos: no normal segue o tema, no
-// imersivo fica escuro com a cor da capa. Duas guias: a faixa que toca
-// (candidatos do MusicBrainz/AcoustID, letra) e a aba inteira (lote com
-// revisão).
+// imersivo fica escuro com a cor da capa. Três guias: a faixa que toca
+// (candidatos do MusicBrainz/AcoustID, letra), a edição à mão das tags e a
+// aba inteira (lote com revisão).
 // ---------------------------------------------------------------------
 
 import { Tema } from "theme.slint";
@@ -22,10 +22,130 @@ export struct CandidatoInfo {
     digital: bool,
 }
 
+/// Campos da edição à mão (números como texto: vazio = sem)
+export struct EdicaoInfo {
+    titulo: string,
+    artista: string,
+    album: string,
+    artista_album: string,
+    genero: string,
+    ano: string,
+    faixa: string,
+    disco: string,
+    /// Caminho do arquivo, só para mostrar
+    arquivo: string,
+}
+
 export struct ItemRevisao {
     original: string,
     sugestao: string,
     confianca: int,
+}
+
+// Caixinha "Também salvar no arquivo", na paleta da tela (o CaixaSelecao
+// do tema não tem a versão escura do imersivo)
+component CaixaGravar inherits Rectangle {
+    in-out property <bool> marcada;
+    in property <color> texto;
+    in property <color> suave;
+    in property <color> borda;
+    in property <color> destaque;
+    in property <color> neutro;
+
+    min-height: caixa_gravar.preferred-height;
+
+    caixa_gravar := HorizontalLayout {
+        spacing: 8px;
+
+        Rectangle {
+            width: 18px;
+            height: 18px;
+            y: 1px;
+            border-radius: 5px;
+            border-width: 1px;
+            border-color: root.marcada || toque_gravar.has-hover ? root.destaque : root.borda;
+            background: root.marcada ? root.destaque.with-alpha(0.25) : root.neutro;
+            animate background, border-color { duration: 130ms; }
+
+            Image {
+                source: @image-url("icons/check.svg");
+                width: 12px;
+                height: 12px;
+                x: (parent.width - self.width) / 2;
+                y: (parent.height - self.height) / 2;
+                colorize: root.texto;
+                visible: root.marcada;
+            }
+        }
+        VerticalLayout {
+            spacing: 2px;
+
+            Text {
+                text: I18n.info_apply_tags;
+                color: root.texto;
+                font-size: 13px;
+                wrap: word-wrap;
+            }
+            Text {
+                text: I18n.info_apply_tags_desc;
+                color: root.suave;
+                font-size: 11px;
+                wrap: word-wrap;
+            }
+        }
+    }
+    toque_gravar := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.marcada = !root.marcada; }
+    }
+}
+
+// Campo com rótulo nas duas paletas
+component Campo inherits VerticalLayout {
+    in property <string> rotulo;
+    in-out property <string> texto;
+    in property <bool> numero: false;
+    in property <color> cor_texto;
+    in property <color> suave;
+    in property <color> borda;
+    in property <color> destaque;
+    in property <color> neutro;
+    callback aceito();
+
+    spacing: 4px;
+    vertical-stretch: 0;
+    horizontal-stretch: 1;
+    // Pares lado a lado com a mesma largura (a sobra se divide a partir da
+    // largura preferida, que seguiria o rótulo)
+    preferred-width: 0px;
+
+    Text {
+        text: root.rotulo;
+        color: root.suave;
+        font-size: 11px;
+        overflow: elide;
+    }
+    Rectangle {
+        height: 32px;
+        border-radius: 8px;
+        background: root.neutro;
+        border-width: 1px;
+        border-color: entrada.has-focus ? root.destaque : root.borda;
+
+        entrada := TextInput {
+            x: 10px;
+            width: parent.width - 20px;
+            height: parent.height;
+            color: root.cor_texto;
+            selection-background-color: root.destaque.with-alpha(0.45);
+            font-size: 13px;
+            vertical-alignment: center;
+            single-line: true;
+            input-type: root.numero ? InputType.number : InputType.text;
+            text <=> root.texto;
+            accepted => { root.aceito(); }
+        }
+    }
 }
 
 // Botão de texto nas duas paletas
@@ -155,6 +275,9 @@ export component JanelaInfo inherits Rectangle {
     /// (posição, aceitar); posição -1 = todas
     callback revisao_decidir(int, bool);
     callback gravar_tags_aba();
+    /// Edição à mão: o que veio das tags/correção (o Rust preenche ao abrir)
+    in property <EdicaoInfo> edicao;
+    callback salvar_edicao(EdicaoInfo, bool);
 
     // Paleta
     property <color> fundo: root.imersivo ? #0b1019 : Tema.painel;
@@ -180,6 +303,22 @@ export component JanelaInfo inherits Rectangle {
     }
     changed aberta => {
         root.confirmar_tags_aba = false;
+        if (root.aberta) {
+            root.carregar_edicao();
+        }
+    }
+
+    // Cópia editável (salvar manda ela; desfazer volta à `edicao`)
+    property <EdicaoInfo> rascunho;
+    property <bool> alterado: root.rascunho != root.edicao;
+    function carregar_edicao() {
+        root.rascunho = root.edicao;
+    }
+    changed edicao => { root.carregar_edicao(); }
+    function salvar() {
+        if (root.alterado && root.rascunho.titulo != "") {
+            root.salvar_edicao(root.rascunho, root.gravar);
+        }
     }
 
     visible: root.aberta;
@@ -220,22 +359,25 @@ export component JanelaInfo inherits Rectangle {
             HorizontalLayout {
                 spacing: 6px;
 
-                for nome[i] in [I18n.info_tab_track, I18n.info_tab_batch]: Rectangle {
+                // Na tela: Faixa, Editar, Aba inteira (a guia 1 continua
+                // sendo a aba inteira)
+                for nome[i] in [I18n.info_tab_track, I18n.info_tab_edit, I18n.info_tab_batch]: Rectangle {
+                    property <int> g: i == 0 ? 0 : (i == 1 ? 2 : 1);
                     height: 30px;
                     width: rotulo_guia.preferred-width + 24px;
                     border-radius: 15px;
-                    background: i == root.guia ? root.destaque.with-alpha(0.22) : (toque_guia.has-hover ? root.hover : transparent);
+                    background: self.g == root.guia ? root.destaque.with-alpha(0.22) : (toque_guia.has-hover ? root.hover : transparent);
 
                     rotulo_guia := Text {
                         text: nome;
-                        color: i == root.guia ? root.texto : root.suave;
+                        color: parent.g == root.guia ? root.texto : root.suave;
                         font-size: 14px;
-                        font-weight: i == root.guia ? 700 : 400;
+                        font-weight: parent.g == root.guia ? 700 : 400;
                         horizontal-alignment: center;
                         vertical-alignment: center;
                     }
                     toque_guia := TouchArea {
-                        clicked => { root.guia = i; }
+                        clicked => { root.guia = parent.g; }
                     }
                 }
                 Rectangle { horizontal-stretch: 1; }
@@ -459,56 +601,14 @@ export component JanelaInfo inherits Rectangle {
                     spacing: 12px;
                     vertical-stretch: 0;
 
-                    // Caixinha na paleta da tela (o CaixaSelecao do tema
-                    // não tem a versão escura do imersivo)
-                    Rectangle {
+                    CaixaGravar {
                         horizontal-stretch: 1;
-                        min-height: caixa_gravar.preferred-height;
-
-                        caixa_gravar := HorizontalLayout {
-                            spacing: 8px;
-
-                            Rectangle {
-                                width: 18px;
-                                height: 18px;
-                                y: 1px;
-                                border-radius: 5px;
-                                border-width: 1px;
-                                border-color: root.gravar || toque_gravar.has-hover ? root.destaque : root.borda;
-                                background: root.gravar ? root.destaque.with-alpha(0.25) : root.neutro;
-                                animate background, border-color { duration: 130ms; }
-
-                                Image {
-                                    source: @image-url("icons/check.svg");
-                                    width: 12px;
-                                    height: 12px;
-                                    x: (parent.width - self.width) / 2;
-                                    y: (parent.height - self.height) / 2;
-                                    colorize: root.texto;
-                                    visible: root.gravar;
-                                }
-                            }
-                            VerticalLayout {
-                                spacing: 2px;
-
-                                Text {
-                                    text: I18n.info_apply_tags;
-                                    color: root.texto;
-                                    font-size: 13px;
-                                    wrap: word-wrap;
-                                }
-                                Text {
-                                    text: I18n.info_apply_tags_desc;
-                                    color: root.suave;
-                                    font-size: 11px;
-                                    wrap: word-wrap;
-                                }
-                            }
-                        }
-                        toque_gravar := TouchArea {
-                            mouse-cursor: pointer;
-                            clicked => { root.gravar = !root.gravar; }
-                        }
+                        marcada <=> root.gravar;
+                        texto: root.texto;
+                        suave: root.suave;
+                        borda: root.borda;
+                        destaque: root.destaque;
+                        neutro: root.neutro;
                     }
                     Botao {
                         y: (parent.height - self.height) / 2;
@@ -519,6 +619,172 @@ export component JanelaInfo inherits Rectangle {
                         cor_texto: root.texto;
                         neutro: root.neutro;
                         clicado => { root.aplicar(root.escolhido, root.gravar); }
+                    }
+                }
+            }
+
+            // ---------------------------------------------------------
+            // Editar à mão
+            // ---------------------------------------------------------
+            if root.guia == 2 : VerticalLayout {
+                spacing: 10px;
+                vertical-stretch: 1;
+
+                Text {
+                    vertical-stretch: 0;
+                    text: I18n.edit_desc;
+                    color: root.suave;
+                    font-size: 13px;
+                    wrap: word-wrap;
+                }
+                Campo {
+                    rotulo: I18n.edit_title;
+                    texto <=> root.rascunho.titulo;
+                    cor_texto: root.texto;
+                    suave: root.suave;
+                    borda: root.borda;
+                    destaque: root.destaque;
+                    neutro: root.neutro;
+                    aceito => { root.salvar(); }
+                }
+                HorizontalLayout {
+                    spacing: 10px;
+                    vertical-stretch: 0;
+
+                    Campo {
+                        rotulo: I18n.info_field_artist;
+                        texto <=> root.rascunho.artista;
+                        cor_texto: root.texto;
+                        suave: root.suave;
+                        borda: root.borda;
+                        destaque: root.destaque;
+                        neutro: root.neutro;
+                        aceito => { root.salvar(); }
+                    }
+                    Campo {
+                        rotulo: I18n.edit_album_artist;
+                        texto <=> root.rascunho.artista_album;
+                        cor_texto: root.texto;
+                        suave: root.suave;
+                        borda: root.borda;
+                        destaque: root.destaque;
+                        neutro: root.neutro;
+                        aceito => { root.salvar(); }
+                    }
+                }
+                HorizontalLayout {
+                    spacing: 10px;
+                    vertical-stretch: 0;
+
+                    Campo {
+                        rotulo: I18n.info_field_album;
+                        texto <=> root.rascunho.album;
+                        cor_texto: root.texto;
+                        suave: root.suave;
+                        borda: root.borda;
+                        destaque: root.destaque;
+                        neutro: root.neutro;
+                        aceito => { root.salvar(); }
+                    }
+                    Campo {
+                        rotulo: I18n.edit_genre;
+                        texto <=> root.rascunho.genero;
+                        cor_texto: root.texto;
+                        suave: root.suave;
+                        borda: root.borda;
+                        destaque: root.destaque;
+                        neutro: root.neutro;
+                        aceito => { root.salvar(); }
+                    }
+                }
+                HorizontalLayout {
+                    spacing: 10px;
+                    vertical-stretch: 0;
+
+                    Campo {
+                        rotulo: I18n.edit_year;
+                        width: 96px;
+                        texto <=> root.rascunho.ano;
+                        numero: true;
+                        cor_texto: root.texto;
+                        suave: root.suave;
+                        borda: root.borda;
+                        destaque: root.destaque;
+                        neutro: root.neutro;
+                        aceito => { root.salvar(); }
+                    }
+                    Campo {
+                        rotulo: I18n.edit_track;
+                        width: 96px;
+                        texto <=> root.rascunho.faixa;
+                        numero: true;
+                        cor_texto: root.texto;
+                        suave: root.suave;
+                        borda: root.borda;
+                        destaque: root.destaque;
+                        neutro: root.neutro;
+                        aceito => { root.salvar(); }
+                    }
+                    Campo {
+                        rotulo: I18n.edit_disc;
+                        width: 96px;
+                        texto <=> root.rascunho.disco;
+                        numero: true;
+                        cor_texto: root.texto;
+                        suave: root.suave;
+                        borda: root.borda;
+                        destaque: root.destaque;
+                        neutro: root.neutro;
+                        aceito => { root.salvar(); }
+                    }
+                    Rectangle { horizontal-stretch: 1; }
+                }
+                Text {
+                    text: root.edicao.arquivo;
+                    color: root.suave;
+                    font-size: 11px;
+                    overflow: elide;
+                }
+                if root.tags_texto != "" : Text {
+                    text: root.tags_texto;
+                    color: root.suave;
+                    font-size: 12px;
+                    wrap: word-wrap;
+                }
+
+                Rectangle { vertical-stretch: 1; }
+
+                HorizontalLayout {
+                    spacing: 12px;
+                    vertical-stretch: 0;
+
+                    CaixaGravar {
+                        horizontal-stretch: 1;
+                        marcada <=> root.gravar;
+                        texto: root.texto;
+                        suave: root.suave;
+                        borda: root.borda;
+                        destaque: root.destaque;
+                        neutro: root.neutro;
+                    }
+                    Botao {
+                        y: (parent.height - self.height) / 2;
+                        texto: I18n.edit_undo;
+                        habilitado: root.alterado;
+                        destaque: root.destaque;
+                        cor_texto: root.texto;
+                        neutro: root.neutro;
+                        clicado => { root.carregar_edicao(); }
+                    }
+                    Botao {
+                        y: (parent.height - self.height) / 2;
+                        texto: I18n.edit_save;
+                        principal: true;
+                        habilitado: root.alterado && root.rascunho.titulo != "";
+                        destaque: root.destaque;
+                        cor_texto: root.texto;
+                        neutro: root.neutro;
+                        clicado => { root.salvar(); }
                     }
                 }
             }
