@@ -71,6 +71,16 @@ pub(crate) fn atualizar_abas(estado: &EstadoAudio, ui: &MainWindow) {
         })
         .collect();
     ui.set_abas(ModelRc::new(VecModel::from(nomes)));
+    ui.set_fim_playlists(fim_playlists(estado) as i32);
+    let nomes_playlists: Vec<SharedString> = estado
+        .pastas
+        .iter()
+        .filter(|p| p.e_playlist())
+        .map(|p| p.nome.as_str().into())
+        .collect();
+    ui.set_playlist_nomes(ModelRc::new(VecModel::from(nomes_playlists)));
+    let visivel = estado.pastas.get(estado.aba_visivel);
+    ui.set_aba_e_playlist(visivel.is_some_and(PastaMusical::e_playlist));
     ui.set_aba_ativa(estado.aba_visivel as i32);
     ui.set_aba_tocando(estado.pasta_reproducao.map_or(-1, |i| i as i32));
 }
@@ -84,7 +94,8 @@ pub(crate) fn garantir_pasta_carregada(estado: &mut EstadoAudio, indice: usize) 
     if pasta.carregada {
         return;
     }
-    let chaves: Vec<String> = match pasta.tipo {
+    let chaves: Vec<String> = match &pasta.tipo {
+        Tipo::Playlist { arquivo } => playlists::ler(arquivo),
         Tipo::Favoritas => estado.biblioteca.favoritas().to_vec(),
         Tipo::MaisTocadas => estado
             .biblioteca
@@ -281,11 +292,16 @@ pub(crate) fn abrir_pasta(estado: &mut EstadoAudio, ui: &MainWindow, caminho: Pa
 
 /// Fecha uma aba. Se era a pasta que estava tocando, a reprodução para.
 pub(crate) fn fechar_pasta(estado: &mut EstadoAudio, ui: &MainWindow, idx: usize) {
-    // As listas especiais não fecham
-    if idx < ESPECIAIS || idx >= estado.pastas.len() {
+    // As listas especiais não fecham; playlist só sai apagando (a aba
+    // voltaria na próxima vez, já que o arquivo continua lá)
+    if idx < ESPECIAIS || estado.pastas.get(idx).is_none_or(PastaMusical::e_playlist) {
         return;
     }
+    remover_aba(estado, ui, idx);
+}
 
+/// Tira a aba `idx` (já validada) e acerta os índices.
+pub(crate) fn remover_aba(estado: &mut EstadoAudio, ui: &MainWindow, idx: usize) {
     if estado.pasta_reproducao == Some(idx) {
         stop_music(estado, ui);
         estado.pasta_reproducao = None;
@@ -312,6 +328,34 @@ pub(crate) fn fechar_pasta(estado: &mut EstadoAudio, ui: &MainWindow, idx: usize
     atualizar_abas(estado, ui);
     atualizar_lista(estado, ui);
     atualizar_imersivo(estado, ui);
+}
+
+/// Põe `pasta` na posição `pos`, deslocando os índices que apontam para as
+/// abas dali em diante.
+pub(crate) fn inserir_aba(estado: &mut EstadoAudio, pos: usize, pasta: PastaMusical) {
+    let pos = pos.min(estado.pastas.len());
+    estado.pastas.insert(pos, pasta);
+    // Posto no fim não desloca ninguém
+    if pos + 1 == estado.pastas.len() {
+        return;
+    }
+    if let Some(p) = estado.pasta_reproducao.as_mut()
+        && *p >= pos
+    {
+        *p += 1;
+    }
+    if estado.aba_visivel >= pos {
+        estado.aba_visivel += 1;
+    }
+}
+
+/// Fim das abas de playlist (elas vêm logo depois das especiais).
+pub(crate) fn fim_playlists(estado: &EstadoAudio) -> usize {
+    ESPECIAIS
+        + estado.pastas[ESPECIAIS.min(estado.pastas.len())..]
+            .iter()
+            .take_while(|p| p.e_playlist())
+            .count()
 }
 
 /// Abre (ou troca) a aba do álbum com as faixas do grupo, na ordem do disco,

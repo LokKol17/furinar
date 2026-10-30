@@ -505,6 +505,11 @@ export component CampoTexto inherits Rectangle {
     callback editado(string);
     callback aceito();
 
+    public function focar() {
+        entrada.focus();
+        entrada.select-all();
+    }
+
     height: 30px;
     border-radius: 8px;
     background: Tema.neutro;

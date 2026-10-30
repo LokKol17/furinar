@@ -123,6 +123,42 @@ pub fn pt_br() -> Translations {
     t.insert("media_all", "Tudo");
     t.insert("media_audio", "Só áudio");
     t.insert("media_video", "Só vídeo");
+    t.insert("playlist_add_to", "Adicionar à playlist");
+    t.insert("playlist_new", "Nova playlist…");
+    t.insert("playlist_remove", "Remover desta playlist");
+    t.insert("playlist_move_up", "Mover para cima");
+    t.insert("playlist_move_down", "Mover para baixo");
+    t.insert("playlist_rename", "Renomear…");
+    t.insert("playlist_delete", "Apagar…");
+    t.insert("playlist_import", "Importar playlist (.m3u)…");
+    t.insert("playlist_open_folder", "Abrir pasta…");
+    t.insert("playlist_title_new", "Nova playlist");
+    t.insert("playlist_title_rename", "Renomear playlist");
+    t.insert("playlist_title_delete", "Apagar playlist");
+    t.insert(
+        "playlist_delete_msg",
+        "Apagar “{nome}”? As músicas continuam no disco; só a lista some.",
+    );
+    t.insert("playlist_name", "Nome da playlist");
+    t.insert("playlist_create", "Criar");
+    t.insert("playlist_confirm_rename", "Renomear");
+    t.insert("playlist_confirm_delete", "Apagar");
+    t.insert("playlist_cancel", "Cancelar");
+    t.insert("playlist_empty", "Playlist vazia. Clique com o botão direito numa música (ou no + ao passar o mouse) e escolha \"Adicionar à playlist\".");
+    t.insert("sort_playlist", "Ordem da playlist");
+    t.insert("playlist_added", "Adicionada a “{nome}”");
+    t.insert("playlist_already", "Já está em “{nome}”");
+    t.insert("playlist_removed", "Removida de “{nome}”");
+    t.insert("playlist_created", "Playlist “{nome}” criada");
+    t.insert(
+        "playlist_created_with",
+        "Playlist “{nome}” criada com a música",
+    );
+    t.insert("playlist_deleted", "Playlist “{nome}” apagada");
+    t.insert(
+        "playlist_save_failed",
+        "Não deu para salvar a playlist “{nome}”",
+    );
     t.insert("info_result_one", "1 resultado");
     t.insert(
         "net_timeout",
@@ -398,6 +434,42 @@ pub fn en() -> Translations {
     t.insert("media_all", "Everything");
     t.insert("media_audio", "Audio only");
     t.insert("media_video", "Video only");
+    t.insert("playlist_add_to", "Add to playlist");
+    t.insert("playlist_new", "New playlist…");
+    t.insert("playlist_remove", "Remove from this playlist");
+    t.insert("playlist_move_up", "Move up");
+    t.insert("playlist_move_down", "Move down");
+    t.insert("playlist_rename", "Rename…");
+    t.insert("playlist_delete", "Delete…");
+    t.insert("playlist_import", "Import playlist (.m3u)…");
+    t.insert("playlist_open_folder", "Open folder…");
+    t.insert("playlist_title_new", "New playlist");
+    t.insert("playlist_title_rename", "Rename playlist");
+    t.insert("playlist_title_delete", "Delete playlist");
+    t.insert(
+        "playlist_delete_msg",
+        "Delete “{nome}”? The songs stay on disk; only the list goes away.",
+    );
+    t.insert("playlist_name", "Playlist name");
+    t.insert("playlist_create", "Create");
+    t.insert("playlist_confirm_rename", "Rename");
+    t.insert("playlist_confirm_delete", "Delete");
+    t.insert("playlist_cancel", "Cancel");
+    t.insert("playlist_empty", "Empty playlist. Right-click a song (or use the + that shows on hover) and pick \"Add to playlist\".");
+    t.insert("sort_playlist", "Playlist order");
+    t.insert("playlist_added", "Added to “{nome}”");
+    t.insert("playlist_already", "Already in “{nome}”");
+    t.insert("playlist_removed", "Removed from “{nome}”");
+    t.insert("playlist_created", "Playlist “{nome}” created");
+    t.insert(
+        "playlist_created_with",
+        "Playlist “{nome}” created with the song",
+    );
+    t.insert("playlist_deleted", "Playlist “{nome}” deleted");
+    t.insert(
+        "playlist_save_failed",
+        "Couldn't save the playlist “{nome}”",
+    );
     t.insert("info_result_one", "1 result");
     t.insert(
         "net_timeout",

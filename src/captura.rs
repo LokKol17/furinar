@@ -71,6 +71,12 @@ fn captura_modo_normal() {
     e.pasta_reproducao = Some(ESPECIAIS);
     e.arquivo_atual = e.pastas[ESPECIAIS].tracks.get(2).map(|t| t.path.clone());
     e.indice_atual = Some(2);
+    // Uma playlist (só a aba; o arquivo não precisa existir)
+    listas::inserir_aba(
+        &mut e,
+        ESPECIAIS,
+        PastaMusical::playlist(PathBuf::from("/tmp/Para correr.m3u8")),
+    );
     atualizar_abas(&e, &ui);
     atualizar_lista(&mut e, &ui);
     ui.set_sono_texto("14:59".into());
@@ -91,6 +97,18 @@ fn captura_modo_normal() {
     // FURINAR_CAPTURA_TOAST=<texto>: aviso no rodapé
     if let Ok(texto) = std::env::var("FURINAR_CAPTURA_TOAST") {
         avisar(&ui, &texto);
+    }
+    // FURINAR_CAPTURA_DIALOGO=1|2|3: diálogo de playlist (nova, renomear,
+    // apagar)
+    if let Some(modo) = std::env::var("FURINAR_CAPTURA_DIALOGO")
+        .ok()
+        .and_then(|m| m.parse::<i32>().ok())
+    {
+        ui.set_dialogo_mensagem(
+            "Apagar “Para correr”? As músicas continuam no disco; só a lista some.".into(),
+        );
+        ui.set_dialogo_texto(if modo == 1 { "" } else { "Para correr" }.into());
+        ui.set_dialogo_modo(modo);
     }
     // FURINAR_CAPTURA_CONFIG=1: configurações abertas
     if std::env::var_os("FURINAR_CAPTURA_CONFIG").is_some() {

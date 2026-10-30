@@ -25,7 +25,9 @@ mod miniaturas;
 mod musicbrainz;
 mod painel;
 mod plataforma;
+mod playlists;
 mod ponte_imersivo;
+mod ponte_playlists;
 mod rede;
 mod reproducao;
 mod scrobble;
@@ -189,6 +191,25 @@ fn aplicar_idioma(idioma: &str, ui: &MainWindow) {
     i18n.set_info_conf_high(g("info_conf_high"));
     i18n.set_info_conf_mid(g("info_conf_mid"));
     i18n.set_info_conf_low(g("info_conf_low"));
+    i18n.set_playlist_add_to(g("playlist_add_to"));
+    i18n.set_playlist_new(g("playlist_new"));
+    i18n.set_playlist_remove(g("playlist_remove"));
+    i18n.set_playlist_move_up(g("playlist_move_up"));
+    i18n.set_playlist_move_down(g("playlist_move_down"));
+    i18n.set_playlist_rename(g("playlist_rename"));
+    i18n.set_playlist_delete(g("playlist_delete"));
+    i18n.set_playlist_import(g("playlist_import"));
+    i18n.set_playlist_open_folder(g("playlist_open_folder"));
+    i18n.set_playlist_title_new(g("playlist_title_new"));
+    i18n.set_playlist_title_rename(g("playlist_title_rename"));
+    i18n.set_playlist_title_delete(g("playlist_title_delete"));
+    i18n.set_playlist_name(g("playlist_name"));
+    i18n.set_playlist_create(g("playlist_create"));
+    i18n.set_playlist_confirm_rename(g("playlist_confirm_rename"));
+    i18n.set_playlist_confirm_delete(g("playlist_confirm_delete"));
+    i18n.set_playlist_cancel(g("playlist_cancel"));
+    i18n.set_playlist_empty(g("playlist_empty"));
+    i18n.set_sort_playlist(g("sort_playlist"));
     i18n.set_media_label(g("media_label"));
     i18n.set_media_all(g("media_all"));
     i18n.set_media_audio(g("media_audio"));
@@ -456,6 +477,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             Tipo::MaisTocadas,
             ordem_salva(CHAVE_MAIS_TOCADAS, Ordem::Padrao),
         ));
+        // Playlists logo depois das especiais (a ordem vem do arquivo)
+        ponte_playlists::carregar_abas(&mut e);
+        for pasta in e.pastas.iter_mut().filter(|p| p.e_playlist()) {
+            pasta.ordem = ordem_salva(&pasta.chave(), Ordem::Padrao);
+        }
 
         // Carrega as pastas salvas. Se alguma não existir mais, é pulada, e o
         // mapeamento mantém os índices salvos (de configs antigas) coerentes
@@ -484,7 +510,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             e.pastas.iter().position(|p| p.chave() == chave)
         };
         let legado = |i: Option<usize>| i.and_then(|i| mapeamento.get(i).copied().flatten());
-        let primeira_pasta = if e.pastas.len() > ESPECIAIS {
+        let fim_playlists = listas::fim_playlists(&e);
+        let primeira_pasta = if e.pastas.len() > fim_playlists {
+            fim_playlists
+        } else if e.pastas.len() > ESPECIAIS {
             ESPECIAIS
         } else {
             0
@@ -520,6 +549,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     ponte_imersivo::ligar(&ui, &estado);
     web_ui::ligar(&ui, &estado);
     plataforma::ligar(&ui, &estado);
+    ponte_playlists::ligar(&ui, &estado);
 
     {
         let estado = estado.clone();

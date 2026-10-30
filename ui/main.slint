@@ -48,6 +48,31 @@ export component MainWindow inherits Window {
     in-out property <float> progresso: 0.0;
     in-out property <string> texto_tempo: "00:00 / 00:00";
     in property <[LinhaLista]> musicas: [];
+    // Playlists: abas em [especiais, fim_playlists)
+    in property <int> fim_playlists: 2;
+    in property <[string]> playlist_nomes: [];
+    /// A aba visível é uma playlist (menu da linha: remover, mover)
+    in property <bool> aba_e_playlist: false;
+    /// Diálogo de playlist: 0 fechado, 1 nova, 2 renomear, 3 apagar
+    in-out property <int> dialogo_modo: 0;
+    /// Campo do diálogo (nome; no "apagar", o nome da playlist)
+    in-out property <string> dialogo_texto: "";
+    /// Texto do "apagar" (com o nome; o Slint não substitui em strings)
+    in property <string> dialogo_mensagem: "";
+    /// Linha da lista cujo menu está aberto
+    private property <int> linha_menu: -1;
+    /// Aba cujo menu está aberto
+    private property <int> aba_menu: -1;
+    callback playlist_adicionar(int, int);
+    callback playlist_adicionar_atual(int);
+    callback playlist_remover(int);
+    callback playlist_mover(int, int);
+    callback playlist_nova();
+    callback playlist_renomear(int);
+    callback playlist_apagar(int);
+    callback playlist_importar();
+    callback dialogo_confirmar(string);
+    callback dialogo_cancelar();
     /// Filtro de tipo da aba visível: 0 tudo, 1 só áudio, 2 só vídeo.
     in property <int> midia_atual: 0;
     /// A aba visível tem vídeo (só então o filtro aparece no menu).
@@ -252,7 +277,7 @@ export component MainWindow inherits Window {
     private property <int> especiais: 2;
     private property <length> largura_especial: 40px;
     private property <[string]> opcoes_midia: [I18n.media_all, I18n.media_audio, I18n.media_video];
-    private property <[string]> opcoes_ordem: [I18n.sort_default, I18n.sort_title, I18n.sort_artist, I18n.sort_album, I18n.sort_duration, I18n.sort_added, I18n.sort_plays];
+    private property <[string]> opcoes_ordem: [aba_e_playlist ? I18n.sort_playlist : I18n.sort_default, I18n.sort_title, I18n.sort_artist, I18n.sort_album, I18n.sort_duration, I18n.sort_added, I18n.sort_plays];
 
     // Mantém a linha selecionada dentro da área visível da lista
     function manter_visivel() {
@@ -703,7 +728,7 @@ export component MainWindow inherits Window {
                 spacing: 8px;
                 cross-axis-alignment: center;
 
-                Flickable {
+                abas_flick := Flickable {
                     horizontal-stretch: 1;
                     height: 32px;
                     content-width: max(0, abas.length - especiais) * (largura_aba + 6px) + min(abas.length, especiais) * (largura_especial + 6px);
@@ -727,6 +752,16 @@ export component MainWindow inherits Window {
                                 clicked => {
                                     aba_selecionada(i);
                                     atalhos.focus();
+                                }
+                                // Playlist: renomear/apagar no botão direito
+                                pointer-event(evento) => {
+                                    if (i >= especiais && i < fim_playlists && evento.button == PointerEventButton.right && evento.kind == PointerEventKind.down) {
+                                        aba_menu = i;
+                                        menu_aba.show({
+                                            x: self.absolute-position.x + self.mouse-x - ancora_menu_aba.absolute-position.x,
+                                            y: self.absolute-position.y + self.mouse-y - ancora_menu_aba.absolute-position.y,
+                                        });
+                                    }
                                 }
                             }
 
@@ -752,10 +787,19 @@ export component MainWindow inherits Window {
                                 accessible-role: text;
                                 accessible-label: nome;
                             }
+                            // Playlist: ícone antes do nome
+                            if i >= especiais && i < fim_playlists : Image {
+                                source: @image-url("icons/playlist.svg");
+                                x: 10px;
+                                y: (parent.height - 4px - self.height) / 2;
+                                width: 13px;
+                                height: 13px;
+                                colorize: i == aba_ativa ? Tema.dourado : Tema.texto_suave;
+                            }
                             if i >= especiais : Text {
-                                x: 12px;
+                                x: i < fim_playlists ? 28px : 12px;
                                 y: 0px;
-                                width: parent.width - 50px;
+                                width: parent.width - self.x - 38px;
                                 height: parent.height - 4px;
                                 text: nome;
                                 color: i == aba_ativa ? Tema.texto : Tema.texto_suave;
@@ -777,9 +821,10 @@ export component MainWindow inherits Window {
                             }
 
                             // Fechar: só na aba ativa, para não poluir (as
-                            // especiais não fecham)
+                            // especiais não fecham; playlist sai apagando,
+                            // pelo botão direito)
                             Rectangle {
-                                visible: i == aba_ativa && i >= especiais;
+                                visible: i == aba_ativa && i >= fim_playlists;
                                 x: parent.width - 22px;
                                 y: 8px;
                                 width: 16px;
@@ -811,6 +856,27 @@ export component MainWindow inherits Window {
                     }
                 }
 
+                // Menu das abas de playlist (`aba_menu` diz qual). Dentro de
+                // um retângulo de largura zero: no layout não ocupa espaço
+                ancora_menu_aba := Rectangle {
+                    width: 0px;
+
+                    menu_aba := ContextMenuArea {
+                        enabled: false;
+
+                        Menu {
+                            MenuItem {
+                                title: I18n.playlist_rename;
+                                activated => { playlist_renomear(aba_menu); }
+                            }
+                            MenuItem {
+                                title: I18n.playlist_delete;
+                                activated => { playlist_apagar(aba_menu); }
+                            }
+                        }
+                    }
+                }
+
                 // Abrir mais uma pasta
                 Rectangle {
                     width: 32px;
@@ -831,9 +897,29 @@ export component MainWindow inherits Window {
                     }
 
                     mais_touch := TouchArea {
-                        clicked => {
-                            abrir_pasta();
-                            atalhos.focus();
+                        clicked => { menu_mais.show({ x: 0px, y: parent.height + 4px }); }
+                    }
+                    // Abrir pasta, nova playlist ou importar uma
+                    menu_mais := ContextMenuArea {
+                        enabled: false;
+
+                        Menu {
+                            MenuItem {
+                                title: I18n.playlist_open_folder;
+                                activated => {
+                                    abrir_pasta();
+                                    atalhos.focus();
+                                }
+                            }
+                            MenuSeparator { }
+                            MenuItem {
+                                title: I18n.playlist_new;
+                                activated => { playlist_nova(); }
+                            }
+                            MenuItem {
+                                title: I18n.playlist_import;
+                                activated => { playlist_importar(); }
+                            }
                         }
                     }
 
@@ -900,11 +986,11 @@ export component MainWindow inherits Window {
                                 font-size: 13px;
                                 vertical-alignment: center;
                                 x: musica.video ? 36px : 14px;
-                                width: parent.width - self.x - (i == linha_tocando && tocando ? 58px : 38px);
+                                width: parent.width - self.x - (linha_toque.has-hover || mais_toque.has-hover || estrela_toque.has-hover || (i == linha_tocando && tocando) ? 66px : 38px);
                                 overflow: elide;
                             }
                             // Tocando agora: só existe enquanto toca (anima a cada quadro)
-                            if i == linha_tocando && tocando : Barras {
+                            if i == linha_tocando && tocando && !linha_toque.has-hover && !mais_toque.has-hover && !estrela_toque.has-hover : Barras {
                                 x: parent.width - 52px;
                                 y: (parent.height - self.height) / 2;
                             }
@@ -915,10 +1001,42 @@ export component MainWindow inherits Window {
                                     // Devolve o foco para os atalhos de teclado
                                     atalhos.focus();
                                 }
+                                // Botão direito: um menu só para a lista toda
+                                // (um por linha pesaria em listas grandes)
+                                pointer-event(evento) => {
+                                    if (evento.button == PointerEventButton.right && evento.kind == PointerEventKind.down) {
+                                        linha_menu = i;
+                                        menu_linha.show({
+                                            x: self.mouse-x,
+                                            y: i * altura_linha + lista.content-y + self.mouse-y,
+                                        });
+                                    }
+                                }
+                            }
+
+                            // "+ playlist": no hover, ao lado da estrela
+                            if linha_toque.has-hover || mais_toque.has-hover || estrela_toque.has-hover : Image {
+                                x: parent.width - 54px;
+                                y: (parent.height - self.height) / 2;
+                                width: 15px;
+                                height: 15px;
+                                source: @image-url("icons/playlist_mais.svg");
+                                colorize: mais_toque.has-hover ? Tema.texto : Tema.texto_suave;
+                            }
+                            mais_toque := TouchArea {
+                                x: parent.width - 62px;
+                                width: 24px;
+                                clicked => {
+                                    linha_menu = i;
+                                    menu_adicionar.show({
+                                        x: parent.width - 62px,
+                                        y: (i + 1) * altura_linha + lista.content-y,
+                                    });
+                                }
                             }
 
                             // Estrela: sempre nas favoritas, no hover nas outras
-                            if musica.favorita || linha_toque.has-hover || estrela_toque.has-hover : Image {
+                            if musica.favorita || linha_toque.has-hover || estrela_toque.has-hover || mais_toque.has-hover : Image {
                                 x: parent.width - 30px;
                                 y: (parent.height - self.height) / 2;
                                 width: 14px;
@@ -936,6 +1054,84 @@ export component MainWindow inherits Window {
                             }
                         }
                     }
+                }
+
+                // Menus da lista (um só para todas as linhas; `linha_menu`
+                // diz de qual linha). Ficam por baixo: o clique direito chega
+                // pela linha, que chama show()
+                menu_linha := ContextMenuArea {
+                    // Só por show(): o clique direito vem pela linha
+                    enabled: false;
+                    x: 0px;
+                    y: 0px;
+                    width: parent.width;
+                    height: parent.height;
+
+                    Menu {
+                        Menu {
+                            title: I18n.playlist_add_to;
+
+                            for nome[p] in playlist_nomes : MenuItem {
+                                title: nome;
+                                activated => { playlist_adicionar(linha_menu, p); }
+                            }
+                            if playlist_nomes.length > 0 : MenuSeparator { }
+                            MenuItem {
+                                title: I18n.playlist_new;
+                                activated => { playlist_adicionar(linha_menu, -1); }
+                            }
+                        }
+                        if aba_e_playlist : MenuSeparator { }
+                        if aba_e_playlist : MenuItem {
+                            title: I18n.playlist_remove;
+                            activated => { playlist_remover(linha_menu); }
+                        }
+                        // A ordem visível só é a do arquivo na ordem padrão,
+                        // sem busca
+                        if aba_e_playlist : MenuItem {
+                            title: I18n.playlist_move_up;
+                            enabled: ordem_atual == 0 && texto_busca == "" && linha_menu > 0;
+                            activated => { playlist_mover(linha_menu, -1); }
+                        }
+                        if aba_e_playlist : MenuItem {
+                            title: I18n.playlist_move_down;
+                            enabled: ordem_atual == 0 && texto_busca == "" && linha_menu < musicas.length - 1;
+                            activated => { playlist_mover(linha_menu, 1); }
+                        }
+                    }
+                }
+                menu_adicionar := ContextMenuArea {
+                    // Só por show(): o clique direito vem pela linha
+                    enabled: false;
+                    x: 0px;
+                    y: 0px;
+                    width: parent.width;
+                    height: parent.height;
+
+                    Menu {
+                        for nome[p] in playlist_nomes : MenuItem {
+                            title: nome;
+                            activated => { playlist_adicionar(linha_menu, p); }
+                        }
+                        if playlist_nomes.length > 0 : MenuSeparator { }
+                        MenuItem {
+                            title: I18n.playlist_new;
+                            activated => { playlist_adicionar(linha_menu, -1); }
+                        }
+                    }
+                }
+
+                // Playlist vazia: diz como ela se enche
+                if !mostrar_letra && musicas.length == 0 && aba_e_playlist : Text {
+                    x: 24px;
+                    width: parent.width - 48px;
+                    height: parent.height;
+                    text: I18n.playlist_empty;
+                    color: Tema.texto_suave;
+                    font-size: 13px;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                    wrap: word-wrap;
                 }
 
                 // Lista especial vazia: diz como ela se enche
@@ -1125,6 +1321,12 @@ export component MainWindow inherits Window {
         opcoes_midia: opcoes_midia;
         aba_tem_video: aba_tem_video;
         midia_escolhida(i) => { midia_escolhida(i); }
+        playlist_nomes: playlist_nomes;
+        aba_e_playlist: aba_e_playlist;
+        playlist_adicionar(l, p) => { playlist_adicionar(l, p); }
+        playlist_adicionar_atual(p) => { playlist_adicionar_atual(p); }
+        playlist_remover(l) => { playlist_remover(l); }
+        playlist_mover(l, d) => { playlist_mover(l, d); }
         especiais: especiais;
         alternar_favorita => { alternar_favorita_atual(); }
         favorita_alternada(i) => { favorita_alternada(i); }
@@ -1687,6 +1889,90 @@ export component MainWindow inherits Window {
                             }
                         }
                     }
+                }
+            }
+        }
+    }
+
+    // Diálogo das playlists: nome (nova, renomear) ou confirmação (apagar).
+    // Cartão sobre a janela, nos dois modos; no mini não abre
+    if dialogo_modo != 0 && !modo_mini : Rectangle {
+        background: #00000080;
+
+        // Clique fora cancela
+        TouchArea {
+            clicked => { dialogo_cancelar(); }
+        }
+
+        FocusScope {
+            key-pressed(evento) => {
+                if (evento.text == Key.Escape) {
+                    dialogo_cancelar();
+                    return accept;
+                }
+                reject
+            }
+
+            cartao_dialogo := Rectangle {
+                width: min(parent.width - 48px, 380px);
+                height: conteudo_dialogo.preferred-height;
+                x: (parent.width - self.width) / 2;
+                y: (parent.height - self.height) / 2;
+                background: Tema.painel;
+                border-radius: 14px;
+                border-width: 1px;
+                border-color: Tema.borda;
+                drop-shadow-blur: 24px;
+                drop-shadow-color: #00000060;
+
+                // Clique no cartão não cancela
+                TouchArea { }
+
+                conteudo_dialogo := VerticalLayout {
+                    padding: 20px;
+                    spacing: 12px;
+
+                    Text {
+                        text: dialogo_modo == 1 ? I18n.playlist_title_new
+                            : (dialogo_modo == 2 ? I18n.playlist_title_rename : I18n.playlist_title_delete);
+                        color: Tema.texto;
+                        font-size: 17px;
+                        font-weight: 700;
+                    }
+                    if dialogo_modo == 3 : Text {
+                        text: dialogo_mensagem;
+                        color: Tema.texto_suave;
+                        font-size: 13px;
+                        wrap: word-wrap;
+                    }
+                    if dialogo_modo != 3 : campo_dialogo := CampoTexto {
+                        height: 34px;
+                        texto <=> dialogo_texto;
+                        placeholder: I18n.playlist_name;
+                        aceito => { dialogo_confirmar(dialogo_texto); }
+                        init => { self.focar(); }
+                    }
+                    HorizontalLayout {
+                        alignment: end;
+                        spacing: 8px;
+
+                        BotaoTexto {
+                            texto: I18n.playlist_cancel;
+                            clicado => { dialogo_cancelar(); }
+                        }
+                        BotaoTexto {
+                            texto: dialogo_modo == 1 ? I18n.playlist_create
+                                : (dialogo_modo == 2 ? I18n.playlist_confirm_rename : I18n.playlist_confirm_delete);
+                            primario: true;
+                            clicado => { dialogo_confirmar(dialogo_texto); }
+                        }
+                    }
+                }
+            }
+            // Sem campo (apagar): o Esc ainda precisa chegar aqui
+            init => {
+                if (dialogo_modo == 3) {
+                    self.focus();
                 }
             }
         }

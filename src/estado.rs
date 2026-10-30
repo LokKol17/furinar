@@ -26,6 +26,11 @@ pub(crate) enum Tipo {
     Album {
         origem: String,
     },
+    /// Playlist do usuário (`playlists.rs`): as abas logo depois das
+    /// especiais. A ordem padrão é a do arquivo.
+    Playlist {
+        arquivo: PathBuf,
+    },
 }
 
 /// Uma aba: pasta de música aberta pelo usuário ou lista especial. Nas
@@ -89,6 +94,19 @@ impl PastaMusical {
         }
     }
 
+    pub(crate) fn playlist(arquivo: PathBuf) -> Self {
+        let mut p = Self::especial(Tipo::Playlist { arquivo }, Ordem::Padrao);
+        p.nome = match &p.tipo {
+            Tipo::Playlist { arquivo } => playlists::nome(arquivo),
+            _ => String::new(),
+        };
+        p
+    }
+
+    pub(crate) fn e_playlist(&self) -> bool {
+        matches!(self.tipo, Tipo::Playlist { .. })
+    }
+
     pub(crate) fn especial(tipo: Tipo, ordem: Ordem) -> Self {
         Self {
             caminho: PathBuf::new(),
@@ -108,6 +126,7 @@ impl PastaMusical {
             Tipo::Favoritas => CHAVE_FAVORITAS.to_string(),
             Tipo::MaisTocadas => CHAVE_MAIS_TOCADAS.to_string(),
             Tipo::Album { origem } => origem.clone(),
+            Tipo::Playlist { arquivo } => arquivo.to_string_lossy().to_string(),
         }
     }
 
@@ -244,6 +263,10 @@ pub(crate) struct EstadoAudio {
     pub(crate) indices_visiveis: Vec<usize>,
     /// Texto atual da busca (título/artista).
     pub(crate) filtro: String,
+    /// Faixa (chave) a pôr na playlist que o diálogo "Nova playlist" criar.
+    pub(crate) playlist_pendente: Option<String>,
+    /// Aba da playlist que o diálogo renomeia ou apaga.
+    pub(crate) playlist_alvo: Option<usize>,
     /// Letra sincronizada da faixa atual (tempo em segundos, texto), ordenada.
     pub(crate) letra_atual: Vec<(f64, String)>,
     /// Tempo e posição de cada palavra, por linha (LRC estendido; vazio
@@ -320,6 +343,8 @@ impl Default for EstadoAudio {
             idioma: "en".to_string(),
             indices_visiveis: Vec::new(),
             filtro: String::new(),
+            playlist_pendente: None,
+            playlist_alvo: None,
             letra_atual: Vec::new(),
             letra_palavras: Vec::new(),
             letra_livre: false,

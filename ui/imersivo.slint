@@ -330,6 +330,8 @@ export component TelaImersiva inherits Rectangle {
     in property <int> midia_atual;
     in property <[string]> opcoes_midia;
     in property <bool> aba_tem_video;
+    in property <[string]> playlist_nomes;
+    in property <bool> aba_e_playlist;
     in property <int> especiais;
 
     // Configurações da tela cheia
@@ -375,6 +377,10 @@ export component TelaImersiva inherits Rectangle {
     callback album_clicado(int);
     callback ordem_escolhida(int);
     callback midia_escolhida(int);
+    callback playlist_adicionar(int, int);
+    callback playlist_adicionar_atual(int);
+    callback playlist_remover(int);
+    callback playlist_mover(int, int);
     callback alternar_crossfade();
     callback alternar_replaygain(bool);
     callback alternar_fundo_reativo(bool);
@@ -948,6 +954,29 @@ export component TelaImersiva inherits Rectangle {
                 cor: root.destaque;
                 clicado => { root.alternar_favorita(); }
             }
+            botao_playlist := BotaoImersivo {
+                y: (parent.height - self.height) / 2;
+                icone: @image-url("icons/playlist_mais.svg");
+                dica: I18n.playlist_add_to;
+                cor: root.destaque;
+                clicado => { menu_playlist.show({ x: 0px, y: self.height + 6px }); }
+
+                menu_playlist := ContextMenuArea {
+                    enabled: false;
+
+                    Menu {
+                        for nome[p] in root.playlist_nomes : MenuItem {
+                            title: nome;
+                            activated => { root.playlist_adicionar_atual(p); }
+                        }
+                        if root.playlist_nomes.length > 0 : MenuSeparator { }
+                        MenuItem {
+                            title: I18n.playlist_new;
+                            activated => { root.playlist_adicionar_atual(-1); }
+                        }
+                    }
+                }
+            }
             BotaoImersivo {
                 y: (parent.height - self.height) / 2;
                 icone: @image-url("icons/lua.svg");
@@ -1332,6 +1361,11 @@ export component TelaImersiva inherits Rectangle {
         album_clicado(i) => { root.album_clicado(i); }
         ordem_escolhida(i) => { root.ordem_escolhida(i); }
         midia_escolhida(i) => { root.midia_escolhida(i); }
+        playlist_nomes: root.playlist_nomes;
+        aba_e_playlist: root.aba_e_playlist;
+        playlist_adicionar(l, p) => { root.playlist_adicionar(l, p); }
+        playlist_remover(l) => { root.playlist_remover(l); }
+        playlist_mover(l, d) => { root.playlist_mover(l, d); }
         favorita_alternada(i) => { root.favorita_alternada(i); }
         aba_selecionada(i) => { root.aba_selecionada(i); }
         busca_mudou(t) => { root.busca_mudou(t); }
