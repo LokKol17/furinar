@@ -179,6 +179,8 @@ pub(crate) struct EstadoAudio {
     pub(crate) buscador: Option<buscador::Buscador>,
     /// Buscar a letra na web quando a faixa tocando não tem.
     pub(crate) letras_web: bool,
+    /// "Também salvar no arquivo" na tela de informações (lembrado).
+    pub(crate) gravar_tags_info: bool,
     /// Chave de aplicativo do AcoustID ("" = sem impressão digital).
     pub(crate) chave_acoustid: String,
     /// Status no Discord ligado, e a conexão (só existe ligado).
@@ -264,6 +266,7 @@ impl Default for EstadoAudio {
             metadados: metadados::Banco::default(),
             buscador: None,
             letras_web: false,
+            gravar_tags_info: false,
             chave_acoustid: String::new(),
             discord_ativo: false,
             discord: None,
@@ -343,6 +346,7 @@ pub(crate) fn salvar_configuracao(estado: &EstadoAudio) {
             .collect(),
         crossfade: estado.crossfade,
         letras_web: estado.letras_web,
+        gravar_tags_info: estado.gravar_tags_info,
         chave_acoustid: estado.chave_acoustid.clone(),
         discord: estado.discord_ativo,
         listenbrainz_token: estado.contas.listenbrainz.clone(),

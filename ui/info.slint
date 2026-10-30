@@ -12,6 +12,9 @@ import { I18n } from "i18n.slint";
 
 export struct CandidatoInfo {
     titulo: string,
+    artista: string,
+    /// Álbum com o ano, no mesmo formato do álbum atual
+    album: string,
     detalhe: string,
     /// 0 a 100
     confianca: int,
@@ -60,21 +63,63 @@ component Botao inherits Rectangle {
     }
 }
 
-// Pílula com a confiança: verde, amarela ou vermelha
+// Pílula com a confiança em palavras (e a porcentagem): verde, amarela ou
+// vermelha
 component Nota inherits Rectangle {
     in property <int> valor;
-    width: 44px;
+    width: rotulo.preferred-width + 18px;
     height: 20px;
     border-radius: 10px;
     background: (root.valor >= 90 ? #2e9d5b : (root.valor >= 70 ? #c9a050 : #c9564f)).with-alpha(0.25);
 
-    Text {
-        text: root.valor + "%";
+    rotulo := Text {
+        text: (root.valor >= 90 ? I18n.info_conf_high : (root.valor >= 70 ? I18n.info_conf_mid : I18n.info_conf_low)) + " · " + root.valor + "%";
         color: root.valor >= 90 ? #4cd685 : (root.valor >= 70 ? #e3bd6a : #ef7d75);
         font-size: 11px;
         font-weight: 700;
         horizontal-alignment: center;
         vertical-alignment: center;
+    }
+}
+
+// Uma linha de "o que muda": campo, valor atual riscado e o novo
+component Mudanca inherits HorizontalLayout {
+    in property <string> campo;
+    in property <string> antes;
+    in property <string> depois;
+    in property <color> texto;
+    in property <color> suave;
+    in property <color> destaque;
+    // Antes e depois com a mesma largura: as setas ficam alinhadas
+    property <length> coluna: (self.width - 56px - 12px - 3 * self.spacing) / 2;
+
+    spacing: 8px;
+    Text {
+        text: root.campo;
+        width: 56px;
+        color: root.suave;
+        font-size: 12px;
+    }
+    Text {
+        text: root.antes != "" ? root.antes : I18n.info_empty;
+        width: root.coluna;
+        color: root.suave;
+        font-size: 12px;
+        overflow: elide;
+    }
+    Text {
+        text: "→";
+        width: 12px;
+        color: root.destaque;
+        font-size: 12px;
+    }
+    Text {
+        text: root.depois != "" ? root.depois : I18n.info_empty;
+        color: root.texto;
+        font-size: 12px;
+        font-weight: 600;
+        width: root.coluna;
+        overflow: elide;
     }
 }
 
@@ -92,6 +137,8 @@ export component JanelaInfo inherits Rectangle {
     in property <string> estado;
     in property <bool> ocupado;
     in property <[CandidatoInfo]> candidatos;
+    /// "Também salvar no arquivo"
+    in-out property <bool> gravar;
 
     in property <bool> lote_ativo;
     in property <float> lote_progresso;
@@ -121,16 +168,17 @@ export component JanelaInfo inherits Rectangle {
     /// 0 = faixa, 1 = aba inteira
     in-out property <int> guia: 0;
     property <int> escolhido: -1;
-    /// "Gravar nas tags" pede um segundo clique
-    property <bool> confirmar_tags: false;
+    property <CandidatoInfo> atual: root.escolhido >= 0 ? root.candidatos[root.escolhido] : { };
+    property <bool> muda_titulo: root.atual.titulo != root.titulo;
+    property <bool> muda_artista: root.atual.artista != root.artista;
+    property <bool> muda_album: root.atual.album != "" && root.atual.album != root.album;
+    /// Gravar as tags da aba inteira pede um segundo clique
     property <bool> confirmar_tags_aba: false;
 
     changed candidatos => {
         root.escolhido = root.candidatos.length > 0 ? 0 : -1;
-        root.confirmar_tags = false;
     }
     changed aberta => {
-        root.confirmar_tags = false;
         root.confirmar_tags_aba = false;
     }
 
@@ -285,6 +333,13 @@ export component JanelaInfo inherits Rectangle {
                     background: root.borda;
                 }
 
+                if root.candidatos.length == 0 : Text {
+                    text: I18n.info_hint;
+                    color: root.suave;
+                    font-size: 13px;
+                    wrap: word-wrap;
+                }
+
                 HorizontalLayout {
                     spacing: 10px;
                     vertical-stretch: 0;
@@ -326,10 +381,7 @@ export component JanelaInfo inherits Rectangle {
                             border-color: root.destaque.with-alpha(0.6);
 
                             toque_c := TouchArea {
-                                clicked => {
-                                    root.escolhido = i;
-                                    root.confirmar_tags = false;
-                                }
+                                clicked => { root.escolhido = i; }
                             }
                             VerticalLayout {
                                 x: 12px;
@@ -367,41 +419,106 @@ export component JanelaInfo inherits Rectangle {
                     wrap: word-wrap;
                 }
 
-                if root.candidatos.length > 0 : HorizontalLayout {
-                    spacing: 8px;
-                    alignment: end;
+                if root.escolhido >= 0 : VerticalLayout {
+                    spacing: 4px;
+                    vertical-stretch: 0;
 
                     Text {
-                        text: root.confirmar_tags ? I18n.info_confirm_tags : "";
-                        color: #e3bd6a;
-                        font-size: 12px;
-                        vertical-alignment: center;
-                        horizontal-stretch: 1;
-                        wrap: word-wrap;
+                        text: (root.muda_titulo || root.muda_artista || root.muda_album) ? I18n.info_changes : I18n.info_no_changes;
+                        color: root.texto;
+                        font-size: 13px;
+                        font-weight: 600;
                     }
-                    Botao {
-                        texto: root.confirmar_tags ? I18n.info_confirm_button : I18n.info_apply_tags;
-                        habilitado: root.escolhido >= 0;
+                    if root.muda_titulo : Mudanca {
+                        campo: I18n.info_field_title;
+                        antes: root.titulo;
+                        depois: root.atual.titulo;
+                        texto: root.texto;
+                        suave: root.suave;
                         destaque: root.destaque;
-                        cor_texto: root.texto;
-                        neutro: root.neutro;
-                        clicado => {
-                            if (root.confirmar_tags) {
-                                root.confirmar_tags = false;
-                                root.aplicar(root.escolhido, true);
-                            } else {
-                                root.confirmar_tags = true;
+                    }
+                    if root.muda_artista : Mudanca {
+                        campo: I18n.info_field_artist;
+                        antes: root.artista;
+                        depois: root.atual.artista;
+                        texto: root.texto;
+                        suave: root.suave;
+                        destaque: root.destaque;
+                    }
+                    if root.muda_album : Mudanca {
+                        campo: I18n.info_field_album;
+                        antes: root.album;
+                        depois: root.atual.album;
+                        texto: root.texto;
+                        suave: root.suave;
+                        destaque: root.destaque;
+                    }
+                }
+
+                if root.candidatos.length > 0 : HorizontalLayout {
+                    spacing: 12px;
+                    vertical-stretch: 0;
+
+                    // Caixinha na paleta da tela (o CaixaSelecao do tema
+                    // não tem a versão escura do imersivo)
+                    Rectangle {
+                        horizontal-stretch: 1;
+                        min-height: caixa_gravar.preferred-height;
+
+                        caixa_gravar := HorizontalLayout {
+                            spacing: 8px;
+
+                            Rectangle {
+                                width: 18px;
+                                height: 18px;
+                                y: 1px;
+                                border-radius: 5px;
+                                border-width: 1px;
+                                border-color: root.gravar || toque_gravar.has-hover ? root.destaque : root.borda;
+                                background: root.gravar ? root.destaque.with-alpha(0.25) : root.neutro;
+                                animate background, border-color { duration: 130ms; }
+
+                                Image {
+                                    source: @image-url("icons/check.svg");
+                                    width: 12px;
+                                    height: 12px;
+                                    x: (parent.width - self.width) / 2;
+                                    y: (parent.height - self.height) / 2;
+                                    colorize: root.texto;
+                                    visible: root.gravar;
+                                }
                             }
+                            VerticalLayout {
+                                spacing: 2px;
+
+                                Text {
+                                    text: I18n.info_apply_tags;
+                                    color: root.texto;
+                                    font-size: 13px;
+                                    wrap: word-wrap;
+                                }
+                                Text {
+                                    text: I18n.info_apply_tags_desc;
+                                    color: root.suave;
+                                    font-size: 11px;
+                                    wrap: word-wrap;
+                                }
+                            }
+                        }
+                        toque_gravar := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => { root.gravar = !root.gravar; }
                         }
                     }
                     Botao {
+                        y: (parent.height - self.height) / 2;
                         texto: I18n.info_apply;
                         principal: true;
                         habilitado: root.escolhido >= 0;
                         destaque: root.destaque;
                         cor_texto: root.texto;
                         neutro: root.neutro;
-                        clicado => { root.aplicar(root.escolhido, false); }
+                        clicado => { root.aplicar(root.escolhido, root.gravar); }
                     }
                 }
             }

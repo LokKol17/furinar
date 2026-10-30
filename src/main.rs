@@ -178,6 +178,17 @@ fn aplicar_idioma(idioma: &str, ui: &MainWindow) {
     i18n.set_info_search_web(g("info_search_web"));
     i18n.set_info_apply(g("info_apply"));
     i18n.set_info_apply_tags(g("info_apply_tags"));
+    i18n.set_info_hint(g("info_hint"));
+    i18n.set_info_apply_tags_desc(g("info_apply_tags_desc"));
+    i18n.set_info_changes(g("info_changes"));
+    i18n.set_info_no_changes(g("info_no_changes"));
+    i18n.set_info_field_title(g("info_field_title"));
+    i18n.set_info_field_artist(g("info_field_artist"));
+    i18n.set_info_field_album(g("info_field_album"));
+    i18n.set_info_empty(g("info_empty"));
+    i18n.set_info_conf_high(g("info_conf_high"));
+    i18n.set_info_conf_mid(g("info_conf_mid"));
+    i18n.set_info_conf_low(g("info_conf_low"));
     i18n.set_info_confirm_tags(g("info_confirm_tags"));
     i18n.set_info_confirm_button(g("info_confirm_button"));
     i18n.set_batch_desc(g("batch_desc"));
@@ -383,6 +394,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         e.biblioteca = Biblioteca::carregar();
         e.metadados = metadados::Banco::carregar();
         e.letras_web = config.letras_web;
+        e.gravar_tags_info = config.gravar_tags_info;
         e.chave_acoustid = config.chave_acoustid.clone();
         e.discord_ativo = config.discord;
         e.contas = scrobble::Contas {
@@ -401,6 +413,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         enviar_fila_scrobble(&mut e);
         ui.set_discord(config.discord);
         ui.set_letras_web(config.letras_web);
+        ui.set_info_gravar(config.gravar_tags_info);
         ui.set_chave_acoustid(config.chave_acoustid.as_str().into());
         e.crossfade = config.crossfade;
         e.replaygain = config.replaygain;

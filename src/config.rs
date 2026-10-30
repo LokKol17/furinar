@@ -57,6 +57,9 @@ pub struct AppConfig {
     /// instalações novas; configurações antigas sem o campo ficam desligadas.
     #[serde(default)]
     pub letras_web: bool,
+    /// Última escolha de "Também salvar no arquivo" na tela de informações.
+    #[serde(default)]
+    pub gravar_tags_info: bool,
     /// Chave de aplicativo do AcoustID (impressão digital).
     #[serde(default)]
     pub chave_acoustid: String,
@@ -117,6 +120,7 @@ impl Default for AppConfig {
             ordens: HashMap::new(),
             crossfade: 0,
             letras_web: true,
+            gravar_tags_info: false,
             chave_acoustid: String::new(),
             discord: false,
             listenbrainz_token: String::new(),

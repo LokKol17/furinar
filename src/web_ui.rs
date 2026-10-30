@@ -5,13 +5,16 @@ use crate::*;
 
 /// Como mostrar um candidato na tela de informações.
 pub(crate) fn linha_candidato(c: &metadados::Candidato, pelo_som: &str) -> CandidatoInfo {
+    // Mesmo formato do álbum atual na tela, para a comparação "o que muda"
+    let album = match (&c.album, c.ano) {
+        (Some(album), Some(ano)) => format!("{album} ({ano})"),
+        (Some(album), None) => album.clone(),
+        (None, _) => String::new(),
+    };
     let mut detalhe = c.artista.clone();
-    if let Some(album) = &c.album {
+    if !album.is_empty() {
         detalhe.push_str(" · ");
-        detalhe.push_str(album);
-        if let Some(ano) = c.ano {
-            detalhe.push_str(&format!(" ({ano})"));
-        }
+        detalhe.push_str(&album);
     }
     if c.duracao > 0 {
         detalhe.push_str(" · ");
@@ -23,6 +26,8 @@ pub(crate) fn linha_candidato(c: &metadados::Candidato, pelo_som: &str) -> Candi
     }
     CandidatoInfo {
         titulo: c.titulo.as_str().into(),
+        artista: c.artista.as_str().into(),
+        album: album.into(),
         detalhe: detalhe.into(),
         confianca: c.confianca as i32,
         digital: c.fonte == metadados::Fonte::ImpressaoDigital,
@@ -270,6 +275,7 @@ pub(crate) fn processar_web(estado: &mut EstadoAudio, ui: &MainWindow) {
                 let texto = match (&erro, lista.len()) {
                     (Some(e), 0) => format!("{}: {e}", t("info_error")),
                     (_, 0) => t("info_nothing"),
+                    (_, 1) => t("info_result_one"),
                     (_, n) => t("info_results").replace("{n}", &n.to_string()),
                 };
                 estado.info_candidatos = lista;
@@ -538,6 +544,10 @@ pub(crate) fn ligar(ui: &MainWindow, estado: &Rc<RefCell<EstadoAudio>>) {
             ) else {
                 return;
             };
+            if e.gravar_tags_info != gravar {
+                e.gravar_tags_info = gravar;
+                salvar_configuracao(&e);
+            }
             let correcao = metadados::Correcao::from(&c);
             aplicar_correcao(&mut e, &chave, correcao.clone());
             e.metadados.salvar();

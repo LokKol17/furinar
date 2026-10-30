@@ -87,6 +87,8 @@ export component MainWindow inherits Window {
     in property <string> info_estado;
     in property <bool> info_ocupado;
     in property <[CandidatoInfo]> info_candidatos;
+    /// "Também salvar no arquivo" (lembrado na configuração)
+    in-out property <bool> info_gravar;
     in property <bool> lote_ativo;
     in property <float> lote_progresso;
     in property <string> lote_texto;
@@ -1126,6 +1128,7 @@ export component MainWindow inherits Window {
         estado: info_estado;
         ocupado: info_ocupado;
         candidatos: info_candidatos;
+        gravar <=> info_gravar;
         lote_ativo: lote_ativo;
         lote_progresso: lote_progresso;
         lote_texto: lote_texto;

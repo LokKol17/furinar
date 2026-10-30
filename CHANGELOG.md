@@ -7,6 +7,10 @@ e o projeto adere ao [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Alterado
+
+- Tela de informações da faixa mais clara: um texto diz o que fazer, o botão virou "Procurar na internet", a confiança aparece em palavras (Certeza, Provável, Talvez) e o resultado escolhido mostra "o que muda" (título, artista, álbum: atual → novo). Os dois botões "Aplicar" / "Aplicar e gravar nas tags" viraram um só, "Usar estes dados", com a caixinha "Também salvar no arquivo" explicada logo abaixo; a escolha fica lembrada.
+
 ### Corrigido
 
 - "Buscar na web" às vezes terminava em "erro HTTP 400": o AcoustID recusa (com 400) impressão de áudio curto demais e duração 0, que o Furinar mandava quando o arquivo não informa a duração (MP3 sem cabeçalho Xing, M4A fragmentado de download). Agora usa a duração do áudio decodificado e não consulta com menos de 10 s. Erros de serviço mostram o motivo que ele deu (ex.: "HTTP 400: invalid fingerprint").

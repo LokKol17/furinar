@@ -31,12 +31,29 @@ pub fn pt_br() -> Translations {
     t.insert("info_restore", "Restaurar original");
     t.insert("info_lyrics_label", "Letra");
     t.insert("info_get_lyrics", "Baixar letra");
-    t.insert("info_search_web", "Buscar na web");
-    t.insert("info_apply", "Aplicar");
-    t.insert("info_apply_tags", "Aplicar e gravar nas tags");
+    t.insert("info_search_web", "Procurar na internet");
+    t.insert(
+        "info_hint",
+        "Nome ou dados errados? Procure a faixa na internet e escolha a versão certa.",
+    );
+    t.insert("info_apply", "Usar estes dados");
+    t.insert("info_apply_tags", "Também salvar no arquivo");
+    t.insert(
+        "info_apply_tags_desc",
+        "Outros players e o celular também passam a ver a correção. Sem isso, só o Furinar muda, e dá para desfazer.",
+    );
+    t.insert("info_changes", "O que muda");
+    t.insert("info_no_changes", "Nada muda: os dados já estão assim.");
+    t.insert("info_field_title", "Título");
+    t.insert("info_field_artist", "Artista");
+    t.insert("info_field_album", "Álbum");
+    t.insert("info_empty", "(vazio)");
+    t.insert("info_conf_high", "Certeza");
+    t.insert("info_conf_mid", "Provável");
+    t.insert("info_conf_low", "Talvez");
     t.insert(
         "info_confirm_tags",
-        "Isso altera o arquivo de música. Clique de novo para confirmar.",
+        "Isso altera os arquivos de música. Clique de novo para confirmar.",
     );
     t.insert("info_confirm_button", "Confirmar");
     t.insert("batch_desc", "Identifica todas as faixas desta aba no MusicBrainz e baixa as letras que faltam. Acertos com 90% ou mais entram sozinhos; o resto fica aqui para você revisar. Nada é gravado nos arquivos sem você pedir.");
@@ -83,6 +100,7 @@ pub fn pt_br() -> Translations {
     t.insert("lastfm_connected", "Conectado como {u}");
     t.insert("info_by_sound", "identificada pelo som");
     t.insert("info_nothing", "Nada encontrado.");
+    t.insert("info_result_one", "1 resultado");
     t.insert("info_results", "{n} resultados — escolha um");
     t.insert("info_searching", "Buscando…");
     t.insert("tags_written", "{n} arquivos atualizados");
@@ -215,12 +233,32 @@ pub fn en() -> Translations {
     t.insert("info_restore", "Restore original");
     t.insert("info_lyrics_label", "Lyrics");
     t.insert("info_get_lyrics", "Get lyrics");
-    t.insert("info_search_web", "Search the web");
-    t.insert("info_apply", "Apply");
-    t.insert("info_apply_tags", "Apply and write tags");
+    t.insert("info_search_web", "Search online");
+    t.insert(
+        "info_hint",
+        "Wrong name or details? Search for the track online and pick the right one.",
+    );
+    t.insert("info_apply", "Use this info");
+    t.insert("info_apply_tags", "Also save it to the file");
+    t.insert(
+        "info_apply_tags_desc",
+        "Other players and your phone will see the fix too. Without it, only Furinar changes, and you can undo it.",
+    );
+    t.insert("info_changes", "What changes");
+    t.insert(
+        "info_no_changes",
+        "Nothing changes: the details already match.",
+    );
+    t.insert("info_field_title", "Title");
+    t.insert("info_field_artist", "Artist");
+    t.insert("info_field_album", "Album");
+    t.insert("info_empty", "(empty)");
+    t.insert("info_conf_high", "Sure");
+    t.insert("info_conf_mid", "Likely");
+    t.insert("info_conf_low", "Maybe");
     t.insert(
         "info_confirm_tags",
-        "This changes the music file. Click again to confirm.",
+        "This changes the music files. Click again to confirm.",
     );
     t.insert("info_confirm_button", "Confirm");
     t.insert("batch_desc", "Identifies every track in this tab on MusicBrainz and downloads missing lyrics. Matches of 90% or more are applied automatically; the rest waits here for review. Nothing is written to your files unless you ask.");
@@ -267,6 +305,7 @@ pub fn en() -> Translations {
     t.insert("lastfm_connected", "Connected as {u}");
     t.insert("info_by_sound", "matched by sound");
     t.insert("info_nothing", "Nothing found.");
+    t.insert("info_result_one", "1 result");
     t.insert("info_results", "{n} results — pick one");
     t.insert("info_searching", "Searching…");
     t.insert("tags_written", "{n} files updated");
