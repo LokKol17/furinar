@@ -142,6 +142,48 @@ component OpcaoImersiva inherits Rectangle {
 }
 
 // Campo de texto de uma linha no estilo da tela cheia
+// Seletor de opções no estilo da tela cheia (o Segmentado do tema segue o
+// tema claro/escuro; aqui é sempre escuro, com a cor da capa)
+component SegmentadoImersivo inherits Rectangle {
+    in property <[string]> opcoes;
+    in property <int> atual;
+    in property <color> cor;
+    callback escolhido(int);
+
+    height: 34px;
+    border-radius: 10px;
+    border-width: 1px;
+    border-color: #ffffff1f;
+    background: #ffffff12;
+
+    HorizontalLayout {
+        padding: 3px;
+        spacing: 3px;
+
+        for opcao[i] in root.opcoes : Rectangle {
+            border-radius: 8px;
+            background: i == root.atual ? root.cor : (toque.has-hover ? #ffffff14 : transparent);
+            animate background { duration: 120ms; }
+
+            Text {
+                text: opcao;
+                color: #ffffff;
+                font-size: 13px;
+                font-weight: i == root.atual ? 600 : 400;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+            toque := TouchArea {
+                clicked => {
+                    if (i != root.atual) {
+                        root.escolhido(i);
+                    }
+                }
+            }
+        }
+    }
+}
+
 component CampoImersivo inherits Rectangle {
     in-out property <string> texto;
     in property <bool> senha: false;
@@ -303,6 +345,8 @@ export component TelaImersiva inherits Rectangle {
     in property <string> lastfm_estado;
     in property <string> scrobble_estado;
     in-out property <string> chave_acoustid;
+    in-out property <bool> escanear_subpastas;
+    in property <bool> ffmpeg_ausente;
 
     callback sair();
     callback anterior();
@@ -334,6 +378,9 @@ export component TelaImersiva inherits Rectangle {
     callback limpar_fundo();
     callback abrir_info();
     callback alternar_letras_web(bool);
+    callback trocar_idioma(string);
+    callback alternar_escanear_subpastas(bool);
+    callback abrir_pagina_ffmpeg();
     callback alternar_discord(bool);
     callback listenbrainz_mudou(string);
     callback lastfm_credenciais_mudou(string, string);
@@ -984,6 +1031,35 @@ export component TelaImersiva inherits Rectangle {
                         }
                     }
 
+                    // Idioma (o tema não entra: a tela cheia é sempre escura)
+                    HorizontalLayout {
+                        padding-left: 12px;
+                        padding-right: 12px;
+                        spacing: 12px;
+
+                        Text {
+                            text: I18n.language;
+                            color: #ffffff;
+                            font-size: 14px;
+                            vertical-alignment: center;
+                        }
+                        // Cada idioma escrito nele mesmo, como no modo normal
+                        SegmentadoImersivo {
+                            horizontal-stretch: 1;
+                            opcoes: ["English", "Português"];
+                            atual: I18n.idioma == "en" ? 0 : 1;
+                            cor: root.destaque;
+                            escolhido(i) => { root.trocar_idioma(i == 0 ? "en" : "pt-br"); }
+                        }
+                    }
+
+                    OpcaoImersiva {
+                        rotulo: I18n.scan_subfolders;
+                        descricao: I18n.scan_subfolders_desc;
+                        ligado <=> root.escanear_subpastas;
+                        cor: root.destaque;
+                        alternado(v) => { root.alternar_escanear_subpastas(v); }
+                    }
                     OpcaoImersiva {
                         rotulo: I18n.replaygain;
                         descricao: I18n.replaygain_desc;
@@ -1097,6 +1173,11 @@ export component TelaImersiva inherits Rectangle {
                             cor: root.destaque;
                             editado(t) => { root.listenbrainz_mudou(t); }
                         }
+                        Text {
+                            text: I18n.lastfm_keys;
+                            color: #ffffffb3;
+                            font-size: 13px;
+                        }
                         HorizontalLayout {
                             spacing: 8px;
 
@@ -1180,6 +1261,28 @@ export component TelaImersiva inherits Rectangle {
                             if root.fundo_global_nome != "" : BotaoTexto {
                                 texto: I18n.bg_clear;
                                 clicado => { root.limpar_fundo(); }
+                            }
+                        }
+                    }
+
+                    // Sem FFmpeg: o que fica de fora e onde conseguir
+                    if root.ffmpeg_ausente : VerticalLayout {
+                        padding-left: 12px;
+                        padding-right: 12px;
+                        spacing: 8px;
+
+                        Text {
+                            text: I18n.ffmpeg_missing;
+                            color: #ffffff80;
+                            font-size: 12px;
+                            wrap: word-wrap;
+                        }
+                        HorizontalLayout {
+                            alignment: start;
+
+                            BotaoTexto {
+                                texto: I18n.ffmpeg_get;
+                                clicado => { root.abrir_pagina_ffmpeg(); }
                             }
                         }
                     }
