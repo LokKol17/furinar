@@ -60,6 +60,19 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="1.12.0" date="2026-10-30">
+      <description>
+        <p>Playlists, manual tag editing and clearer messages:</p>
+        <ul>
+          <li>Playlists as .m3u8 files, each in its own tab: add songs from the right-click menu or the "+" button, reorder, rename, delete and import .m3u/.m3u8</li>
+          <li>New "Edit" tab in track info to fix title, artist, album, album artist, genre, year, track and disc by hand, optionally saved to the file tags</li>
+          <li>"Audio only" / "Video only" filter per tab</li>
+          <li>Immersive mode settings now match the normal mode (language, subfolder scanning)</li>
+          <li>Track info screen explains what to do and what will change, with a single "Use this data" button</li>
+          <li>Error messages say what failed and what to do; fixed "HTTP 400" from AcoustID on files without a known duration</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.11.0" date="2026-10-30">
       <description>
         <p>More feel to every interaction:</p>

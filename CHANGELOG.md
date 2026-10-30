@@ -7,6 +7,8 @@ e o projeto adere ao [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.12.0] — 2026-10-30
+
 ### Adicionado
 
 - Filtro "Só áudio" / "Só vídeo" no menu de ordenação (modo normal e painel da biblioteca do imersivo), por aba e salvo. Aparece só em abas que têm vídeo; a navegação e o shuffle seguem o filtro.
