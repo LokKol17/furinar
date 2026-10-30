@@ -129,7 +129,7 @@ pub fn enviar(cliente: &mut Cliente, contas: &Contas, fila: Fila) -> (Fila, Opti
         match resultado {
             Ok(()) => {}
             // Sem rede ou servidor sobrecarregado: tenta de novo depois
-            Err(e @ (Erro::Rede(_) | Erro::Status(429 | 500..=599))) => {
+            Err(e @ (Erro::Rede(_) | Erro::Status(429 | 500..=599, _))) => {
                 erro = Some(e.to_string());
                 sobrou.push((servico, escuta));
             }
@@ -210,7 +210,7 @@ fn lastfm(
     let formulario: Vec<(&str, String)> = parametros.into_iter().collect();
     let resposta: Option<serde_json::Value> =
         cliente.json_post("ws.audioscrobbler.com", LASTFM, &formulario)?;
-    let resposta = resposta.ok_or(Erro::Status(404))?;
+    let resposta = resposta.ok_or(Erro::Status(404, String::new()))?;
     if let Some(msg) = resposta.get("message").and_then(|m| m.as_str())
         && resposta.get("error").is_some()
     {

@@ -34,6 +34,8 @@ pub fn chave_efetiva(do_usuario: &str) -> Option<String> {
 const HOST: &str = "api.acoustid.org";
 /// O AcoustID usa os 120 primeiros segundos.
 const SEGUNDOS: u64 = 120;
+/// Menos áudio que isso não dá uma impressão que o AcoustID aceite.
+const MINIMO_SEGUNDOS: u32 = 10;
 
 /// Impressão digital comprimida (base64, como o `fpcalc` gera) e a duração
 /// da faixa em segundos.
@@ -59,12 +61,17 @@ pub fn impressao(caminho: &Path) -> Option<(String, u32)> {
     }
     fp.consume(&lote);
     fp.finish();
-    if fp.fingerprint().is_empty() {
+    // Pouco áudio decodificado (arquivo quebrado, decodificador que parou
+    // cedo): o AcoustID recusa com 400 ou devolve lixo
+    let segundos_lidos = (lidas as u64 / (taxa as u64 * canais as u64).max(1)) as u32;
+    if fp.fingerprint().is_empty() || segundos_lidos < MINIMO_SEGUNDOS {
         return None;
     }
     let comprimida = FingerprintCompressor::from(&config).compress(fp.fingerprint());
     let texto = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(comprimida);
-    let duracao = duracao.unwrap_or((lidas as u64 / (taxa as u64 * canais as u64).max(1)) as u32);
+    // Duração 0 também é 400 ("invalid duration"): o container pode não
+    // dizer (MP3 sem cabeçalho Xing, M4A fragmentado de download)
+    let duracao = duracao.filter(|&d| d > 0).unwrap_or(segundos_lidos);
     Some((texto, duracao))
 }
 

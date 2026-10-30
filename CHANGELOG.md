@@ -7,6 +7,10 @@ e o projeto adere ao [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Corrigido
+
+- "Buscar na web" às vezes terminava em "erro HTTP 400": o AcoustID recusa (com 400) impressão de áudio curto demais e duração 0, que o Furinar mandava quando o arquivo não informa a duração (MP3 sem cabeçalho Xing, M4A fragmentado de download). Agora usa a duração do áudio decodificado e não consulta com menos de 10 s. Erros de serviço mostram o motivo que ele deu (ex.: "HTTP 400: invalid fingerprint").
+
 ## [1.11.0] — 2026-10-30
 
 ### Adicionado

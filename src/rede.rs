@@ -22,8 +22,9 @@ const TENTATIVAS: u32 = 4;
 pub enum Erro {
     /// Sem conexão, DNS, tempo esgotado...
     Rede(String),
-    /// Resposta HTTP fora de 2xx (depois das novas tentativas).
-    Status(u16),
+    /// Resposta HTTP fora de 2xx (depois das novas tentativas), com o motivo
+    /// que o serviço mandou no corpo, se mandou ("" se não).
+    Status(u16, String),
     /// Corpo que não é o JSON esperado.
     Formato(String),
 }
@@ -32,7 +33,8 @@ impl std::fmt::Display for Erro {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Erro::Rede(e) => write!(f, "rede: {e}"),
-            Erro::Status(s) => write!(f, "HTTP {s}"),
+            Erro::Status(s, motivo) if motivo.is_empty() => write!(f, "HTTP {s}"),
+            Erro::Status(s, motivo) => write!(f, "HTTP {s}: {motivo}"),
             Erro::Formato(e) => write!(f, "resposta inesperada: {e}"),
         }
     }
@@ -55,6 +57,20 @@ fn intervalo(host: &str) -> Duration {
         "ws.audioscrobbler.com" => Duration::from_millis(250),
         _ => Duration::from_millis(200),
     }
+}
+
+/// O motivo de um erro no corpo da resposta: `{"error":{"message":..}}`
+/// (AcoustID), `{"error":".."}` (MusicBrainz, ListenBrainz) ou
+/// `{"message":".."}` (Last.fm). Página HTML ou outra coisa: "".
+fn motivo(corpo: &str) -> String {
+    let Ok(v) = serde_json::from_str::<serde_json::Value>(corpo) else {
+        return String::new();
+    };
+    [&v["error"]["message"], &v["error"], &v["message"]]
+        .into_iter()
+        .find_map(|m| m.as_str())
+        .map(|m| m.chars().take(160).collect())
+        .unwrap_or_default()
 }
 
 impl Cliente {
@@ -97,7 +113,9 @@ impl Cliente {
                     let status = r.status().as_u16();
                     // Sobrecarga ou limite: espera e tenta de novo
                     if !matches!(status, 429 | 500 | 502 | 503 | 504) || tentativa == TENTATIVAS {
-                        return Err(Erro::Status(status));
+                        // O AcoustID responde 400 a qualquer pedido que recusa;
+                        // o porquê vem no corpo
+                        return Err(Erro::Status(status, motivo(&r.text().unwrap_or_default())));
                     }
                 }
                 Err(e) if tentativa == TENTATIVAS || !e.is_timeout() => {
@@ -172,5 +190,29 @@ impl Cliente {
                     .map_err(|e| Erro::Rede(e.to_string()))
             })
             .transpose()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn motivo_do_erro_vem_do_corpo_de_cada_servico() {
+        assert_eq!(
+            motivo(
+                r#"{"error": {"code": 3, "message": "invalid fingerprint"}, "status": "error"}"#
+            ),
+            "invalid fingerprint"
+        );
+        assert_eq!(motivo(r#"{"error": "Invalid mbid."}"#), "Invalid mbid.");
+        assert_eq!(
+            motivo(r#"{"error": 10, "message": "Invalid API key"}"#),
+            "Invalid API key"
+        );
+        assert_eq!(motivo("<html>Bad Request</html>"), "");
+        let e = Erro::Status(400, "invalid fingerprint".into());
+        assert_eq!(e.to_string(), "HTTP 400: invalid fingerprint");
+        assert_eq!(Erro::Status(503, String::new()).to_string(), "HTTP 503");
     }
 }
