@@ -86,6 +86,12 @@ fn captura_modo_normal() {
     };
     ui.set_loop_modo(modo("FURINAR_CAPTURA_LOOP"));
     ui.set_shuffle_modo(modo("FURINAR_CAPTURA_SHUFFLE"));
+    // Tocando: o indicador da linha atual aparece
+    ui.set_tocando(true);
+    // FURINAR_CAPTURA_TOAST=<texto>: aviso no rodapé
+    if let Ok(texto) = std::env::var("FURINAR_CAPTURA_TOAST") {
+        avisar(&ui, &texto);
+    }
     // FURINAR_CAPTURA_CONFIG=1: configurações abertas
     if std::env::var_os("FURINAR_CAPTURA_CONFIG").is_some() {
         ui.set_config_aberta(true);
@@ -165,8 +171,24 @@ fn captura_modo_normal() {
         ui.set_info_aberta(true);
     }
 
-    for _ in 0..10 {
+    // FURINAR_CAPTURA_DICA=x,y: ponteiro parado ali (mostra o tooltip)
+    if let Some((x, y)) = std::env::var("FURINAR_CAPTURA_DICA")
+        .ok()
+        .and_then(|v| {
+            v.split_once(',')
+                .map(|(x, y)| (x.parse().ok(), y.parse().ok()))
+        })
+        .and_then(|(x, y)| x.zip(y))
+    {
+        janela.dispatch_event(slint::platform::WindowEvent::PointerMoved {
+            position: slint::LogicalPosition::new(x, y),
+        });
+    }
+    // Tempo real para as animações de entrada (~300 ms) e o atraso do
+    // tooltip (500 ms) passarem
+    for _ in 0..18 {
         slint::platform::update_timers_and_animations();
+        std::thread::sleep(Duration::from_millis(40));
     }
     let mut pixels = vec![PremultipliedRgbaColor::default(); (largura * altura) as usize];
     janela.request_redraw();

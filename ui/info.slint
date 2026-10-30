@@ -136,6 +136,9 @@ export component JanelaInfo inherits Rectangle {
 
     visible: root.aberta;
     background: #00000080;
+    // Entra com fade e o cartão crescendo um pouco (a saída é imediata)
+    opacity: root.aberta ? 1 : 0;
+    animate opacity { duration: 160ms; easing: ease-out; }
 
     // Clique fora fecha
     TouchArea {
@@ -154,6 +157,9 @@ export component JanelaInfo inherits Rectangle {
         drop-shadow-blur: 30px;
         drop-shadow-color: #00000080;
         clip: true;
+        transform-scale-x: root.aberta ? 100% : 96%;
+        transform-scale-y: self.transform-scale-x;
+        animate transform-scale-x, transform-scale-y { duration: 180ms; easing: ease-out; }
 
         // Engole o clique para não fechar
         TouchArea { }

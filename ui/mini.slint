@@ -4,13 +4,14 @@
 // voltar ao tamanho normal. Arrastar pelo fundo move a janela.
 // ---------------------------------------------------------------------
 
-import { Tema } from "theme.slint";
+import { Tema, Dica } from "theme.slint";
 import { I18n } from "i18n.slint";
 
 component BotaoMini inherits Rectangle {
     in property <image> icone;
     in property <string> dica;
     in property <bool> destaque: false;
+    in property <string> atalho: "";
     callback clicado();
 
     width: destaque ? 38px : 32px;
@@ -20,8 +21,11 @@ component BotaoMini inherits Rectangle {
         ? (toque.has-hover ? Tema.oceano.brighter(0.12) : Tema.oceano)
         : (toque.has-hover ? Tema.neutro_hover : transparent);
     accessible-role: button;
-    accessible-label: root.dica;
+    accessible-label: root.atalho != "" ? root.dica + " (" + root.atalho + ")" : root.dica;
     animate background { duration: 120ms; }
+    animate transform-scale-x, transform-scale-y { duration: 140ms; easing: ease-out-back; }
+    transform-scale-x: toque.pressed ? 90% : 100%;
+    transform-scale-y: self.transform-scale-x;
 
     Image {
         source: root.icone;
@@ -30,9 +34,33 @@ component BotaoMini inherits Rectangle {
         x: (parent.width - self.width) / 2;
         y: (parent.height - self.height) / 2;
         colorize: root.destaque ? Tema.sobre_acento : Tema.texto;
+        transform-scale-x: root.trocando ? 55% : 100%;
+        transform-scale-y: self.transform-scale-x;
+        animate transform-scale-x, transform-scale-y { duration: root.trocando ? 70ms : 220ms; easing: root.trocando ? ease-in : ease-out-back; }
+    }
+
+    // Troca de ícone (play/pause, estrela, modos): some rápido e volta com mola
+    private property <bool> trocando: false;
+    changed icone => {
+        root.trocando = true;
+        volta.running = true;
+    }
+    volta := Timer {
+        interval: 80ms;
+        running: false;
+        triggered => {
+            root.trocando = false;
+            self.running = false;
+        }
     }
     toque := TouchArea {
         clicked => { root.clicado(); }
+    }
+    if root.dica != "" : Tooltip {
+        Dica {
+            texto: root.dica;
+            atalho: root.atalho;
+        }
     }
 }
 
@@ -40,6 +68,23 @@ export component MiniPlayer inherits Rectangle {
     in property <string> titulo;
     in property <string> artista;
     in property <image> capa;
+
+    // Troca de faixa: título e capa somem rápido e voltam suaves
+    private property <bool> trocando_faixa: false;
+    changed titulo => {
+        root.trocando_faixa = true;
+        fim_troca.running = true;
+    }
+    fim_troca := Timer {
+        interval: 90ms;
+        running: false;
+        triggered => {
+            root.trocando_faixa = false;
+            self.running = false;
+        }
+    }
+    private property <float> entrada: root.trocando_faixa ? 0 : 1;
+    animate entrada { duration: root.trocando_faixa ? 80ms : 320ms; easing: ease-out; }
     in property <bool> tem_capa;
     in property <bool> tocando;
     in property <float> progresso;
@@ -72,6 +117,7 @@ export component MiniPlayer inherits Rectangle {
                 height: parent.height;
                 source: root.capa;
                 image-fit: cover;
+                opacity: root.entrada;
             }
             if !root.tem_capa : Image {
                 source: @image-url("icons/letra.svg");
@@ -86,6 +132,7 @@ export component MiniPlayer inherits Rectangle {
         VerticalLayout {
             spacing: 2px;
             alignment: center;
+            opacity: root.entrada;
 
             Text {
                 text: root.titulo;
@@ -113,6 +160,7 @@ export component MiniPlayer inherits Rectangle {
                 BotaoMini {
                     icone: root.tocando ? @image-url("icons/pause.svg") : @image-url("icons/play.svg");
                     dica: root.tocando ? I18n.pause_label : I18n.play_label;
+                    atalho: I18n.key_space;
                     destaque: true;
                     clicado => { root.play_pause(); }
                 }
@@ -127,6 +175,7 @@ export component MiniPlayer inherits Rectangle {
                     y: (parent.height - self.height) / 2;
                     icone: @image-url("icons/tela_cheia.svg");
                     dica: I18n.tip_mini_exit;
+                    atalho: "M";
                     clicado => { root.expandir(); }
                 }
             }

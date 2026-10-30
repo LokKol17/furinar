@@ -47,6 +47,78 @@ export global Tema {
 }
 
 // ---------------------------------------------------------------------
+// Dica (conteúdo do Tooltip nativo): texto e, se houver, a tecla de atalho
+// num "chip"
+// ---------------------------------------------------------------------
+
+export component Dica inherits Rectangle {
+    in property <string> texto;
+    in property <string> atalho: "";
+    /// Modo imersivo: sempre escura, sobre qualquer fundo
+    in property <bool> escura: false;
+
+    background: escura ? #0b1a2bee : Tema.painel;
+    border-radius: 6px;
+    border-width: 1px;
+    border-color: escura ? #ffffff22 : Tema.borda;
+
+    HorizontalLayout {
+        padding-left: 9px;
+        padding-right: 9px;
+        padding-top: 5px;
+        padding-bottom: 5px;
+        spacing: 6px;
+
+        Text {
+            text: root.texto;
+            color: root.escura ? #f1f5f9 : Tema.texto;
+            font-size: 12px;
+            vertical-alignment: center;
+        }
+        if root.atalho != "" : Rectangle {
+            background: root.escura ? #ffffff1a : Tema.neutro_hover;
+            border-radius: 4px;
+            border-width: 1px;
+            border-color: root.escura ? #ffffff26 : Tema.borda;
+
+            HorizontalLayout {
+                padding-left: 5px;
+                padding-right: 5px;
+
+                Text {
+                    text: root.atalho;
+                    color: root.escura ? #f1f5f9b0 : Tema.texto_suave;
+                    font-size: 11px;
+                    font-weight: 600;
+                    vertical-alignment: center;
+                }
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------
+// "Tocando agora": três barrinhas de equalizador. Só deve existir (com `if`)
+// enquanto toca: o animation-tick redesenha a cada quadro.
+// ---------------------------------------------------------------------
+
+export component Barras inherits Rectangle {
+    in property <color> cor: Tema.dourado;
+
+    width: 12px;
+    height: 12px;
+
+    for fase[i] in [0.0, 2.1, 4.2]: Rectangle {
+        x: i * 5px;
+        width: 2px;
+        height: root.height * (0.35 + 0.65 * abs(sin((animation-tick() / 260ms + fase) * 1rad)));
+        y: root.height - self.height;
+        border-radius: 1px;
+        background: root.cor;
+    }
+}
+
+// ---------------------------------------------------------------------
 // Botão de ícone
 // ---------------------------------------------------------------------
 
@@ -60,6 +132,8 @@ export component BotaoIcone inherits Rectangle {
     /// Modo desligado (loop/shuffle): ícone apagado, para o estado se ler
     /// de longe
     in property <bool> apagado: false;
+    /// Tecla de atalho mostrada na dica.
+    in property <string> atalho: "";
     callback clicado();
 
     width: destaque ? 50px : 40px;
@@ -73,9 +147,11 @@ export component BotaoIcone inherits Rectangle {
         : (ativo ? Tema.oceano.with-alpha(0.20) : Tema.neutro);
 
     accessible-role: button;
-    accessible-label: root.dica;
+    accessible-label: root.atalho != "" ? root.dica + " (" + root.atalho + ")" : root.dica;
 
     animate background, border-color { duration: 130ms; }
+    // Encolhe no clique e volta com uma leve mola
+    animate transform-scale-x, transform-scale-y { duration: 140ms; easing: ease-out-back; }
 
     ico := Image {
         source: root.icone;
@@ -85,6 +161,24 @@ export component BotaoIcone inherits Rectangle {
         y: (root.height - self.height) / 2;
         colorize: destaque ? Tema.sobre_acento : (ativo ? Tema.dourado : (apagado ? Tema.texto.with-alpha(0.35) : Tema.texto));
         animate colorize { duration: 130ms; }
+        transform-scale-x: root.trocando ? 55% : 100%;
+        transform-scale-y: self.transform-scale-x;
+        animate transform-scale-x, transform-scale-y { duration: root.trocando ? 70ms : 220ms; easing: root.trocando ? ease-in : ease-out-back; }
+    }
+
+    // Troca de ícone (play/pause, estrela, modos): some rápido e volta com mola
+    private property <bool> trocando: false;
+    changed icone => {
+        root.trocando = true;
+        volta.running = true;
+    }
+    volta := Timer {
+        interval: 80ms;
+        running: false;
+        triggered => {
+            root.trocando = false;
+            self.running = false;
+        }
     }
 
     touch := TouchArea {
@@ -93,10 +187,19 @@ export component BotaoIcone inherits Rectangle {
 
     // Primeiro state que casa vence, então "pressionado" tem prioridade
     // sobre "hover".
+    if root.dica != "" : Tooltip {
+        Dica {
+            texto: root.dica;
+            atalho: root.atalho;
+        }
+    }
+
     states [
         pressionado when touch.pressed : {
             background: destaque ? Tema.oceano.darker(0.22) : Tema.neutro.darker(0.22);
             border-color: Tema.oceano.with-alpha(0.6);
+            transform-scale-x: 92%;
+            transform-scale-y: 92%;
         }
         hover when touch.has-hover : {
             background: destaque ? Tema.oceano.brighter(0.12) : Tema.neutro_hover;
@@ -132,12 +235,16 @@ export component BarraDeslizante inherits Rectangle {
         ? min(1.0, max(0.0, (valor - minimo) / (maximo - minimo)))
         : 0.0;
 
+    // Engrossa no hover (e enquanto arrasta)
+    private property <length> espessura: touch.has-hover || touch.pressed ? 8px : 6px;
+    animate espessura { duration: 120ms; easing: ease-out; }
+
     trilha := Rectangle {
         x: 0px;
         width: parent.width;
-        height: 6px;
+        height: root.espessura;
         y: (parent.height - self.height) / 2;
-        border-radius: 3px;
+        border-radius: self.height / 2;
         background: root.cor_trilha;
         border-width: 1px;
         border-color: Tema.borda;
@@ -148,9 +255,9 @@ export component BarraDeslizante inherits Rectangle {
     preenchido := Rectangle {
         x: 0px;
         width: polegar.x + polegar.width / 2;
-        height: 6px;
+        height: root.espessura;
         y: (parent.height - self.height) / 2;
-        border-radius: 3px;
+        border-radius: self.height / 2;
         background: @linear-gradient(90deg, root.cor, root.cor.brighter(0.18));
     }
 
@@ -166,6 +273,7 @@ export component BarraDeslizante inherits Rectangle {
         drop-shadow-blur: 0px;
         drop-shadow-offset-y: 1px;
         animate drop-shadow-color, drop-shadow-blur { duration: 140ms; }
+        animate transform-scale-x, transform-scale-y { duration: 140ms; easing: ease-out-back; }
     }
 
     touch := TouchArea {
@@ -195,9 +303,11 @@ export component BarraDeslizante inherits Rectangle {
     }
 
     states [
-        hover when touch.has-hover : {
+        hover when touch.has-hover || touch.pressed : {
             polegar.drop-shadow-color: root.cor.with-alpha(0.70);
             polegar.drop-shadow-blur: 6px;
+            polegar.transform-scale-x: 125%;
+            polegar.transform-scale-y: 125%;
         }
     ]
 
@@ -274,6 +384,7 @@ export component BotaoTitulo inherits Rectangle {
     in property <string> dica: "";
     /// Fechar: hover em vermelho suave em vez de oceano.
     in property <bool> perigo: false;
+    in property <string> atalho: "";
     callback clicado();
 
     width: 40px;
@@ -281,9 +392,10 @@ export component BotaoTitulo inherits Rectangle {
     border-radius: 6px;
     background: transparent;
     accessible-role: button;
-    accessible-label: root.dica;
+    accessible-label: root.atalho != "" ? root.dica + " (" + root.atalho + ")" : root.dica;
 
     animate background { duration: 110ms; }
+    animate transform-scale-x, transform-scale-y { duration: 140ms; easing: ease-out-back; }
 
     ico := Image {
         source: root.icone;
@@ -299,7 +411,20 @@ export component BotaoTitulo inherits Rectangle {
         clicked => { root.clicado(); }
     }
 
+    if root.dica != "" : Tooltip {
+        Dica {
+            texto: root.dica;
+            atalho: root.atalho;
+        }
+    }
+
     states [
+        pressionado when touch.pressed : {
+            background: root.perigo ? Tema.perigo.with-alpha(0.85) : Tema.neutro_hover;
+            ico.colorize: root.perigo ? Tema.sobre_acento : Tema.texto;
+            transform-scale-x: 90%;
+            transform-scale-y: 90%;
+        }
         hover when touch.has-hover : {
             background: root.perigo ? Tema.perigo.with-alpha(0.85) : Tema.neutro_hover;
             // Sobre o vermelho o ícone tem que ser claro nos dois temas

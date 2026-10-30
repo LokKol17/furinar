@@ -16,6 +16,7 @@ pub(crate) fn atualizar_selecao_visivel(estado: &EstadoAudio, ui: &MainWindow) {
         None
     };
     ui.set_indice_selecionado(pos.map_or(-1, |p| p as i32));
+    ui.set_linha_tocando(pos.map_or(-1, |p| p as i32));
 }
 
 /// Reconstrói a lista da aba visível aplicando o filtro e atualiza a seleção.
@@ -408,7 +409,16 @@ pub(crate) fn abrir_externos(estado: &mut EstadoAudio, ui: &MainWindow, caminhos
     if tracks.is_empty() {
         return;
     }
+    let lang = translations::get_translations(&estado.idioma);
+    let titulo = tracks[inicio].titulo.clone();
     abrir_aba_temporaria(estado, ui, origem, nome, tracks, inicio);
+    avisar(
+        ui,
+        &format!(
+            "{} {titulo}",
+            lang.get("toast_playing").copied().unwrap_or("")
+        ),
+    );
 }
 
 /// Toca `arquivo` numa aba de pasta que já o tem. `false` se nenhuma tem.
@@ -491,8 +501,15 @@ pub(crate) fn contar_reproducao(estado: &mut EstadoAudio, ui: &MainWindow) {
 
 /// Marca ou desmarca uma faixa como favorita e atualiza o que mostra isso.
 pub(crate) fn alternar_favorita(estado: &mut EstadoAudio, ui: &MainWindow, chave: &str) {
-    estado.biblioteca.alternar_favorita(chave);
+    let favorita = estado.biblioteca.alternar_favorita(chave);
     estado.biblioteca.salvar();
+    let lang = translations::get_translations(&estado.idioma);
+    let aviso = if favorita {
+        "toast_fav_on"
+    } else {
+        "toast_fav_off"
+    };
+    avisar(ui, lang.get(aviso).copied().unwrap_or(""));
     renovar_especial(estado, ui, POS_FAVORITAS);
     // A estrela das linhas (a lista especial já remontou a sua)
     if estado.aba_visivel != POS_FAVORITAS {

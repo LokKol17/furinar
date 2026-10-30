@@ -1151,6 +1151,7 @@ pub(crate) fn ligar(ui: &MainWindow, estado: &Rc<RefCell<EstadoAudio>>) {
                 let lang = translations::get_translations(&e.idioma);
                 ui.set_texto_loop(texto_loop(e.modo_loop, &lang).into());
                 ui.set_loop_modo(e.modo_loop as i32);
+                avisar(&ui, &texto_loop(e.modo_loop, &lang));
                 desengatilhar(&mut e, &ui);
                 atualizar_fila(&mut e);
                 salvar_configuracao(&e);
@@ -1178,6 +1179,7 @@ pub(crate) fn ligar(ui: &MainWindow, estado: &Rc<RefCell<EstadoAudio>>) {
                 let lang = translations::get_translations(&e.idioma);
                 ui.set_texto_shuffle(texto_shuffle(e.modo_shuffle, &lang).into());
                 ui.set_shuffle_modo(e.modo_shuffle as i32);
+                avisar(&ui, &texto_shuffle(e.modo_shuffle, &lang));
                 atualizar_fila(&mut e);
                 salvar_configuracao(&e);
             }
@@ -1283,6 +1285,17 @@ pub(crate) fn ligar(ui: &MainWindow, estado: &Rc<RefCell<EstadoAudio>>) {
                 desengatilhar(&mut e, &ui);
             }
             verificar_sono(&mut e, &ui);
+            let lang = translations::get_translations(&e.idioma);
+            let sono = ui.get_sono_texto();
+            let aviso = if sono.is_empty() {
+                lang.get("toast_sleep_off")
+                    .copied()
+                    .unwrap_or("")
+                    .to_string()
+            } else {
+                format!("{}: {sono}", lang.get("tip_sleep").copied().unwrap_or(""))
+            };
+            avisar(&ui, &aviso);
         });
     }
 

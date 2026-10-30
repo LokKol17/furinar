@@ -13,18 +13,18 @@ pub fn pt_br() -> Translations {
     t.insert("tip_next", "Próxima");
     t.insert("tip_lyrics", "Letra");
     t.insert("tip_settings", "Configurações");
-    t.insert("tip_immersive", "Modo imersivo (F11)");
-    t.insert("tip_exit_immersive", "Sair do modo imersivo (Esc)");
-    t.insert("tip_library", "Biblioteca (L)");
+    t.insert("tip_immersive", "Modo imersivo");
+    t.insert("tip_exit_immersive", "Sair do modo imersivo");
+    t.insert("tip_library", "Biblioteca");
     t.insert("library_title", "Biblioteca");
     t.insert("library_empty", "Nenhuma faixa aqui.");
     t.insert("up_next", "A seguir");
     t.insert("up_next_empty", "Nada na fila.");
-    t.insert("tip_lyrics_only", "Só a letra (H)");
-    t.insert("tip_video_only", "Só o vídeo (V)");
+    t.insert("tip_lyrics_only", "Só a letra");
+    t.insert("tip_video_only", "Só o vídeo");
     t.insert("tip_sleep", "Temporizador de sono");
     t.insert("sleep_end", "Fim da faixa");
-    t.insert("tip_info", "Informações da faixa (I)");
+    t.insert("tip_info", "Informações da faixa");
     t.insert("info_tab_track", "Faixa");
     t.insert("info_tab_batch", "Aba inteira");
     t.insert("info_corrected", "Corrigida pela web");
@@ -65,8 +65,8 @@ pub fn pt_br() -> Translations {
         "discord_status",
         "Mostrar no Discord o que está tocando (capa buscada no Deezer)",
     );
-    t.insert("tip_mini", "Mini player (M)");
-    t.insert("tip_mini_exit", "Voltar ao tamanho normal (M)");
+    t.insert("tip_mini", "Mini player");
+    t.insert("tip_mini_exit", "Voltar ao tamanho normal");
     t.insert("scrobble_title", "Scrobble");
     t.insert("listenbrainz_token", "Token do ListenBrainz");
     t.insert("lastfm_keys", "Last.fm: chave e segredo da API");
@@ -100,7 +100,13 @@ pub fn pt_br() -> Translations {
         "As faixas que você mais ouve aparecem aqui.",
     );
     t.insert("tip_sort", "Ordenar");
-    t.insert("tip_favorite", "Favoritar (F)");
+    t.insert("key_space", "Espaço");
+    t.insert("toast_fav_on", "Adicionada às favoritas");
+    t.insert("toast_fav_off", "Removida das favoritas");
+    t.insert("toast_lyrics_saved", "Letra encontrada");
+    t.insert("toast_playing", "Tocando:");
+    t.insert("toast_sleep_off", "Temporizador de sono desligado");
+    t.insert("tip_favorite", "Favoritar");
     t.insert("sort_default", "Padrão");
     t.insert("sort_title", "Título");
     t.insert("sort_artist", "Artista");
@@ -191,18 +197,18 @@ pub fn en() -> Translations {
     t.insert("tip_next", "Next");
     t.insert("tip_lyrics", "Lyrics");
     t.insert("tip_settings", "Settings");
-    t.insert("tip_immersive", "Immersive mode (F11)");
-    t.insert("tip_exit_immersive", "Exit immersive mode (Esc)");
-    t.insert("tip_library", "Library (L)");
+    t.insert("tip_immersive", "Immersive mode");
+    t.insert("tip_exit_immersive", "Exit immersive mode");
+    t.insert("tip_library", "Library");
     t.insert("library_title", "Library");
     t.insert("library_empty", "No tracks here.");
     t.insert("up_next", "Up next");
     t.insert("up_next_empty", "Nothing queued.");
-    t.insert("tip_lyrics_only", "Lyrics only (H)");
-    t.insert("tip_video_only", "Video only (V)");
+    t.insert("tip_lyrics_only", "Lyrics only");
+    t.insert("tip_video_only", "Video only");
     t.insert("tip_sleep", "Sleep timer");
     t.insert("sleep_end", "End of track");
-    t.insert("tip_info", "Track info (I)");
+    t.insert("tip_info", "Track info");
     t.insert("info_tab_track", "Track");
     t.insert("info_tab_batch", "Whole tab");
     t.insert("info_corrected", "Fixed from the web");
@@ -243,8 +249,8 @@ pub fn en() -> Translations {
         "discord_status",
         "Show what's playing on Discord (cover looked up on Deezer)",
     );
-    t.insert("tip_mini", "Mini player (M)");
-    t.insert("tip_mini_exit", "Back to full size (M)");
+    t.insert("tip_mini", "Mini player");
+    t.insert("tip_mini_exit", "Back to full size");
     t.insert("scrobble_title", "Scrobble");
     t.insert("listenbrainz_token", "ListenBrainz token");
     t.insert("lastfm_keys", "Last.fm: API key and secret");
@@ -278,7 +284,13 @@ pub fn en() -> Translations {
         "The tracks you play the most show up here.",
     );
     t.insert("tip_sort", "Sort");
-    t.insert("tip_favorite", "Favorite (F)");
+    t.insert("key_space", "Space");
+    t.insert("toast_fav_on", "Added to favorites");
+    t.insert("toast_fav_off", "Removed from favorites");
+    t.insert("toast_lyrics_saved", "Lyrics found");
+    t.insert("toast_playing", "Playing:");
+    t.insert("toast_sleep_off", "Sleep timer off");
+    t.insert("tip_favorite", "Favorite");
     t.insert("sort_default", "Default");
     t.insert("sort_title", "Title");
     t.insert("sort_artist", "Artist");

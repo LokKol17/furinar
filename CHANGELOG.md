@@ -7,6 +7,18 @@ e o projeto adere ao [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Adicionado
+
+- Dicas (tooltips) nos botões, com a tecla de atalho num "chip" (ex.: Informações da faixa `I`), no modo normal, no imersivo e no mini.
+- Avisos rápidos no rodapé: favoritar/desfavoritar, letra encontrada, arquivo aberto de fora, loop, shuffle e temporizador de sono.
+- Indicador "tocando agora" (barrinhas animadas) na linha da faixa que toca; só existe enquanto toca.
+
+### Alterado
+
+- Botões encolhem no clique e voltam com uma leve mola; o ícone "salta" quando troca (play/pause, estrela, modos).
+- Configurações e tela de informações entram com fade e um leve crescimento; no imersivo e no mini o título e a capa trocam com fade.
+- Barras de progresso e volume engrossam no hover e o botão cresce.
+
 ## [1.10.0] — 2026-10-26
 
 ### Adicionado

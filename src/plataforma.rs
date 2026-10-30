@@ -527,6 +527,23 @@ pub(crate) fn atualizar_discord(estado: &mut EstadoAudio) {
         .mostrar(status);
 }
 
+/// Aviso rápido no rodapé, que some sozinho. Um aviso novo substitui o
+/// anterior, e o timer do anterior não apaga o novo (`toast_id`).
+pub(crate) fn avisar(ui: &MainWindow, texto: &str) {
+    let id = ui.get_toast_id().wrapping_add(1);
+    ui.set_toast_id(id);
+    ui.set_toast_texto(texto.into());
+    ui.set_toast_visivel(true);
+    let ui_fraca = ui.as_weak();
+    Timer::single_shot(Duration::from_millis(2200), move || {
+        if let Some(ui) = ui_fraca.upgrade()
+            && ui.get_toast_id() == id
+        {
+            ui.set_toast_visivel(false);
+        }
+    });
+}
+
 /// Abre uma página no navegador padrão.
 pub(crate) fn abrir_no_navegador(url: &str) {
     #[cfg(target_os = "windows")]

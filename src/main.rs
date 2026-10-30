@@ -203,6 +203,7 @@ fn aplicar_idioma(idioma: &str, ui: &MainWindow) {
     i18n.set_lastfm_disconnect(g("lastfm_disconnect"));
     i18n.set_scrobble_desc(g("scrobble_desc"));
     i18n.set_tip_sort(g("tip_sort"));
+    i18n.set_key_space(g("key_space"));
     i18n.set_tip_favorite(g("tip_favorite"));
     i18n.set_sort_default(g("sort_default"));
     i18n.set_sort_title(g("sort_title"));

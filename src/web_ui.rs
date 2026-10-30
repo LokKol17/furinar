@@ -247,6 +247,7 @@ pub(crate) fn processar_web(estado: &mut EstadoAudio, ui: &MainWindow) {
                         {
                             let tempo = estado.tempo_decorrido;
                             carregar_letra(estado, ui, &caminho, tempo);
+                            avisar(ui, &t("toast_lyrics_saved"));
                         }
                     }
                     Ok(_) => estado.metadados.marcar_sem_letra(&chave),

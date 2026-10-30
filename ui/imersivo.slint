@@ -5,7 +5,7 @@
 // daqui pesa no modo normal. As imagens e a cor chegam prontas do Rust.
 // ---------------------------------------------------------------------
 
-import { Tema, BarraDeslizante } from "theme.slint";
+import { Tema, BarraDeslizante, Dica } from "theme.slint";
 import { I18n } from "i18n.slint";
 import { PainelBiblioteca, LinhaPainel, CartaoAlbum } from "painel.slint";
 
@@ -18,6 +18,7 @@ component BotaoImersivo inherits Rectangle {
     in property <bool> apagado: false;
     in property <bool> grande: false;
     in property <color> cor: Tema.oceano;
+    in property <string> atalho: "";
     callback clicado();
 
     width: grande ? 48px : 36px;
@@ -25,8 +26,9 @@ component BotaoImersivo inherits Rectangle {
     border-radius: self.width / 2;
     background: grande ? #ffffff : (touch.has-hover ? #ffffff26 : transparent);
     accessible-role: button;
-    accessible-label: root.dica;
+    accessible-label: root.atalho != "" ? root.dica + " (" + root.atalho + ")" : root.dica;
     animate background { duration: 120ms; }
+    animate transform-scale-x, transform-scale-y { duration: 140ms; easing: ease-out-back; }
 
     Image {
         source: root.icone;
@@ -36,15 +38,43 @@ component BotaoImersivo inherits Rectangle {
         y: (root.height - self.height) / 2;
         colorize: grande ? #0b1a2b : (root.ativo ? root.cor : (root.apagado ? #ffffff59 : #ffffffdd));
         animate colorize { duration: 200ms; }
+        transform-scale-x: root.trocando ? 55% : 100%;
+        transform-scale-y: self.transform-scale-x;
+        animate transform-scale-x, transform-scale-y { duration: root.trocando ? 70ms : 220ms; easing: root.trocando ? ease-in : ease-out-back; }
+    }
+
+    // Troca de ícone (play/pause, estrela, modos): some rápido e volta com mola
+    private property <bool> trocando: false;
+    changed icone => {
+        root.trocando = true;
+        volta.running = true;
+    }
+    volta := Timer {
+        interval: 80ms;
+        running: false;
+        triggered => {
+            root.trocando = false;
+            self.running = false;
+        }
     }
 
     touch := TouchArea {
         clicked => { root.clicado(); }
     }
 
+    if root.dica != "" : Tooltip {
+        Dica {
+            texto: root.dica;
+            atalho: root.atalho;
+            escura: true;
+        }
+    }
+
     states [
         pressionado when touch.pressed : {
             opacity: 0.7;
+            transform-scale-x: 90%;
+            transform-scale-y: 90%;
         }
     ]
 }
@@ -187,6 +217,23 @@ export component TelaImersiva inherits Rectangle {
     in property <string> creditos: "";
     in property <string> tecnico: "";
     in property <color> cor: Tema.oceano;
+
+    // Troca de faixa: título e capa somem rápido e voltam suaves
+    private property <bool> trocando_faixa: false;
+    changed titulo => {
+        root.trocando_faixa = true;
+        fim_troca.running = true;
+    }
+    fim_troca := Timer {
+        interval: 90ms;
+        running: false;
+        triggered => {
+            root.trocando_faixa = false;
+            self.running = false;
+        }
+    }
+    private property <float> entrada: root.trocando_faixa ? 0 : 1;
+    animate entrada { duration: root.trocando_faixa ? 80ms : 320ms; easing: ease-out; }
 
     in property <[string]> letra: [];
     in property <int> letra_indice: -1;
@@ -491,6 +538,7 @@ export component TelaImersiva inherits Rectangle {
         if root.letra.length == 0 : VerticalLayout {
             alignment: center;
             spacing: 10px;
+            opacity: root.entrada;
 
             Text {
                 text: root.titulo;
@@ -540,6 +588,7 @@ export component TelaImersiva inherits Rectangle {
                 height: parent.height;
                 source: root.capa;
                 image-fit: cover;
+                opacity: root.entrada;
             }
             if !root.tem_capa : Image {
                 source: @image-url("icons/letra.svg");
@@ -554,7 +603,7 @@ export component TelaImersiva inherits Rectangle {
 
     VerticalLayout {
         visible: root.opacidade_extras > 0;
-        opacity: root.opacidade_extras;
+        opacity: root.opacidade_extras * root.entrada;
         x: cartao.x + cartao.width + 24px;
         y: cartao.y;
         width: root.largura_util - self.x - root.margem;
@@ -699,6 +748,7 @@ export component TelaImersiva inherits Rectangle {
         BotaoImersivo {
             icone: @image-url("icons/video.svg");
             dica: I18n.tip_video_only;
+            atalho: "V";
             ativo: true;
             cor: root.destaque;
             clicado => { root.so_video = false; }
@@ -716,6 +766,7 @@ export component TelaImersiva inherits Rectangle {
             y: 18px;
             icone: @image-url("icons/biblioteca.svg");
             dica: I18n.tip_library;
+            atalho: "L";
             ativo: root.painel_aberto;
             cor: root.destaque;
             clicado => { root.painel_aberto = !root.painel_aberto; }
@@ -732,11 +783,13 @@ export component TelaImersiva inherits Rectangle {
             BotaoImersivo {
                 icone: @image-url("icons/voltar.svg");
                 dica: I18n.tip_exit_immersive;
+                atalho: "Esc";
                 clicado => { root.sair(); }
             }
             BotaoImersivo {
                 icone: @image-url("icons/info.svg");
                 dica: I18n.tip_info;
+                atalho: "I";
                 clicado => { root.abrir_info(); }
             }
             BotaoImersivo {
@@ -791,6 +844,8 @@ export component TelaImersiva inherits Rectangle {
                 y: (parent.height - self.height) / 2;
                 grande: true;
                 icone: root.tocando ? @image-url("icons/pause.svg") : @image-url("icons/play.svg");
+                dica: root.tocando ? I18n.pause_label : I18n.play_label;
+                atalho: I18n.key_space;
                 clicado => { root.play_pause(); }
             }
             BotaoImersivo {
@@ -823,18 +878,21 @@ export component TelaImersiva inherits Rectangle {
                 y: (parent.height - self.height) / 2;
                 icone: @image-url("icons/letra.svg");
                 dica: I18n.tip_lyrics_only;
+                atalho: "H";
                 clicado => { root.so_letra = true; }
             }
             if root.e_video : BotaoImersivo {
                 y: (parent.height - self.height) / 2;
                 icone: @image-url("icons/video.svg");
                 dica: I18n.tip_video_only;
+                atalho: "V";
                 clicado => { root.so_video = true; }
             }
             BotaoImersivo {
                 y: (parent.height - self.height) / 2;
                 icone: root.favorita ? @image-url("icons/estrela_cheia.svg") : @image-url("icons/estrela.svg");
                 dica: I18n.tip_favorite;
+                atalho: "F";
                 ativo: root.favorita;
                 cor: root.destaque;
                 clicado => { root.alternar_favorita(); }
@@ -869,6 +927,7 @@ export component TelaImersiva inherits Rectangle {
                 y: (parent.height - self.height) / 2;
                 icone: @image-url("icons/sair_tela_cheia.svg");
                 dica: I18n.tip_exit_immersive;
+                atalho: "Esc";
                 clicado => { root.sair(); }
             }
         }

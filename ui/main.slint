@@ -1,4 +1,4 @@
-import { Tema, BotaoIcone, BotaoTitulo, BarraDeslizante, CampoBusca, CaixaSelecao, CampoTexto, BotaoTexto, Segmentado } from "theme.slint";
+import { Tema, Barras, BotaoIcone, BotaoTitulo, BarraDeslizante, CampoBusca, CaixaSelecao, CampoTexto, BotaoTexto, Segmentado } from "theme.slint";
 import { I18n } from "i18n.slint";
 import { TelaImersiva } from "imersivo.slint";
 import { LinhaPainel, CartaoAlbum } from "painel.slint";
@@ -121,6 +121,8 @@ export component MainWindow inherits Window {
     callback alternar_letras_web(bool);
     callback chave_acoustid_mudou(string);
     in-out property <int> indice_selecionado: -1;
+    /// Linha (visível) da faixa que toca, -1 se ela não está nesta aba.
+    in property <int> linha_tocando: -1;
     in property <[string]> abas: [];
     in-out property <int> aba_ativa: 0;
     /// Aba da pasta de onde vem o som agora (-1 se nada está tocando).
@@ -198,6 +200,10 @@ export component MainWindow inherits Window {
     callback abrir_pasta();
     /// Caminhos vindos de fora ("Abrir com", outra execução), um por linha.
     callback abrir_externos(string);
+    /// Aviso rápido no rodapé (`avisar` no Rust; some sozinho).
+    in property <string> toast_texto: "";
+    in property <bool> toast_visivel: false;
+    in-out property <int> toast_id: 0;
     callback anterior();
     callback play_pause();
     callback parar();
@@ -395,6 +401,7 @@ export component MainWindow inherits Window {
                     BotaoTitulo {
                         icone: @image-url("icons/mini.svg");
                         dica: I18n.tip_mini;
+                        atalho: "M";
                         clicado => { alternar_mini(); }
                     }
                     BotaoTitulo {
@@ -444,6 +451,7 @@ export component MainWindow inherits Window {
                     BotaoIcone {
                         icone: tocando ? @image-url("icons/pause.svg") : @image-url("icons/play.svg");
                         dica: texto_play_pause;
+                        atalho: I18n.key_space;
                         destaque: true;
                         clicado => { play_pause(); }
                     }
@@ -491,6 +499,7 @@ export component MainWindow inherits Window {
                     BotaoIcone {
                         icone: @image-url("icons/info.svg");
                         dica: I18n.tip_info;
+                        atalho: "I";
                         clicado => { abrir_info(); }
                     }
                     BotaoIcone {
@@ -502,6 +511,7 @@ export component MainWindow inherits Window {
                     BotaoIcone {
                         icone: @image-url("icons/tela_cheia.svg");
                         dica: I18n.tip_immersive;
+                        atalho: "F11";
                         clicado => { alternar_imersivo(); }
                     }
                     BotaoIcone {
@@ -833,8 +843,13 @@ export component MainWindow inherits Window {
                                 font-size: 13px;
                                 vertical-alignment: center;
                                 x: musica.video ? 36px : 14px;
-                                width: parent.width - self.x - 38px;
+                                width: parent.width - self.x - (i == linha_tocando && tocando ? 58px : 38px);
                                 overflow: elide;
+                            }
+                            // Tocando agora: só existe enquanto toca (anima a cada quadro)
+                            if i == linha_tocando && tocando : Barras {
+                                x: parent.width - 52px;
+                                y: (parent.height - self.height) / 2;
                             }
 
                             linha_toque := TouchArea {
@@ -1257,6 +1272,11 @@ export component MainWindow inherits Window {
     // clique fora e Esc fecham, e rola quando não cabe
     if config_aberta : Rectangle {
         background: #00000060;
+        // Entra com fade e o cartão crescendo um pouco (a saída é imediata)
+        property <bool> aparecer: false;
+        init => { self.aparecer = true; }
+        opacity: self.aparecer ? 1 : 0;
+        animate opacity { duration: 160ms; easing: ease-out; }
 
         TouchArea {
             clicked => {
@@ -1277,6 +1297,9 @@ export component MainWindow inherits Window {
             drop-shadow-blur: 24px;
             drop-shadow-color: #00000060;
             clip: true;
+            transform-scale-x: parent.aparecer ? 100% : 96%;
+            transform-scale-y: self.transform-scale-x;
+            animate transform-scale-x, transform-scale-y { duration: 180ms; easing: ease-out; }
 
             // Engole o clique para não fechar
             TouchArea { }
@@ -1599,6 +1622,38 @@ export component MainWindow inherits Window {
                     }
                 }
             }
+        }
+    }
+
+    // Aviso rápido: pílula acima da barra de controles, por cima de tudo.
+    // No mini a janela é baixa demais: lá não aparece
+    if !modo_mini : Rectangle {
+        property <bool> mostrar: toast_visivel && toast_texto != "";
+        visible: self.opacity > 0;
+        opacity: self.mostrar ? 1 : 0;
+        animate opacity { duration: 180ms; easing: ease-out; }
+        width: min(parent.width - 32px, rotulo_toast.preferred-width + 32px);
+        height: 34px;
+        x: (parent.width - self.width) / 2;
+        y: parent.height - self.height - (modo_imersivo ? 140px : 28px) + (self.mostrar ? 0px : 10px);
+        animate y { duration: 220ms; easing: ease-out; }
+        border-radius: 17px;
+        background: modo_imersivo ? #0b1a2bee : Tema.painel;
+        border-width: 1px;
+        border-color: modo_imersivo ? #ffffff22 : Tema.borda;
+        drop-shadow-blur: 14px;
+        drop-shadow-color: #00000050;
+        drop-shadow-offset-y: 3px;
+
+        rotulo_toast := Text {
+            x: 16px;
+            width: parent.width - 32px;
+            text: toast_texto;
+            color: modo_imersivo ? #f1f5f9 : Tema.texto;
+            font-size: 13px;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+            overflow: elide;
         }
     }
 }
