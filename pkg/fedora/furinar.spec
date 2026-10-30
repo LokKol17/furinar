@@ -1,5 +1,5 @@
 Name:           furinar
-Version:        1.12.0
+Version:        1.12.1
 Release:        1%{?dist}
 Summary:        A light, fast, and beautiful audio player
 

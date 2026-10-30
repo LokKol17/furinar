@@ -60,6 +60,11 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="1.12.1" date="2026-10-30">
+      <description>
+        <p>Lyrics from LRCLIB no longer fail with "overloaded" so often: requests are paced to LRCLIB's limits, honor the server's Retry-After, pause the service instead of retrying when asked to wait long, and identify as the registered Furinar app.</p>
+      </description>
+    </release>
     <release version="1.12.0" date="2026-10-30">
       <description>
         <p>Playlists, manual tag editing and clearer messages:</p>
