@@ -60,6 +60,17 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="1.11.0" date="2026-10-30">
+      <description>
+        <p>More feel to every interaction:</p>
+        <ul>
+          <li>Tooltips on buttons, with the keyboard shortcut shown as a key chip</li>
+          <li>Quick notices for favorites, lyrics found, files opened, loop, shuffle and sleep timer</li>
+          <li>Animated "now playing" bars on the playing track</li>
+          <li>Buttons press and spring back; settings, track info and track changes fade in; progress bar grows on hover</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.10.0" date="2026-10-26">
       <description>
         <p>Opening files and first run made easy:</p>

@@ -7,6 +7,8 @@ e o projeto adere ao [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.11.0] — 2026-10-30
+
 ### Adicionado
 
 - Dicas (tooltips) nos botões, com a tecla de atalho num "chip" (ex.: Informações da faixa `I`), no modo normal, no imersivo e no mini.
