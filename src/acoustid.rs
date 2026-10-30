@@ -17,7 +17,7 @@ use rusty_chromaprint::{Configuration, FingerprintCompressor, Fingerprinter};
 use serde::Deserialize;
 
 use crate::metadados::proximidade_duracao;
-use crate::rede::{Cliente, Erro};
+use crate::rede::{Cliente, Erro, Tipo};
 
 /// Chave de aplicativo do Furinar: vem do secret `ACOUSTID_CHAVE` no CI da
 /// release (nunca no repositório). Builds locais saem sem ela.
@@ -171,7 +171,7 @@ pub fn consultar(
     };
     if resposta.status != "ok" {
         // Chave inválida, por exemplo
-        return Err(Erro::Formato(format!("AcoustID: {}", resposta.status)));
+        return Err(Erro::novo("AcoustID", Tipo::Recusa(resposta.status)));
     }
     Ok(notas(resposta.results, duracao))
 }

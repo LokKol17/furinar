@@ -688,11 +688,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let ui_fraca = ui.as_weak();
             let pendente = pendente.clone();
             let pronta = pronta.clone();
+            let estado = estado.clone();
             ui.on_baixar_atualizacao(move || {
                 let Some(ui) = ui_fraca.upgrade() else { return };
                 let Some(at) = pendente.lock().unwrap().clone() else {
                     return;
                 };
+                let idioma = estado.borrow().idioma.clone();
                 ui.set_update_progresso(0.0);
                 ui.set_update_estado(2);
                 let ui_fraca = ui.as_weak();
@@ -709,7 +711,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         Ok(()) => ui.set_update_estado(3),
                         Err(e) => {
                             eprintln!("Falha na atualização: {e}");
-                            ui.set_update_erro(e.into());
+                            ui.set_update_erro(e.descrever(&traducao(&idioma)).into());
                             ui.set_update_estado(4);
                         }
                     });
@@ -732,7 +734,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         let _ = ui.hide();
                     }
                     Err(e) => {
-                        ui.set_update_erro(e.into());
+                        eprintln!("Falha ao reiniciar: {e}");
+                        let idioma = estado.borrow().idioma.clone();
+                        ui.set_update_erro(e.descrever(&traducao(&idioma)).into());
                         ui.set_update_estado(4);
                     }
                 }
@@ -787,6 +791,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// Caminhos um por linha, para passar pelo callback da UI.
+/// Busca de texto traduzido por chave, para quem descreve erros.
+fn traducao(idioma: &str) -> impl Fn(&str) -> String + use<> {
+    let lang = translations::get_translations(idioma);
+    move |k: &str| lang.get(k).copied().unwrap_or("").to_string()
+}
+
 fn juntar_linhas(caminhos: &[PathBuf]) -> SharedString {
     caminhos
         .iter()

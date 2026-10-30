@@ -100,7 +100,53 @@ pub fn pt_br() -> Translations {
     t.insert("lastfm_connected", "Conectado como {u}");
     t.insert("info_by_sound", "identificada pelo som");
     t.insert("info_nothing", "Nada encontrado.");
+    t.insert(
+        "tags_fail_permission",
+        "“{nome}” não pôde ser alterado: sem permissão (arquivo só leitura ou pasta protegida).",
+    );
+    t.insert(
+        "tags_fail_busy",
+        "“{nome}” está aberto em outro programa: feche-o e tente de novo.",
+    );
+    t.insert("tags_fail_other", "“{nome}” não pôde ser alterado: {erro}");
+    t.insert("tags_fail_more", "(e mais {n} com problema)");
+    t.insert(
+        "update_err_net",
+        "não deu para baixar a versão nova. Confira a conexão e tente de novo.",
+    );
+    t.insert(
+        "update_err_corrupt",
+        "o download veio corrompido e foi descartado (nada foi trocado). Tente de novo.",
+    );
+    t.insert("update_err_permission", "sem permissão para trocar o Furinar em {pasta}. Baixe a versão nova pela página da release.");
     t.insert("info_result_one", "1 resultado");
+    t.insert(
+        "net_timeout",
+        "{servico} demorou demais para responder. Tente de novo daqui a pouco.",
+    );
+    t.insert(
+        "net_offline",
+        "Não deu para falar com {servico}. Confira a conexão com a internet.",
+    );
+    t.insert(
+        "net_busy",
+        "{servico} está sobrecarregado agora. Tente de novo em alguns minutos.",
+    );
+    t.insert(
+        "net_server",
+        "{servico} está com problemas (erro {n}). Tente de novo mais tarde.",
+    );
+    t.insert(
+        "net_denied",
+        "{servico} recusou o acesso. Confira a chave ou o login nas Configurações.",
+    );
+    t.insert("net_refused", "{servico} recusou o pedido: {motivo}.");
+    t.insert("net_refused_code", "{servico} recusou o pedido (erro {n}).");
+    t.insert(
+        "net_check_key",
+        "Confira a chave ou o login nas Configurações.",
+    );
+    t.insert("net_unexpected", "{servico} respondeu algo inesperado. Tente de novo; se continuar, avise no GitHub do Furinar.");
     t.insert(
         "info_nothing_no_key",
         "Nada encontrado pelo nome. A busca pelo som precisa de uma chave do AcoustID: preencha em Configurações.",
@@ -127,6 +173,22 @@ pub fn pt_br() -> Translations {
     t.insert("toast_fav_off", "Removida das favoritas");
     t.insert("toast_lyrics_saved", "Letra encontrada");
     t.insert("toast_playing", "Tocando:");
+    t.insert(
+        "play_missing",
+        "Não deu para tocar “{nome}”: o arquivo não existe mais (foi movido ou apagado).",
+    );
+    t.insert(
+        "play_needs_ffmpeg",
+        "Não deu para tocar “{nome}”: este formato precisa do FFmpeg.",
+    );
+    t.insert(
+        "play_unsupported",
+        "Não deu para tocar “{nome}”: formato não suportado ou arquivo danificado.",
+    );
+    t.insert(
+        "play_no_output",
+        "Não deu para tocar: nenhuma saída de áudio disponível. Confira o fone ou a caixa de som.",
+    );
     t.insert("toast_sleep_off", "Temporizador de sono desligado");
     t.insert("tip_favorite", "Favoritar");
     t.insert("sort_default", "Padrão");
@@ -309,7 +371,53 @@ pub fn en() -> Translations {
     t.insert("lastfm_connected", "Connected as {u}");
     t.insert("info_by_sound", "matched by sound");
     t.insert("info_nothing", "Nothing found.");
+    t.insert(
+        "tags_fail_permission",
+        "“{nome}” couldn't be changed: no permission (read-only file or protected folder).",
+    );
+    t.insert(
+        "tags_fail_busy",
+        "“{nome}” is open in another program: close it and try again.",
+    );
+    t.insert("tags_fail_other", "“{nome}” couldn't be changed: {erro}");
+    t.insert("tags_fail_more", "(and {n} more with problems)");
+    t.insert(
+        "update_err_net",
+        "couldn't download the new version. Check your connection and try again.",
+    );
+    t.insert(
+        "update_err_corrupt",
+        "the download was corrupted and thrown away (nothing was replaced). Try again.",
+    );
+    t.insert("update_err_permission", "no permission to replace Furinar in {pasta}. Download the new version from the release page.");
     t.insert("info_result_one", "1 result");
+    t.insert(
+        "net_timeout",
+        "{servico} took too long to answer. Try again in a moment.",
+    );
+    t.insert(
+        "net_offline",
+        "Couldn't reach {servico}. Check your internet connection.",
+    );
+    t.insert(
+        "net_busy",
+        "{servico} is overloaded right now. Try again in a few minutes.",
+    );
+    t.insert(
+        "net_server",
+        "{servico} is having problems (error {n}). Try again later.",
+    );
+    t.insert(
+        "net_denied",
+        "{servico} denied access. Check the key or login in Settings.",
+    );
+    t.insert("net_refused", "{servico} refused the request: {motivo}.");
+    t.insert(
+        "net_refused_code",
+        "{servico} refused the request (error {n}).",
+    );
+    t.insert("net_check_key", "Check the key or login in Settings.");
+    t.insert("net_unexpected", "{servico} sent an unexpected answer. Try again; if it keeps happening, report it on Furinar's GitHub.");
     t.insert(
         "info_nothing_no_key",
         "Nothing found by name. Matching by sound needs an AcoustID key: add one in Settings.",
@@ -336,6 +444,22 @@ pub fn en() -> Translations {
     t.insert("toast_fav_off", "Removed from favorites");
     t.insert("toast_lyrics_saved", "Lyrics found");
     t.insert("toast_playing", "Playing:");
+    t.insert(
+        "play_missing",
+        "Couldn't play “{nome}”: the file no longer exists (moved or deleted).",
+    );
+    t.insert(
+        "play_needs_ffmpeg",
+        "Couldn't play “{nome}”: this format needs FFmpeg.",
+    );
+    t.insert(
+        "play_unsupported",
+        "Couldn't play “{nome}”: unsupported format or damaged file.",
+    );
+    t.insert(
+        "play_no_output",
+        "Couldn't play: no audio output available. Check your headphones or speakers.",
+    );
     t.insert("toast_sleep_off", "Sleep timer off");
     t.insert("tip_favorite", "Favorite");
     t.insert("sort_default", "Default");

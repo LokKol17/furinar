@@ -346,6 +346,34 @@ pub(crate) fn abrir_fonte(
     Some((fonte, total_secs, controle))
 }
 
+/// Por que a faixa não abriu (chave de tradução `play_*`).
+fn motivo_falha(caminho: &Path) -> &'static str {
+    if !caminho.exists() {
+        "play_missing"
+    } else if ffmpeg::so_com_ffmpeg(caminho) && !ffmpeg::disponivel() {
+        "play_needs_ffmpeg"
+    } else {
+        "play_unsupported"
+    }
+}
+
+/// Aviso de que a faixa não tocou, com o nome dela e o motivo: antes o
+/// clique simplesmente não fazia nada.
+fn avisar_falha(estado: &EstadoAudio, ui: &MainWindow, caminho: &Path, motivo: &str) {
+    let lang = translations::get_translations(&estado.idioma);
+    let nome = caminho
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let texto = lang
+        .get(motivo)
+        .copied()
+        .unwrap_or("")
+        .replace("{nome}", &nome);
+    eprintln!("não tocou {}: {motivo}", caminho.display());
+    avisar(ui, &texto);
+}
+
 /// Mixer da saída de áudio, abrindo o dispositivo se preciso.
 pub(crate) fn mixer(estado: &mut EstadoAudio) -> Option<&rodio::mixer::Mixer> {
     if estado.saida.is_none() {
@@ -390,10 +418,19 @@ pub(crate) fn executar_seek(
     let Some((fonte, total_secs, controle)) =
         abrir_fonte(estado, &caminho_completo, ganho, Duration::ZERO)
     else {
+        avisar_falha(
+            estado,
+            ui,
+            &caminho_completo,
+            motivo_falha(&caminho_completo),
+        );
+        publicar_play_pause(estado, ui, false);
         return;
     };
     let volume = estado.volume_atual;
     let Some(mixer) = mixer(estado) else {
+        avisar_falha(estado, ui, &caminho_completo, "play_no_output");
+        publicar_play_pause(estado, ui, false);
         return;
     };
     let sink = Player::connect_new(mixer);

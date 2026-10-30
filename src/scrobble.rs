@@ -13,7 +13,7 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-use crate::rede::{Cliente, Erro};
+use crate::rede::{Cliente, Erro, Tipo};
 
 const LISTENBRAINZ: &str = "https://api.listenbrainz.org/1/submit-listens";
 const LASTFM: &str = "https://ws.audioscrobbler.com/2.0/";
@@ -114,7 +114,7 @@ pub fn tocando_agora(cliente: &mut Cliente, contas: &Contas, escuta: &Escuta) {
 /// Envia as escutas (a fila antiga primeiro). Devolve o que não foi por erro
 /// de rede (vai para a fila) e a última mensagem de erro de outro tipo
 /// (token inválido, por exemplo: essas não adianta repetir).
-pub fn enviar(cliente: &mut Cliente, contas: &Contas, fila: Fila) -> (Fila, Option<String>) {
+pub fn enviar(cliente: &mut Cliente, contas: &Contas, fila: Fila) -> (Fila, Option<Erro>) {
     let mut sobrou = Vec::new();
     let mut erro = None;
     for (servico, escuta) in fila {
@@ -129,11 +129,11 @@ pub fn enviar(cliente: &mut Cliente, contas: &Contas, fila: Fila) -> (Fila, Opti
         match resultado {
             Ok(()) => {}
             // Sem rede ou servidor sobrecarregado: tenta de novo depois
-            Err(e @ (Erro::Rede(_) | Erro::Status(429 | 500..=599, _))) => {
-                erro = Some(e.to_string());
+            Err(e) if e.temporario() => {
+                erro = Some(e);
                 sobrou.push((servico, escuta));
             }
-            Err(e) => erro = Some(e.to_string()),
+            Err(e) => erro = Some(e),
         }
     }
     (sobrou, erro)
@@ -210,11 +210,11 @@ fn lastfm(
     let formulario: Vec<(&str, String)> = parametros.into_iter().collect();
     let resposta: Option<serde_json::Value> =
         cliente.json_post("ws.audioscrobbler.com", LASTFM, &formulario)?;
-    let resposta = resposta.ok_or(Erro::Status(404, String::new()))?;
+    let resposta = resposta.ok_or(Erro::novo("Last.fm", Tipo::Status(404, String::new())))?;
     if let Some(msg) = resposta.get("message").and_then(|m| m.as_str())
         && resposta.get("error").is_some()
     {
-        return Err(Erro::Formato(format!("Last.fm: {msg}")));
+        return Err(Erro::novo("Last.fm", Tipo::Recusa(msg.to_string())));
     }
     Ok(resposta)
 }
@@ -259,7 +259,7 @@ pub fn lastfm_token(
     let token = r
         .get("token")
         .and_then(|t| t.as_str())
-        .ok_or_else(|| Erro::Formato("sem token".into()))?
+        .ok_or_else(|| Erro::novo("Last.fm", Tipo::Formato("sem token".into())))?
         .to_string();
     let url = format!(
         "https://www.last.fm/api/auth/?api_key={}&token={token}",
@@ -283,7 +283,7 @@ pub fn lastfm_sessao(
     let sessao = &r["session"];
     match (sessao["key"].as_str(), sessao["name"].as_str()) {
         (Some(k), Some(n)) => Ok((k.to_string(), n.to_string())),
-        _ => Err(Erro::Formato("sem sessão".into())),
+        _ => Err(Erro::novo("Last.fm", Tipo::Formato("sem sessão".into()))),
     }
 }
 

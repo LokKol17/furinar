@@ -258,7 +258,7 @@ pub(crate) fn processar_web(estado: &mut EstadoAudio, ui: &MainWindow) {
                     Ok(_) => estado.metadados.marcar_sem_letra(&chave),
                     Err(e) => {
                         if estado.info_chave.as_deref() == Some(chave.as_str()) {
-                            ui.set_info_estado(format!("{}: {e}", t("info_error")).into());
+                            ui.set_info_estado(e.descrever(&t).into());
                         }
                     }
                 }
@@ -273,7 +273,7 @@ pub(crate) fn processar_web(estado: &mut EstadoAudio, ui: &MainWindow) {
                     continue;
                 }
                 let texto = match (&erro, lista.len()) {
-                    (Some(e), 0) => format!("{}: {e}", t("info_error")),
+                    (Some(e), 0) => e.descrever(&t),
                     // Sem chave a busca pelo som nem roda: dizer, em vez de
                     // só "nada encontrado" (builds locais saem sem a embutida)
                     (_, 0) if acoustid::chave_efetiva(&estado.chave_acoustid).is_none() => {
@@ -319,7 +319,7 @@ pub(crate) fn processar_web(estado: &mut EstadoAudio, ui: &MainWindow) {
                 estado.metadados.salvar();
                 renovar = true;
                 if let Some(e) = erro.filter(|_| !cancelado && estado.lote.automaticas == 0) {
-                    ui.set_info_estado(format!("{}: {e}", t("info_error")).into());
+                    ui.set_info_estado(e.descrever(&t).into());
                 }
                 // A letra da faixa atual pode ter chegado no lote
                 if let Some(caminho) = caminho_atual(estado)
@@ -355,9 +355,7 @@ pub(crate) fn processar_web(estado: &mut EstadoAudio, ui: &MainWindow) {
             buscador::Resposta::Scrobble { sobrou, erro } => {
                 estado.fila_scrobble.extend(sobrou);
                 scrobble::salvar_fila(&estado.fila_scrobble);
-                let texto = erro
-                    .map(|e| format!("{}: {e}", t("info_error")))
-                    .unwrap_or_default();
+                let texto = erro.map(|e| e.descrever(&t)).unwrap_or_default();
                 ui.set_scrobble_estado(texto.into());
             }
             buscador::Resposta::LastfmToken(resultado) => match resultado {
@@ -366,7 +364,7 @@ pub(crate) fn processar_web(estado: &mut EstadoAudio, ui: &MainWindow) {
                     abrir_no_navegador(&url);
                     publicar_lastfm(estado, ui);
                 }
-                Err(e) => ui.set_lastfm_estado(format!("{}: {e}", t("info_error")).into()),
+                Err(e) => ui.set_lastfm_estado(e.descrever(&t).into()),
             },
             buscador::Resposta::LastfmSessao(resultado) => {
                 estado.lastfm_token = None;
@@ -379,14 +377,31 @@ pub(crate) fn processar_web(estado: &mut EstadoAudio, ui: &MainWindow) {
                     }
                     Err(e) => {
                         publicar_lastfm(estado, ui);
-                        ui.set_lastfm_estado(format!("{}: {e}", t("info_error")).into());
+                        ui.set_lastfm_estado(e.descrever(&t).into());
                     }
                 }
             }
             buscador::Resposta::Gravadas { ok, falhas } => {
                 let mut texto = t("tags_written").replace("{n}", &ok.to_string());
-                if let Some(f) = falhas.first() {
-                    texto.push_str(&format!(" · {}: {f}", t("info_error")));
+                if let Some((caminho, falha)) = falhas.first() {
+                    eprintln!("tags não gravadas em {}: {falha:?}", caminho.display());
+                    let nome = caminho
+                        .file_name()
+                        .map(|n| n.to_string_lossy().into_owned())
+                        .unwrap_or_default();
+                    let motivo = match falha {
+                        metadados::FalhaTags::SemPermissao => t("tags_fail_permission"),
+                        metadados::FalhaTags::EmUso => t("tags_fail_busy"),
+                        metadados::FalhaTags::Outra(e) => t("tags_fail_other").replace("{erro}", e),
+                    };
+                    texto.push_str(" · ");
+                    texto.push_str(&motivo.replace("{nome}", &nome));
+                    if falhas.len() > 1 {
+                        texto.push(' ');
+                        texto.push_str(
+                            &t("tags_fail_more").replace("{n}", &(falhas.len() - 1).to_string()),
+                        );
+                    }
                 }
                 ui.set_tags_texto(texto.into());
             }

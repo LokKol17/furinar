@@ -58,12 +58,12 @@ pub enum Pedido {
 pub enum Resposta {
     Letra {
         chave: String,
-        resultado: Result<letras_web::Resultado, String>,
+        resultado: Result<letras_web::Resultado, Erro>,
     },
     Candidatos {
         chave: String,
         lista: Vec<Candidato>,
-        erro: Option<String>,
+        erro: Option<Erro>,
     },
     LoteProgresso {
         feitas: usize,
@@ -76,7 +76,7 @@ pub enum Resposta {
     },
     LoteFim {
         cancelado: bool,
-        erro: Option<String>,
+        erro: Option<Erro>,
     },
     Capa {
         chave: String,
@@ -85,22 +85,22 @@ pub enum Resposta {
     /// `Err` = falhou (rede, cota): tentar de novo depois.
     CapaDiscord {
         chave: String,
-        url: Result<Option<String>, String>,
+        url: Result<Option<String>, Erro>,
     },
     Gravadas {
         ok: usize,
-        falhas: Vec<String>,
+        falhas: Vec<(PathBuf, crate::metadados::FalhaTags)>,
     },
     TocandoAgora,
     /// O que não foi (volta para a fila) e o último erro.
     Scrobble {
         sobrou: scrobble::Fila,
-        erro: Option<String>,
+        erro: Option<Erro>,
     },
     /// (token, URL para autorizar)
-    LastfmToken(Result<(String, String), String>),
+    LastfmToken(Result<(String, String), Erro>),
     /// (sessão, usuário)
-    LastfmSessao(Result<(String, String), String>),
+    LastfmSessao(Result<(String, String), Erro>),
 }
 
 impl Resposta {
@@ -197,9 +197,8 @@ fn trabalhar(
                 automatica,
             } => Resposta::Letra {
                 chave: consulta.chave.clone(),
-                resultado: conectar(&mut conexao).and_then(|c| {
-                    buscar_letra(c, &consulta, automatica, chave).map_err(|e| e.to_string())
-                }),
+                resultado: conectar(&mut conexao)
+                    .and_then(|c| buscar_letra(c, &consulta, automatica, chave)),
             },
             Pedido::Identificar(consulta) => {
                 let (lista, erro) = match conectar(&mut conexao) {
@@ -225,9 +224,8 @@ fn trabalhar(
                 artista,
                 duracao,
             } => Resposta::CapaDiscord {
-                url: conectar(&mut conexao).and_then(|c| {
-                    deezer::capa(c, &titulo, artista.as_deref(), duracao).map_err(|e| e.to_string())
-                }),
+                url: conectar(&mut conexao)
+                    .and_then(|c| deezer::capa(c, &titulo, artista.as_deref(), duracao)),
                 chave,
             },
             Pedido::Capa { chave, lancamento } => Resposta::Capa {
@@ -242,7 +240,7 @@ fn trabalhar(
                 for (caminho, correcao) in itens {
                     match crate::metadados::gravar_tags(&caminho, &correcao) {
                         Ok(()) => ok += 1,
-                        Err(e) => falhas.push(format!("{}: {e}", caminho.display())),
+                        Err(e) => falhas.push((caminho, e)),
                     }
                 }
                 Resposta::Gravadas { ok, falhas }
@@ -263,18 +261,17 @@ fn trabalhar(
                     erro: Some(e),
                 },
             },
-            Pedido::LastfmToken { chave, segredo } => {
-                Resposta::LastfmToken(conectar(&mut conexao).and_then(|c| {
-                    scrobble::lastfm_token(c, &chave, &segredo).map_err(|e| e.to_string())
-                }))
-            }
+            Pedido::LastfmToken { chave, segredo } => Resposta::LastfmToken(
+                conectar(&mut conexao).and_then(|c| scrobble::lastfm_token(c, &chave, &segredo)),
+            ),
             Pedido::LastfmSessao {
                 chave,
                 segredo,
                 token,
-            } => Resposta::LastfmSessao(conectar(&mut conexao).and_then(|c| {
-                scrobble::lastfm_sessao(c, &chave, &segredo, &token).map_err(|e| e.to_string())
-            })),
+            } => Resposta::LastfmSessao(
+                conectar(&mut conexao)
+                    .and_then(|c| scrobble::lastfm_sessao(c, &chave, &segredo, &token)),
+            ),
         };
         if tx.send(resposta).is_err() {
             return;
@@ -282,11 +279,12 @@ fn trabalhar(
     }
 }
 
-fn conectar(conexao: &mut Option<Cliente>) -> Result<&mut Cliente, String> {
-    if conexao.is_none() {
-        *conexao = Some(Cliente::novo().map_err(|e| e.to_string())?);
-    }
-    conexao.as_mut().ok_or_else(|| "sem cliente".to_string())
+fn conectar(conexao: &mut Option<Cliente>) -> Result<&mut Cliente, Erro> {
+    let cliente = match conexao.take() {
+        Some(c) => c,
+        None => Cliente::novo()?,
+    };
+    Ok(conexao.insert(cliente))
 }
 
 /// Letra no LRCLIB. Na busca automática, faixa sem artista (nem na tag, nem
@@ -334,10 +332,10 @@ fn identificar(
     cliente: &mut Cliente,
     consulta: &Consulta,
     chave_acoustid: Option<&str>,
-) -> (Vec<Candidato>, Option<String>) {
+) -> (Vec<Candidato>, Option<Erro>) {
     let mut erro = None;
     let mut lista = musicbrainz::buscar_texto(cliente, consulta).unwrap_or_else(|e| {
-        erro = Some(e.to_string());
+        erro = Some(e);
         Vec::new()
     });
     let bastou = lista
@@ -353,7 +351,7 @@ fn identificar(
                 lista.dedup_by(|a, b| a.gravacao == b.gravacao);
                 erro = None;
             }
-            Err(e) => erro = erro.or(Some(e.to_string())),
+            Err(e) => erro = erro.or(Some(e)),
         }
     }
     if !lista.is_empty() {

@@ -231,25 +231,79 @@ fn escolher(
     })
 }
 
-fn cliente() -> Result<reqwest::blocking::Client, String> {
+/// Por que a atualização falhou, no que o usuário pode fazer.
+#[derive(Debug)]
+pub enum Falha {
+    /// Sem conexão ou o GitHub não respondeu.
+    Rede(String),
+    /// O baixado não confere com o SHA256SUMS (nada foi trocado).
+    Corrompido,
+    /// Sem permissão de escrita na pasta do Furinar.
+    SemPermissao(PathBuf),
+    Outra(String),
+}
+
+impl std::fmt::Display for Falha {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Falha::Rede(e) => write!(f, "rede: {e}"),
+            Falha::Corrompido => write!(f, "o arquivo baixado não confere com o SHA256SUMS"),
+            Falha::SemPermissao(p) => write!(f, "sem permissão em {}", p.display()),
+            Falha::Outra(e) => write!(f, "{e}"),
+        }
+    }
+}
+
+impl Falha {
+    /// Frase para a tela, no idioma de `t` (chaves `update_err_*`).
+    pub fn descrever(&self, t: &dyn Fn(&str) -> String) -> String {
+        match self {
+            Falha::Rede(_) => t("update_err_net"),
+            Falha::Corrompido => t("update_err_corrupt"),
+            Falha::SemPermissao(p) => {
+                t("update_err_permission").replace("{pasta}", &p.display().to_string())
+            }
+            Falha::Outra(e) => e.clone(),
+        }
+    }
+
+    /// Erro de arquivo em `pasta`: sem permissão vira `SemPermissao`.
+    fn de(e: &(dyn std::error::Error + 'static), pasta: &Path) -> Self {
+        let mut atual = Some(e);
+        while let Some(erro) = atual {
+            if let Some(io) = erro.downcast_ref::<std::io::Error>()
+                && matches!(
+                    io.kind(),
+                    std::io::ErrorKind::PermissionDenied | std::io::ErrorKind::ReadOnlyFilesystem
+                )
+            {
+                return Falha::SemPermissao(pasta.to_path_buf());
+            }
+            atual = erro.source();
+        }
+        Falha::Outra(e.to_string())
+    }
+}
+
+fn cliente() -> Result<reqwest::blocking::Client, Falha> {
     reqwest::blocking::Client::builder()
         .user_agent(concat!("Furinar/", env!("CARGO_PKG_VERSION")))
         .timeout(std::time::Duration::from_secs(300))
         .build()
-        .map_err(|e| e.to_string())
+        .map_err(|e| Falha::Rede(e.to_string()))
 }
 
 fn pedir(
     cliente: &reqwest::blocking::Client,
     url: &str,
-) -> Result<reqwest::blocking::Response, String> {
+) -> Result<reqwest::blocking::Response, Falha> {
     // A URL da API devolve o binário com este Accept (e redireciona)
     cliente
         .get(url)
         .header(reqwest::header::ACCEPT, "application/octet-stream")
         .send()
         .and_then(|r| r.error_for_status())
-        .map_err(|e| e.to_string())
+        .map_err(|e| Falha::Rede(e.to_string()))
 }
 
 /// Hash esperado de `nome` num `SHA256SUMS` ("<hex>  <nome>" por linha).
@@ -269,18 +323,23 @@ fn copiar_com_hash(
     mut saida: impl Write,
     total: Option<u64>,
     progresso: &dyn Fn(f32),
-) -> Result<String, String> {
+    pasta: &Path,
+) -> Result<String, Falha> {
     let mut hasher = Sha256::new();
     let mut buffer = vec![0u8; 64 * 1024];
     let mut lidos = 0u64;
     let mut ultimo = -1i32;
     loop {
-        let n = leitor.read(&mut buffer).map_err(|e| e.to_string())?;
+        let n = leitor
+            .read(&mut buffer)
+            .map_err(|e| Falha::Rede(e.to_string()))?;
         if n == 0 {
             break;
         }
         hasher.update(&buffer[..n]);
-        saida.write_all(&buffer[..n]).map_err(|e| e.to_string())?;
+        saida
+            .write_all(&buffer[..n])
+            .map_err(|e| Falha::de(&e, pasta))?;
         lidos += n as u64;
         if let Some(total) = total.filter(|t| *t > 0) {
             // Avisa a cada 1%, não a cada bloco
@@ -291,7 +350,7 @@ fn copiar_com_hash(
             }
         }
     }
-    saida.flush().map_err(|e| e.to_string())?;
+    saida.flush().map_err(|e| Falha::de(&e, pasta))?;
     Ok(hasher
         .finalize()
         .iter()
@@ -301,19 +360,15 @@ fn copiar_com_hash(
 
 /// Baixa, confere e deixa pronto. No modo `Substituir` o executável já
 /// sai trocado daqui.
-pub fn baixar(at: &Atualizacao, progresso: &dyn Fn(f32)) -> Result<Baixado, String> {
-    let somas = at
-        .somas
-        .as_ref()
-        .ok_or("a release não tem SHA256SUMS; atualização recusada")?;
-    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+pub fn baixar(at: &Atualizacao, progresso: &dyn Fn(f32)) -> Result<Baixado, Falha> {
+    let somas = at.somas.as_ref().ok_or(Falha::Corrompido)?;
+    let exe = std::env::current_exe().map_err(|e| Falha::Outra(e.to_string()))?;
     let cliente = cliente()?;
 
     let somas = pedir(&cliente, &somas.url)?
         .text()
-        .map_err(|e| e.to_string())?;
-    let esperado = hash_esperado(&somas, &at.asset.nome)
-        .ok_or_else(|| format!("{} não está no SHA256SUMS", at.asset.nome))?;
+        .map_err(|e| Falha::Rede(e.to_string()))?;
+    let esperado = hash_esperado(&somas, &at.asset.nome).ok_or(Falha::Corrompido)?;
 
     // Ao lado do executável quando possível: a troca vira um rename na
     // mesma partição. O setup vai para a pasta temporária.
@@ -326,8 +381,14 @@ pub fn baixar(at: &Atualizacao, progresso: &dyn Fn(f32)) -> Result<Baixado, Stri
 
     let resposta = pedir(&cliente, &at.asset.url)?;
     let total = resposta.content_length();
-    let arquivo = std::fs::File::create(&destino).map_err(|e| e.to_string())?;
-    let obtido = copiar_com_hash(resposta, std::io::BufWriter::new(arquivo), total, progresso);
+    let arquivo = std::fs::File::create(&destino).map_err(|e| Falha::de(&e, &pasta))?;
+    let obtido = copiar_com_hash(
+        resposta,
+        std::io::BufWriter::new(arquivo),
+        total,
+        progresso,
+        &pasta,
+    );
     let obtido = match obtido {
         Ok(h) => h,
         Err(e) => {
@@ -337,15 +398,14 @@ pub fn baixar(at: &Atualizacao, progresso: &dyn Fn(f32)) -> Result<Baixado, Stri
     };
     if obtido != esperado {
         let _ = std::fs::remove_file(&destino);
-        return Err(format!(
-            "o arquivo baixado não confere com o SHA256SUMS (esperado {esperado}, veio {obtido})"
-        ));
+        eprintln!("SHA-256 não confere: esperado {esperado}, veio {obtido}");
+        return Err(Falha::Corrompido);
     }
 
     match at.modo {
         Modo::Instalador => {
             let setup = std::env::temp_dir().join(SETUP_WINDOWS);
-            std::fs::rename(&destino, &setup).map_err(|e| e.to_string())?;
+            std::fs::rename(&destino, &setup).map_err(|e| Falha::de(&e, &pasta))?;
             Ok(Baixado::Instalador(setup))
         }
         Modo::Substituir => {
@@ -356,33 +416,35 @@ pub fn baixar(at: &Atualizacao, progresso: &dyn Fn(f32)) -> Result<Baixado, Stri
         }
         Modo::Manual => {
             let _ = std::fs::remove_file(&destino);
-            Err("esta instalação não se atualiza sozinha".into())
+            Err(Falha::Outra(
+                "esta instalação não se atualiza sozinha".into(),
+            ))
         }
     }
 }
 
 /// Troca o executável em uso pelo baixado (extraindo do .tar.gz no Linux).
-fn substituir(baixado: &Path, pasta: &Path) -> Result<(), String> {
-    let erro = |e: &dyn std::fmt::Display| e.to_string();
+fn substituir(baixado: &Path, pasta: &Path) -> Result<(), Falha> {
     if !baixado.to_string_lossy().ends_with(".tar.gz") {
-        return self_update::self_replace::self_replace(baixado).map_err(|e| erro(&e));
+        return self_update::self_replace::self_replace(baixado).map_err(|e| Falha::de(&e, pasta));
     }
     let temp = self_update::TempDir::new_in(pasta)
         .or_else(|_| self_update::TempDir::new())
-        .map_err(|e| erro(&e))?;
+        .map_err(|e| Falha::de(&e, pasta))?;
     self_update::Extract::from_source(baixado)
         .archive(self_update::ArchiveKind::Tar(Some(
             self_update::Compression::Gz,
         )))
         .extract_file(temp.path(), "furinar")
-        .map_err(|e| erro(&e))?;
-    self_update::self_replace::self_replace(temp.path().join("furinar")).map_err(|e| erro(&e))
+        .map_err(|e| Falha::de(&e, pasta))?;
+    self_update::self_replace::self_replace(temp.path().join("furinar"))
+        .map_err(|e| Falha::de(&e, pasta))
 }
 
 /// Abre a versão nova. Quem chama salva o estado antes e fecha o app logo
 /// depois. No Windows instalado, o setup roda em silêncio, fecha o que
 /// sobrar aberto e reabre o Furinar no fim (`/reabrir=1`, ver furinar.iss).
-pub fn reiniciar(baixado: &Baixado) -> Result<(), String> {
+pub fn reiniciar(baixado: &Baixado) -> Result<(), Falha> {
     let mut comando = match baixado {
         Baixado::Substituido(exe) => std::process::Command::new(exe),
         Baixado::Instalador(setup) => {
@@ -397,7 +459,10 @@ pub fn reiniciar(baixado: &Baixado) -> Result<(), String> {
             c
         }
     };
-    comando.spawn().map(|_| ()).map_err(|e| e.to_string())
+    comando
+        .spawn()
+        .map(|_| ())
+        .map_err(|e| Falha::Outra(e.to_string()))
 }
 
 #[cfg(test)]
@@ -481,9 +546,13 @@ mod tests {
         let dados = b"abc";
         let mut saida = Vec::new();
         let avisos = std::cell::RefCell::new(Vec::new());
-        let hash = copiar_com_hash(&dados[..], &mut saida, Some(3), &|p| {
-            avisos.borrow_mut().push(p)
-        })
+        let hash = copiar_com_hash(
+            &dados[..],
+            &mut saida,
+            Some(3),
+            &|p| avisos.borrow_mut().push(p),
+            Path::new("."),
+        )
         .unwrap();
         assert_eq!(saida, dados);
         // SHA-256 de "abc" (FIPS 180-2)
@@ -594,7 +663,7 @@ mod tests {
         // Mesmo SHA256SUMS, arquivo diferente: recusa e não deixa nada
         let base = servidor(vec![("/asset", vec![8u8; 1000]), ("/somas", somas)]);
         let erro = baixar(&atualizacao(&base, nome), &|_| {}).err().unwrap();
-        assert!(erro.contains("não confere"), "{erro}");
+        assert!(matches!(erro, Falha::Corrompido), "{erro}");
 
         // Sem SHA256SUMS na release: recusa antes de baixar
         let mut sem_somas = atualizacao(&base, nome);

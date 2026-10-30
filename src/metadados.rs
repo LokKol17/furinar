@@ -352,21 +352,57 @@ pub fn capa_web(lancamento: &str) -> Option<PathBuf> {
     pasta_cache("capas_web").map(|p| p.join(format!("{lancamento}.jpg")))
 }
 
+/// Por que as tags não foram gravadas, no que o usuário pode resolver.
+#[derive(Debug)]
+pub enum FalhaTags {
+    /// Arquivo só leitura, pasta sem permissão, disco montado só leitura.
+    SemPermissao,
+    /// Aberto em outro programa (Windows trava o arquivo).
+    EmUso,
+    Outra(String),
+}
+
+impl FalhaTags {
+    fn de(e: &(dyn std::error::Error + 'static)) -> Self {
+        // O erro de E/S fica no fundo da cadeia do lofty
+        let mut atual = Some(e);
+        while let Some(erro) = atual {
+            if let Some(io) = erro.downcast_ref::<std::io::Error>() {
+                // 32/33: ERROR_SHARING_VIOLATION / ERROR_LOCK_VIOLATION
+                if cfg!(windows) && matches!(io.raw_os_error(), Some(32 | 33)) {
+                    return Self::EmUso;
+                }
+                if matches!(
+                    io.kind(),
+                    std::io::ErrorKind::PermissionDenied | std::io::ErrorKind::ReadOnlyFilesystem
+                ) {
+                    return Self::SemPermissao;
+                }
+            }
+            atual = erro.source();
+        }
+        Self::Outra(e.to_string())
+    }
+}
+
 /// Escreve a correção (e a capa, se houver e o arquivo não tiver uma) nas
 /// tags do arquivo. Mexe no arquivo de música: só sob pedido explícito.
-pub fn gravar_tags(caminho: &Path, c: &Correcao) -> Result<(), String> {
+pub fn gravar_tags(caminho: &Path, c: &Correcao) -> Result<(), FalhaTags> {
+    if fs::metadata(caminho).is_ok_and(|m| m.permissions().readonly()) {
+        return Err(FalhaTags::SemPermissao);
+    }
     use lofty::config::WriteOptions;
     use lofty::picture::{MimeType, Picture, PictureType};
     use lofty::prelude::*;
     use lofty::tag::Tag;
 
-    let mut arquivo = lofty::read_from_path(caminho).map_err(|e| e.to_string())?;
+    let mut arquivo = lofty::read_from_path(caminho).map_err(|e| FalhaTags::de(&e))?;
     if arquivo.primary_tag().is_none() {
         let tipo = arquivo.primary_tag_type();
         arquivo.insert_tag(Tag::new(tipo));
     }
     let Some(tag) = arquivo.primary_tag_mut() else {
-        return Err("sem tag".into());
+        return Err(FalhaTags::Outra("sem tag".into()));
     };
     tag.set_title(c.titulo.clone());
     if !c.artista.is_empty() {
@@ -397,7 +433,7 @@ pub fn gravar_tags(caminho: &Path, c: &Correcao) -> Result<(), String> {
         );
     }
     tag.save_to_path(caminho, WriteOptions::default())
-        .map_err(|e| e.to_string())
+        .map_err(|e| FalhaTags::de(&e))
 }
 
 #[cfg(test)]
@@ -535,6 +571,16 @@ mod tests {
         assert_eq!(lido.artista.as_deref(), Some("Banda"));
         assert_eq!(lido.album.as_deref(), Some("Disco"));
         assert_eq!(lido.numero, 1004);
+
+        // Só leitura: diz que é permissão, não o erro cru do sistema
+        let original = fs::metadata(&faixa).unwrap().permissions();
+        let mut so_leitura = original.clone();
+        so_leitura.set_readonly(true);
+        fs::set_permissions(&faixa, so_leitura).unwrap();
+        let falha = gravar_tags(&faixa, &c);
+        // Devolve a escrita (o Windows não apaga arquivo só leitura)
+        let _ = fs::set_permissions(&faixa, original);
+        assert!(matches!(falha, Err(FalhaTags::SemPermissao)), "{falha:?}");
         let _ = fs::remove_dir_all(&dir);
     }
 }

@@ -2,7 +2,7 @@
 //! imagem por URL pública). API aberta, sem chave; só é chamada com o status
 //! do Discord ligado.
 
-use crate::rede::{Cliente, Erro};
+use crate::rede::{Cliente, Erro, Tipo};
 use crate::track::normalizar_busca;
 use serde_json::Value;
 
@@ -35,7 +35,7 @@ pub fn capa(
         let Some(resposta) = resposta else { continue };
         if let Some(erro) = resposta.get("error") {
             // Cota estourada etc.: erro, para não guardar "sem capa"
-            return Err(Erro::Formato(format!("deezer: {erro}")));
+            return Err(Erro::novo("Deezer", Tipo::Recusa(erro.to_string())));
         }
         if let Some(url) = escolher(&resposta, titulo, artista, duracao) {
             return Ok(Some(url));
