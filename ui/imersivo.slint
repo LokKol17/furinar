@@ -327,6 +327,9 @@ export component TelaImersiva inherits Rectangle {
     in-out property <int> guia: 0;
     in property <int> ordem_atual;
     in property <[string]> opcoes_ordem;
+    in property <int> midia_atual;
+    in property <[string]> opcoes_midia;
+    in property <bool> aba_tem_video;
     in property <int> especiais;
 
     // Configurações da tela cheia
@@ -371,6 +374,7 @@ export component TelaImersiva inherits Rectangle {
     callback albuns_rolou(int, int);
     callback album_clicado(int);
     callback ordem_escolhida(int);
+    callback midia_escolhida(int);
     callback alternar_crossfade();
     callback alternar_replaygain(bool);
     callback alternar_fundo_reativo(bool);
@@ -1318,12 +1322,16 @@ export component TelaImersiva inherits Rectangle {
         guia <=> root.guia;
         ordem_atual: root.ordem_atual;
         opcoes_ordem: root.opcoes_ordem;
+        midia_atual: root.midia_atual;
+        opcoes_midia: root.opcoes_midia;
+        aba_tem_video: root.aba_tem_video;
         especiais: root.especiais;
 
         guia_mudou(g) => { root.guia_mudou(g); }
         albuns_rolou(a, b) => { root.albuns_rolou(a, b); }
         album_clicado(i) => { root.album_clicado(i); }
         ordem_escolhida(i) => { root.ordem_escolhida(i); }
+        midia_escolhida(i) => { root.midia_escolhida(i); }
         favorita_alternada(i) => { root.favorita_alternada(i); }
         aba_selecionada(i) => { root.aba_selecionada(i); }
         busca_mudou(t) => { root.busca_mudou(t); }

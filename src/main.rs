@@ -189,6 +189,10 @@ fn aplicar_idioma(idioma: &str, ui: &MainWindow) {
     i18n.set_info_conf_high(g("info_conf_high"));
     i18n.set_info_conf_mid(g("info_conf_mid"));
     i18n.set_info_conf_low(g("info_conf_low"));
+    i18n.set_media_label(g("media_label"));
+    i18n.set_media_all(g("media_all"));
+    i18n.set_media_audio(g("media_audio"));
+    i18n.set_media_video(g("media_video"));
     i18n.set_info_confirm_tags(g("info_confirm_tags"));
     i18n.set_info_confirm_button(g("info_confirm_button"));
     i18n.set_batch_desc(g("batch_desc"));
@@ -468,6 +472,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             pasta.ordem = ordem_salva(caminho_salvo, Ordem::Padrao);
             e.pastas.push(pasta);
             mapeamento.push(Some(e.pastas.len() - 1));
+        }
+        for pasta in &mut e.pastas {
+            if let Some(&m) = config.midias.get(&pasta.chave()) {
+                pasta.midia = Midia::de_indice(m as usize);
+            }
         }
 
         let pela_chave = |chave: &Option<String>| {

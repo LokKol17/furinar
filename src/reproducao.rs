@@ -1527,6 +1527,22 @@ mod tests {
         e
     }
 
+    /// "Só vídeo"/"só áudio" vale para a lista e para a navegação.
+    #[test]
+    fn filtro_de_midia_vale_para_a_navegacao() {
+        let mut e = estado_com_faixas(4);
+        e.pastas[0].tracks[1].path = "1.mkv".into();
+        e.pastas[0].tracks[3].path = "3.mp4".into();
+        e.pastas[0].midia = Midia::SoVideo;
+        assert_eq!(ordem_reproducao(&e).map(|(_, o)| o), Some(vec![1, 3]));
+        e.indice_atual = Some(1);
+        assert_eq!(proximas(&mut e, 5), vec![3]);
+        e.pastas[0].midia = Midia::SoAudio;
+        assert_eq!(ordem_reproducao(&e).map(|(_, o)| o), Some(vec![0, 2]));
+        e.pastas[0].midia = Midia::Tudo;
+        assert_eq!(ordem_reproducao(&e).map(|(_, o)| o.len()), Some(4));
+    }
+
     #[test]
     fn anterior_no_shuffle_volta_pelo_historico() {
         let mut e = estado_com_faixas(10);

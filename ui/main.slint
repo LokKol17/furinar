@@ -48,6 +48,11 @@ export component MainWindow inherits Window {
     in-out property <float> progresso: 0.0;
     in-out property <string> texto_tempo: "00:00 / 00:00";
     in property <[LinhaLista]> musicas: [];
+    /// Filtro de tipo da aba visível: 0 tudo, 1 só áudio, 2 só vídeo.
+    in property <int> midia_atual: 0;
+    /// A aba visível tem vídeo (só então o filtro aparece no menu).
+    in property <bool> aba_tem_video: false;
+    callback midia_escolhida(int);
     /// Ordem da aba visível (posição em `opcoes_ordem`).
     in property <int> ordem_atual: 0;
     /// A faixa que toca está nas favoritas.
@@ -246,6 +251,7 @@ export component MainWindow inherits Window {
     /// Abas especiais (favoritas, mais tocadas) vêm primeiro, só com ícone
     private property <int> especiais: 2;
     private property <length> largura_especial: 40px;
+    private property <[string]> opcoes_midia: [I18n.media_all, I18n.media_audio, I18n.media_video];
     private property <[string]> opcoes_ordem: [I18n.sort_default, I18n.sort_title, I18n.sort_artist, I18n.sort_album, I18n.sort_duration, I18n.sort_added, I18n.sort_plays];
 
     // Mantém a linha selecionada dentro da área visível da lista
@@ -584,8 +590,9 @@ export component MainWindow inherits Window {
                 botao_ordem := BotaoIcone {
                     height: 38px;
                     icone: @image-url("icons/ordenar.svg");
-                    dica: I18n.tip_sort + ": " + opcoes_ordem[ordem_atual];
-                    ativo: ordem_atual != 0;
+                    dica: I18n.tip_sort + ": " + opcoes_ordem[ordem_atual]
+                        + (midia_atual != 0 ? " · " + opcoes_midia[midia_atual] : "");
+                    ativo: ordem_atual != 0 || midia_atual != 0;
                     clicado => { menu_ordem.show(); }
                 }
             }
@@ -627,6 +634,54 @@ export component MainWindow inherits Window {
                                 vertical-alignment: center;
                             }
                             if i == ordem_atual : Image {
+                                source: @image-url("icons/check.svg");
+                                x: parent.width - 26px;
+                                width: 12px;
+                                height: 12px;
+                                y: (parent.height - self.height) / 2;
+                                colorize: Tema.oceano;
+                            }
+                        }
+
+                        // Só áudio / só vídeo: aparece em aba com vídeo
+                        if aba_tem_video : Rectangle {
+                            height: 9px;
+
+                            Rectangle {
+                                y: 4px;
+                                height: 1px;
+                                background: Tema.borda;
+                            }
+                        }
+                        if aba_tem_video : Text {
+                            height: 24px;
+                            x: 12px;
+                            text: I18n.media_label;
+                            color: Tema.texto_suave;
+                            font-size: 11px;
+                            vertical-alignment: center;
+                        }
+                        for nome[i] in aba_tem_video ? opcoes_midia : []: Rectangle {
+                            height: 32px;
+                            border-radius: 6px;
+                            background: midia_toque.has-hover ? Tema.neutro_hover : transparent;
+
+                            midia_toque := TouchArea {
+                                clicked => {
+                                    midia_escolhida(i);
+                                    atalhos.focus();
+                                }
+                            }
+                            Text {
+                                x: 12px;
+                                height: parent.height;
+                                text: nome;
+                                color: i == midia_atual ? Tema.oceano : Tema.texto;
+                                font-weight: i == midia_atual ? 700 : 400;
+                                font-size: 13px;
+                                vertical-alignment: center;
+                            }
+                            if i == midia_atual : Image {
                                 source: @image-url("icons/check.svg");
                                 x: parent.width - 26px;
                                 width: 12px;
@@ -1066,6 +1121,10 @@ export component MainWindow inherits Window {
         guia <=> imv_guia;
         ordem_atual: ordem_atual;
         opcoes_ordem: opcoes_ordem;
+        midia_atual: midia_atual;
+        opcoes_midia: opcoes_midia;
+        aba_tem_video: aba_tem_video;
+        midia_escolhida(i) => { midia_escolhida(i); }
         especiais: especiais;
         alternar_favorita => { alternar_favorita_atual(); }
         favorita_alternada(i) => { favorita_alternada(i); }

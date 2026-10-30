@@ -201,6 +201,11 @@ export component PainelBiblioteca inherits Rectangle {
     in-out property <int> guia: 0;
     in property <int> ordem_atual;
     in property <[string]> opcoes_ordem;
+    /// Filtro de tipo (0 tudo, 1 só áudio, 2 só vídeo) e suas opções; só
+    /// aparece em aba com vídeo
+    in property <int> midia_atual;
+    in property <[string]> opcoes_midia;
+    in property <bool> aba_tem_video;
     /// Abas especiais no começo (favoritas, mais tocadas)
     in property <int> especiais;
 
@@ -208,6 +213,7 @@ export component PainelBiblioteca inherits Rectangle {
     callback albuns_rolou(int, int);
     callback album_clicado(int);
     callback ordem_escolhida(int);
+    callback midia_escolhida(int);
     callback favorita_alternada(int);
     callback aba_selecionada(int);
     callback busca_mudou(string);
@@ -482,7 +488,7 @@ export component PainelBiblioteca inherits Rectangle {
             border-radius: 20px;
             background: ordem_toque.has-hover ? #ffffff26 : #ffffff14;
             border-width: 1px;
-            border-color: root.ordem_atual != 0 ? root.cor.with-alpha(0.8) : #ffffff1a;
+            border-color: root.ordem_atual != 0 || root.midia_atual != 0 ? root.cor.with-alpha(0.8) : #ffffff1a;
             animate background { duration: 120ms; }
 
             Image {
@@ -491,7 +497,7 @@ export component PainelBiblioteca inherits Rectangle {
                 height: 16px;
                 x: (parent.width - self.width) / 2;
                 y: (parent.height - self.height) / 2;
-                colorize: root.ordem_atual != 0 ? root.cor : #ffffffcc;
+                colorize: root.ordem_atual != 0 || root.midia_atual != 0 ? root.cor : #ffffffcc;
             }
             ordem_toque := TouchArea {
                 clicked => { menu_ordem.show(); }
@@ -528,6 +534,44 @@ export component PainelBiblioteca inherits Rectangle {
                             text: nome;
                             color: i == root.ordem_atual ? root.cor : #ffffffd0;
                             font-weight: i == root.ordem_atual ? 700 : 400;
+                            font-size: 13px;
+                            vertical-alignment: center;
+                        }
+                    }
+                    if root.aba_tem_video : Rectangle {
+                        height: 9px;
+
+                        Rectangle {
+                            y: 4px;
+                            height: 1px;
+                            background: #ffffff1a;
+                        }
+                    }
+                    if root.aba_tem_video : Text {
+                        height: 24px;
+                        x: 12px;
+                        text: I18n.media_label;
+                        color: #ffffff80;
+                        font-size: 11px;
+                        vertical-alignment: center;
+                    }
+                    for nome[i] in root.aba_tem_video ? root.opcoes_midia : []: Rectangle {
+                        height: 34px;
+                        border-radius: 8px;
+                        background: midia_toque.has-hover ? #ffffff14 : transparent;
+
+                        midia_toque := TouchArea {
+                            clicked => {
+                                root.midia_escolhida(i);
+                                root.devolver_foco();
+                            }
+                        }
+                        Text {
+                            x: 12px;
+                            height: parent.height;
+                            text: nome;
+                            color: i == root.midia_atual ? root.cor : #ffffffd0;
+                            font-weight: i == root.midia_atual ? 700 : 400;
                             font-size: 13px;
                             vertical-alignment: center;
                         }

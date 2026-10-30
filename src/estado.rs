@@ -41,6 +41,39 @@ pub(crate) struct PastaMusical {
     pub(crate) carregada: bool,
     pub(crate) tipo: Tipo,
     pub(crate) ordem: Ordem,
+    /// Que arquivos a aba mostra (e a navegação percorre).
+    pub(crate) midia: Midia,
+}
+
+/// Filtro por tipo de arquivo de cada aba.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) enum Midia {
+    #[default]
+    Tudo,
+    SoAudio,
+    SoVideo,
+}
+
+impl Midia {
+    pub(crate) fn de_indice(i: usize) -> Self {
+        match i {
+            1 => Midia::SoAudio,
+            2 => Midia::SoVideo,
+            _ => Midia::Tudo,
+        }
+    }
+
+    pub(crate) fn indice(self) -> usize {
+        self as usize
+    }
+
+    pub(crate) fn aceita(self, video: bool) -> bool {
+        match self {
+            Midia::Tudo => true,
+            Midia::SoAudio => !video,
+            Midia::SoVideo => video,
+        }
+    }
 }
 
 impl PastaMusical {
@@ -52,6 +85,7 @@ impl PastaMusical {
             carregada: false,
             tipo: Tipo::Pasta,
             ordem: Ordem::Padrao,
+            midia: Midia::Tudo,
         }
     }
 
@@ -63,6 +97,7 @@ impl PastaMusical {
             carregada: false,
             tipo,
             ordem,
+            midia: Midia::Tudo,
         }
     }
 
@@ -343,6 +378,12 @@ pub(crate) fn salvar_configuracao(estado: &EstadoAudio) {
             .iter()
             .filter(|p| p.ordem != Ordem::Padrao && !matches!(p.tipo, Tipo::Album { .. }))
             .map(|p| (p.chave(), p.ordem.indice() as u8))
+            .collect(),
+        midias: estado
+            .pastas
+            .iter()
+            .filter(|p| p.midia != Midia::Tudo && !matches!(p.tipo, Tipo::Album { .. }))
+            .map(|p| (p.chave(), p.midia.indice() as u8))
             .collect(),
         crossfade: estado.crossfade,
         letras_web: estado.letras_web,

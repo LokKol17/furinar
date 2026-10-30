@@ -44,6 +44,12 @@ pub(crate) fn atualizar_lista(estado: &mut EstadoAudio, ui: &MainWindow) {
             .get(estado.aba_visivel)
             .map_or(0, |p| p.ordem.indice() as i32),
     );
+    let pasta = estado.pastas.get(estado.aba_visivel);
+    ui.set_midia_atual(pasta.map_or(0, |p| p.midia.indice() as i32));
+    // O filtro só aparece em aba com vídeo (ou já filtrada)
+    ui.set_aba_tem_video(pasta.is_some_and(|p| {
+        p.midia != Midia::Tudo || p.tracks.iter().any(|t| ffmpeg::e_video(Path::new(&t.path)))
+    }));
     atualizar_favorita_atual(estado, ui);
 
     atualizar_selecao_visivel(estado, ui);
@@ -169,6 +175,13 @@ pub(crate) fn ordem_lista(estado: &EstadoAudio, indice: usize, filtro: &str) -> 
         return Vec::new();
     };
     let mut ordem = ordem_filtrada(&pasta.tracks, filtro);
+    if pasta.midia != Midia::Tudo {
+        ordem.retain(|&i| {
+            pasta
+                .midia
+                .aceita(ffmpeg::e_video(Path::new(&pasta.tracks[i].path)))
+        });
+    }
     track::ordenar(&mut ordem, &pasta.tracks, pasta.ordem, |i| {
         pasta
             .chave_faixa(i)
@@ -655,6 +668,31 @@ pub(crate) fn ligar(ui: &MainWindow, estado: &Rc<RefCell<EstadoAudio>>) {
             pasta.ordem = Ordem::de_indice(indice.max(0) as usize);
             // A ordem nova é a da navegação: a fila em ordem muda, a do
             // shuffle não (sorteio não depende de ordem)
+            atualizar_lista(&mut e, &ui);
+            salvar_configuracao(&e);
+        });
+    }
+
+    {
+        let estado = estado.clone();
+        let ui_fraca = ui.as_weak();
+        ui.on_midia_escolhida(move |indice| {
+            let Some(ui) = ui_fraca.upgrade() else {
+                return;
+            };
+            let mut e = estado.borrow_mut();
+            let aba = e.aba_visivel;
+            let Some(pasta) = e.pastas.get_mut(aba) else {
+                return;
+            };
+            pasta.midia = Midia::de_indice(indice.max(0) as usize);
+            // Muda o que a navegação percorre: o que o shuffle já sorteou
+            // pode ter ficado de fora
+            if e.pasta_reproducao == Some(aba) {
+                e.sacola_shuffle.clear();
+                e.sorteio.clear();
+            }
+            desengatilhar(&mut e, &ui);
             atualizar_lista(&mut e, &ui);
             salvar_configuracao(&e);
         });

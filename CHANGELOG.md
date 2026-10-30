@@ -7,6 +7,10 @@ e o projeto adere ao [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Adicionado
+
+- Filtro "Só áudio" / "Só vídeo" no menu de ordenação (modo normal e painel da biblioteca do imersivo), por aba e salvo. Aparece só em abas que têm vídeo; a navegação e o shuffle seguem o filtro.
+
 ### Alterado
 
 - Tela de informações da faixa mais clara: um texto diz o que fazer, o botão virou "Procurar na internet", a confiança aparece em palavras (Certeza, Provável, Talvez) e o resultado escolhido mostra "o que muda" (título, artista, álbum: atual → novo). Os dois botões "Aplicar" / "Aplicar e gravar nas tags" viraram um só, "Usar estes dados", com a caixinha "Também salvar no arquivo" explicada logo abaixo; a escolha fica lembrada.

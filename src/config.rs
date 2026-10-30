@@ -50,6 +50,10 @@ pub struct AppConfig {
     /// Ordem escolhida em cada aba (chave da lista → `Ordem::indice`).
     #[serde(default)]
     pub ordens: HashMap<String, u8>,
+    /// Filtro "só áudio"/"só vídeo" de cada aba (chave da lista →
+    /// `Midia::indice`; ausente = tudo).
+    #[serde(default)]
+    pub midias: HashMap<String, u8>,
     /// Crossfade em segundos (0 = só gapless).
     #[serde(default)]
     pub crossfade: u8,
@@ -118,6 +122,7 @@ impl Default for AppConfig {
             tempo_atual: None,
             fila_shuffle: Vec::new(),
             ordens: HashMap::new(),
+            midias: HashMap::new(),
             crossfade: 0,
             letras_web: true,
             gravar_tags_info: false,

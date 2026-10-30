@@ -119,6 +119,10 @@ pub fn pt_br() -> Translations {
         "o download veio corrompido e foi descartado (nada foi trocado). Tente de novo.",
     );
     t.insert("update_err_permission", "sem permissão para trocar o Furinar em {pasta}. Baixe a versão nova pela página da release.");
+    t.insert("media_label", "Mostrar");
+    t.insert("media_all", "Tudo");
+    t.insert("media_audio", "Só áudio");
+    t.insert("media_video", "Só vídeo");
     t.insert("info_result_one", "1 resultado");
     t.insert(
         "net_timeout",
@@ -390,6 +394,10 @@ pub fn en() -> Translations {
         "the download was corrupted and thrown away (nothing was replaced). Try again.",
     );
     t.insert("update_err_permission", "no permission to replace Furinar in {pasta}. Download the new version from the release page.");
+    t.insert("media_label", "Show");
+    t.insert("media_all", "Everything");
+    t.insert("media_audio", "Audio only");
+    t.insert("media_video", "Video only");
     t.insert("info_result_one", "1 result");
     t.insert(
         "net_timeout",
