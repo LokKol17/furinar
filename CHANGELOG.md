@@ -7,6 +7,10 @@ e o projeto adere ao [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Corrigido
+
+- Letras: o LRCLIB respondia "sobrecarregado" com frequência, principalmente na busca da aba inteira. O Furinar mandava até 5 pedidos por segundo, e o limite dele é ~90 por minuto. Agora espera 0,7 s entre pedidos, respeita o tempo que o servidor pede (`Retry-After`, com uma folga aleatória) e, se ele pede para esperar muito, pausa o LRCLIB em vez de insistir (insistir pode render bloqueio temporário). Os pedidos agora se identificam como o app registrado no LRCLIB, que tem limite maior.
+
 ## [1.12.0] — 2026-10-30
 
 ### Adicionado
