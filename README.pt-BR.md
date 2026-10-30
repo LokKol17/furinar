@@ -47,8 +47,9 @@ A paleta — azul-marinho, ciano e dourado (ou azul-bebê e branco pérola no te
 - **Várias pastas em abas** — navegar entre elas não interrompe o que está tocando
 - Tags ID3/Vorbis/MP4 (título, artista, álbum, número, duração), subpastas opcionais
 - Busca por título e artista, sem ligar para acento e maiúscula
-- **Ordenação por aba**: título, artista, álbum, duração, adicionadas recentemente ou mais tocadas
+- **Ordenação por aba**: título, artista, álbum, duração, adicionadas recentemente ou mais tocadas — e filtro **só áudio / só vídeo** nas abas que têm vídeos
 - **Favoritas** (estrela ou `F`) e **Mais tocadas**, abas fixas que juntam faixas de todas as pastas
+- **Playlists**, cada uma na sua aba: adicione músicas pelo clique direito, pelo `+` que aparece ao passar o mouse na linha ou pelo botão ao lado da estrela na tela cheia; reordene, renomeie e apague. São arquivos `.m3u8` comuns, que outros players abrem, e dá para importar playlists `.m3u`/`.m3u8`
 
 ### Letras
 - `.lrc` ao lado da faixa, rolando com a música — clique numa linha para pular até ela
@@ -91,10 +92,11 @@ Botão de tela cheia, `F11` ou `furinar --imersivo`.
 ### Metadados da web
 Tela de informações da faixa (`I`):
 - Identifica a faixa no [MusicBrainz](https://musicbrainz.org) pelo nome — ou **pelo som**, com o [AcoustID](https://acoustid.org) (a versão oficial já vem com uma chave; dá para usar a sua)
-- Mostra os candidatos com nota de confiança; você aplica o que estiver certo
+- Mostra os candidatos com nota de confiança e o que muda; você escolhe o certo
+- **Edição à mão**: título, artista, álbum, artista do álbum, gênero, ano, faixa e disco, na guia Editar
 - Baixa a capa do [Cover Art Archive](https://coverartarchive.org) quando a faixa e a pasta não têm uma
 - **Indexa a aba inteira**: o que tem 90% de confiança ou mais entra sozinho, o resto fica para você revisar
-- As correções ficam no Furinar. Só vão para as tags dos arquivos se você pedir (com confirmação), e "Restaurar original" desfaz
+- As correções ficam no Furinar. Só vão para as tags dos arquivos se você marcar "Também salvar no arquivo", e "Restaurar original" desfaz
 
 <div align="center">
 
@@ -111,6 +113,7 @@ Tela de informações da faixa (`I`):
 ### Janela
 - **Mini player** (`M`): a janela vira uma barra com capa e controles, sempre por cima no Windows e no X11. No Wayland o app não pode pedir isso; no GNOME, use `Alt+Espaço` → "Sempre no topo"
 - Tema claro e escuro, trocados na hora; português e inglês
+- Dicas nos botões com a tecla de atalho, e avisos rápidos do que acabou de acontecer
 - Barra de título própria, sem moldura nativa (arrastar, Aero Snap)
 
 <div align="center">
@@ -223,8 +226,9 @@ Ficam em `~/.config/furinar/` no Linux e em `%APPDATA%\Furinar` no Windows (ou a
 |---|---|
 | `furinar_config.json` | Pastas, opções, última faixa e posição, contas de scrobble |
 | `furinar_biblioteca.json` | Favoritas e contagem de reproduções |
-| `furinar_metadados.json` | Correções aceitas da web (por cima das tags) |
+| `furinar_metadados.json` | Correções aceitas da web ou feitas à mão (por cima das tags) |
 | `furinar_scrobbles.json` | Escutas esperando internet para serem enviadas |
+| `playlists/` | Suas playlists, um `.m3u8` cada |
 
 Caches (podem ser apagados à vontade) em `~/.cache/furinar/` ou `%LOCALAPPDATA%\furinar\`: miniaturas de capa (até 64 MB), capas e letras baixadas.
 

@@ -47,8 +47,9 @@ The palette — deep navy, cyan, and gold (or baby blue and pearl white in light
 - **Multiple folders as tabs** — switching tabs never interrupts playback
 - ID3/Vorbis/MP4 tags (title, artist, album, number, duration), optional subfolders
 - Search by title and artist, accent- and case-insensitive
-- **Per-tab sorting**: title, artist, album, duration, recently added or most played
+- **Per-tab sorting**: title, artist, album, duration, recently added or most played — plus an **audio only / video only** filter in tabs that have videos
 - **Favorites** (star or `F`) and **Most played**, fixed tabs gathering tracks from every folder
+- **Playlists**, each in its own tab: add songs from the right-click menu, the `+` that shows on a hovered row or the button next to the star in fullscreen; reorder, rename and delete them. They're plain `.m3u8` files that other players open, and `.m3u`/`.m3u8` playlists can be imported
 
 ### Lyrics
 - `.lrc` next to the track, scrolling with the music — click a line to jump there
@@ -91,10 +92,11 @@ Fullscreen button, `F11` or `furinar --imersivo`.
 ### Web metadata
 Track info screen (`I`):
 - Identifies the track on [MusicBrainz](https://musicbrainz.org) by name — or **by sound**, with [AcoustID](https://acoustid.org) (official builds ship with a key; you can use your own)
-- Shows the candidates with a confidence score; you apply the right one
+- Shows the candidates with a confidence score and what would change; you pick the right one
+- **Edit by hand**: title, artist, album, album artist, genre, year, track and disc, in the Edit tab
 - Downloads cover art from the [Cover Art Archive](https://coverartarchive.org) when the track and folder have none
 - **Indexes a whole tab**: matches of 90% or more are applied automatically, the rest waits for your review
-- Fixes stay in Furinar. They only go into your files' tags if you ask (with confirmation), and "Restore original" undoes them
+- Fixes stay in Furinar. They only go into your files' tags if you tick "Also save it to the file", and "Restore original" undoes them
 
 <div align="center">
 
@@ -111,6 +113,7 @@ Track info screen (`I`):
 ### Window
 - **Mini player** (`M`): the window shrinks into a bar with cover and controls, always on top on Windows and X11. On Wayland apps can't request it; on GNOME, use `Alt+Space` → "Always on Top"
 - Light and dark themes, switched instantly; Portuguese and English
+- Tooltips showing each button's keyboard shortcut, and quick notices for what just happened
 - Custom title bar, frameless (drag to move, Aero Snap)
 
 <div align="center">
@@ -223,8 +226,9 @@ Stored in `~/.config/furinar/` on Linux and in `%APPDATA%\Furinar` on Windows (o
 |---|---|
 | `furinar_config.json` | Folders, options, last track and position, scrobbling accounts |
 | `furinar_biblioteca.json` | Favorites and play counts |
-| `furinar_metadados.json` | Fixes accepted from the web (applied over the tags) |
+| `furinar_metadados.json` | Fixes accepted from the web or made by hand (applied over the tags) |
 | `furinar_scrobbles.json` | Listens waiting for a connection to be sent |
+| `playlists/` | Your playlists, one `.m3u8` each |
 
 Caches (safe to delete) live in `~/.cache/furinar/` or `%LOCALAPPDATA%\furinar\`: cover thumbnails (up to 64 MB), downloaded covers and lyrics.
 
